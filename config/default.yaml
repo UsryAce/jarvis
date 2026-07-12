@@ -1,0 +1,139 @@
+# JARVIS Configuration
+# Copy this to config.yaml and modify as needed
+
+nvidia:
+  api_key: ""  # Set via NVIDIA_API_KEY env var
+  api_base: "https://integrate.api.nvidia.com/v1"
+  models:
+    chat:
+      - id: "meta/llama-3.1-70b-instruct"
+        name: "Llama 3.1 70B"
+        context_window: 128000
+        max_output: 4096
+      - id: "meta/llama-3.1-8b-instruct"
+        name: "Llama 3.1 8B"
+        context_window: 128000
+        max_output: 4096
+      - id: "upstage/solar-10.7b-instruct"
+        name: "Solar 10.7B"
+        context_window: 4096
+        max_output: 4096
+      - id: "meta/llama-3.1-405b-instruct"
+        name: "Llama 3.1 405B"
+        context_window: 128000
+        max_output: 4096
+      - id: "z-ai/glm-5.2"
+        name: "GLM-5.2"
+        context_window: 128000
+        max_output: 4096
+      - id: "moonshotai/kimi-k2.6"
+        name: "Kimi K2.6"
+        context_window: 128000
+        max_output: 4096
+      - id: "mistralai/mistral-large"
+        name: "Mistral Large"
+        context_window: 128000
+        max_output: 4096
+      - id: "deepseek-ai/deepseek-coder-6.7b-instruct"
+        name: "DeepSeek Coder 6.7B"
+        context_window: 128000
+        max_output: 4096
+      - id: "microsoft/phi-4-mini-instruct"
+        name: "Phi-4 Mini"
+        context_window: 128000
+        max_output: 4096
+      - id: "writer/palmyra-fin-70b-32k"
+        name: "Palmyra Fin 70B"
+        context_window: 32768
+        max_output: 4096
+    embedding:
+      - id: "nvidia/nv-embedqa-e5-v5"
+        name: "NV-Embed-QA-E5-v5"
+        dimensions: 1024
+      - id: "nvidia/nv-embedqa-mistral-7b-v2"
+        name: "NV-Embed-QA-Mistral-7B-v2"
+        dimensions: 4096
+      - id: "baai/bge-m3"
+        name: "BGE-M3"
+        dimensions: 1024
+    reranking:
+      - id: "nvidia/nv-rerank-qa-mistral-4b-v3"
+        name: "NV-Rerank-QA-Mistral-4B-v3"
+
+jarvis:
+  name: "JARVIS"
+  wake_word: "jarvis"
+  language: "en"
+  response_length: "medium"
+  personality: "professional_witty"
+
+memory:
+  type: "chromadb"
+  path: "./data/memory"
+  collection: "jarvis_memory"
+  embedding_model: "nvidia/nv-embedqa-e5-v5"
+  max_context: 8192
+  similarity_threshold: 0.7
+
+skills:
+  enabled:
+    - "system"
+    - "files"
+    - "web_search"
+    - "code"
+    - "memory"
+    - "weather"
+    - "calculator"
+    - "trading"
+    - "business"
+    - "education"
+    - "design"
+  auto_load: true
+  skill_dir: "src/skills"
+
+voice:
+  tts:
+    engine: "nvidia"
+    voice: "female"
+    speed: 1.0
+    pitch: 1.0
+  stt:
+    engine: "nvidia"
+    language: "en"
+    continuous: false
+  audio:
+    sample_rate: 16000
+    channels: 1
+    chunk_size: 1024
+
+ui:
+  host: "0.0.0.0"
+  port: 8080
+  theme: "dark"
+  enable_voice: true
+  enable_history: true
+  max_history: 100
+
+logging:
+  level: "INFO"
+  file: "./logs/jarvis.log"
+  max_size: "10MB"
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+security:
+  api_key_required: true
+  allowed_origins:
+    - "http://localhost:8080"
+    - "http://127.0.0.1:8080"
+  rate_limit: 100
+
+external_apis:
+  weather: ""
+  news: ""
+  search: ""
+  search_cx: ""
+  alpha_vantage: ""
+  polygon: ""
+  twelve_data: ""
+  finnhub: ""

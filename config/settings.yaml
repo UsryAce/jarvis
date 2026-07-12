@@ -1,0 +1,168 @@
+# Jarvis Configuration
+jarvis:
+  name: "Jarvis"
+  version: "1.0.0"
+  description: "Local AI Assistant with NVIDIA Models"
+  language: "en"
+  wake_word: "jarvis"
+  response_mode: "voice"  # voice, text, both
+
+# NVIDIA API Configuration
+nvidia:
+  api_base: "https://integrate.api.nvidia.com/v1"
+  # Get your API key from https://build.nvidia.com/
+  api_key: "${NVIDIA_API_KEY}"
+  models:
+    # Chat/Completion Models
+    chat:
+      - id: "nvidia/llama-3.1-nemotron-70b-instruct"
+        name: "Nemotron 3 Ultra"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+        description: "NVIDIA's flagship reasoning model"
+      - id: "nvidia/nemotron-3-ultra"
+        name: "Nemotron 3 Ultra"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "meta/llama-3.1-405b-instruct"
+        name: "Llama 3.1 405B"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "meta/llama-3.1-70b-instruct"
+        name: "Llama 3.1 70B"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "z.ai/glm-4.5-air"
+        name: "GLM-4.5 Air"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "z.ai/glm-4.5"
+        name: "GLM-4.5"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "moonshot/kimi-k2-instruct"
+        name: "Kimi K2 Instruct"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "google/gemma-2-27b-it"
+        name: "Gemma 2 27B"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+      - id: "microsoft/phi-3.5-mini-instruct"
+        name: "Phi-3.5 Mini"
+        type: "chat"
+        max_tokens: 4096
+        temperature: 0.7
+    # Embedding Models
+    embedding:
+      - id: "nvidia/nv-embedqa-e5-v5"
+        name: "NV-Embed-QA-E5-v5"
+        type: "embedding"
+        dimensions: 1024
+      - id: "nvidia/embed-qa-4"
+        name: "Embed QA 4"
+        type: "embedding"
+        dimensions: 1024
+    # Reranking Models
+    reranking:
+      - id: "nvidia/nv-rerank-qa-mistral-4b-v3"
+        name: "NV-Rerank-QA-Mistral-4B-v3"
+        type: "reranking"
+    # Vision Models
+    vision:
+      - id: "nvidia/cosmos-1.0-diffusion-7b"
+        name: "Cosmos 1.0 Diffusion 7B"
+        type: "vision"
+      - id: "nvidia/segformer-b5-ade20k"
+        name: "SegFormer B5 ADE20K"
+        type: "vision"
+    # Audio Models
+    audio:
+      - id: "nvidia/canary-1b"
+        name: "Canary 1B"
+        type: "asr"
+        languages: ["en", "es", "fr", "de", "zh", "ja", "ko"]
+      - id: "nvidia/fastpitch-hifigan"
+        name: "FastPitch HiFi-GAN"
+        type: "tts"
+        voices: ["female", "male"]
+
+# Skills Configuration
+skills:
+  enabled:
+    - "system_control"
+    - "file_operations"
+    - "web_search"
+    - "code_execution"
+    - "memory"
+    - "calendar"
+    - "email"
+    - "weather"
+    - "news"
+    - "calculator"
+    - "unit_converter"
+    - "translation"
+    - "summarization"
+    - "image_generation"
+    - "video_generation"
+    - "audio_transcription"
+  auto_load: true
+  skill_dir: "src/skills"
+
+# Voice Configuration
+voice:
+  tts:
+    engine: "nvidia"  # nvidia, edge, system
+    voice: "female"
+    speed: 1.0
+    pitch: 1.0
+    volume: 1.0
+  stt:
+    engine: "nvidia"  # nvidia, whisper, system
+    language: "en"
+    continuous: false
+    wake_word_detection: true
+  audio:
+    sample_rate: 16000
+    channels: 1
+    chunk_size: 1024
+
+# Memory Configuration
+memory:
+  type: "vector"  # vector, sqlite, both
+  vector_db: "chromadb"
+  embedding_model: "nvidia/nv-embedqa-e5-v5"
+  max_context_length: 8192
+  memory_dir: "data/memory"
+
+# Web UI Configuration
+ui:
+  host: "localhost"
+  port: 8080
+  theme: "dark"
+  enable_voice: true
+  enable_chat_history: true
+  max_history: 100
+
+# Logging
+logging:
+  level: "INFO"
+  file: "logs/jarvis.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Security
+security:
+  api_key_required: true
+  allowed_origins:
+    - "http://localhost:8080"
+    - "http://127.0.0.1:8080"
+  rate_limit: 100

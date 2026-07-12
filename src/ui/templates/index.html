@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS - Local AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79b8ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --error: #f85149;
+            --user-msg: #1f6feb;
+            --assistant-msg: #238636;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .logo svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+        }
+
+        .message-content {
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: var(--user-msg);
+            border-bottom-right-radius: 0.25rem;
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .message-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .message-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .message.user .message-avatar {
+            background: var(--user-msg);
+        }
+
+        .message.assistant .message-avatar {
+            background: var(--success);
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 0.5rem 1rem;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 1rem;
+            flex-shrink: 0;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #messageInput {
+            width: 100%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #messageInput:focus {
+            border-color: var(--accent);
+        }
+
+        #messageInput::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .btn {
+            background: var(--accent);
+            border: none;
+            border-radius: 2rem;
+            padding: 0.75rem 1.5rem;
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-icon {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-primary);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0 1.5rem 1rem;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .suggestion {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 1.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .suggestion:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 300px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .skill-item {
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .skill-item:hover {
+            border-color: var(--accent);
+        }
+
+        .skill-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .skill-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media (max-width: 768px) {
+            .message { max-width: 95%; }
+            .sidebar { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+
+    <header>
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            JARVIS
+        </div>
+        <div class="status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="chat-container" id="chatContainer">
+            <!-- Messages will be inserted here -->
+        </div>
+
+        <div class="suggestions" id="suggestions">
+            <div class="suggestion" onclick="sendMessage('What can you do?')">What can you do?</div>
+            <div class="suggestion" onclick="sendMessage('Show system info')">System info</div>
+            <div class="suggestion" onclick="sendMessage('Calculate 15 * 23')">Calculate</div>
+            <div class="suggestion" onclick="sendMessage('Search for Python asyncio')">Web search</div>
+            <div class="suggestion" onclick="sendMessage('Remember my name is Tony')">Remember</div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input type="text" id="messageInput" placeholder="Ask JARVIS anything..." autocomplete="off">
+            </div>
+            <button class="btn" id="sendBtn" onclick="sendMessage()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+            <button class="btn-icon" id="voiceBtn" onclick="toggleVoice()" title="Voice input">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+            </button>
+            <button class="btn-icon" id="sidebarBtn" onclick="toggleSidebar()" title="Skills">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                    <path d="M8 21h8"></path>
+                    <path d="M12 17v4"></path>
+                </svg>
+            </button>
+        </div>
+    </footer>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>Skills</h3>
+            <button class="btn-icon" onclick="toggleSidebar()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="sidebar-content" id="skillsList">
+            Loading skills...
+        </div>
+    </aside>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const skillsList = document.getElementById('skillsList');
+
+        let ws = null;
+        let isStreaming = false;
+
+        // Connect to WebSocket
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                loadSkills();
+            };
+
+            ws.onclose = () => {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected - Reconnecting...';
+                setTimeout(connect, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWSMessage(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWSMessage(data) {
+            if (data.type === 'chunk') {
+                appendStreamChunk(data.content);
+            } else if (data.type === 'done') {
+                finishStreaming();
+            } else if (data.type === 'response') {
+                addMessage('assistant', data.content);
+            } else if (data.type === 'error') {
+                addMessage('assistant', `Error: ${data.content}`, true);
+            }
+        }
+
+        let currentStreamMessage = null;
+
+        function appendStreamChunk(content) {
+            if (!currentStreamMessage) {
+                currentStreamMessage = document.createElement('div');
+                currentStreamMessage.className = 'message assistant';
+                currentStreamMessage.innerHTML = `
+                    <div class="message-meta">
+                        <div class="message-avatar">J</div>
+                        <span>JARVIS</span>
+                    </div>
+                    <div class="message-content"></div>
+                `;
+                chatContainer.appendChild(currentStreamMessage);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            currentStreamMessage.querySelector('.message-content').textContent += content;
+        }
+
+        function finishStreaming() {
+            currentStreamMessage = null;
+        }
+
+        function addMessage(role, content, isError = false) {
+            const message = document.createElement('div');
+            message.className = `message ${role}`;
+
+            const avatar = role === 'user' ? 'U' : 'J';
+            const name = role === 'user' ? 'You' : 'JARVIS';
+
+            message.innerHTML = `
+                <div class="message-meta">
+                    <div class="message-avatar">${avatar}</div>
+                    <span>${name}</span>
+                </div>
+                <div class="message-content${isError ? ' error' : ''}">${escapeHtml(content)}</div>
+            `;
+
+            chatContainer.appendChild(message);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function sendMessage(message = null) {
+            const text = message || messageInput.value.trim();
+            if (!text) return;
+
+            messageInput.value = '';
+            addMessage('user', text);
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ message: text, stream: true }));
+            } else {
+                // Fallback to REST API
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text, stream: false })
+                    });
+                    const data = await response.json();
+                    addMessage('assistant', data.response || data.error);
+                } catch (e) {
+                    addMessage('assistant', 'Failed to send message', true);
+                }
+            }
+        }
+
+        async function loadSkills() {
+            try {
+                const response = await fetch('/api/skills');
+                const data = await response.json();
+                renderSkills(data.skills || []);
+            } catch (e) {
+                skillsList.innerHTML = '<p style="color: var(--text-secondary)">Failed to load skills</p>';
+            }
+        }
+
+        function renderSkills(skills) {
+            if (!skills.length) {
+                skillsList.innerHTML = '<p style="color: var(--text-secondary)">No skills loaded</p>';
+                return;
+            }
+
+            skillsList.innerHTML = skills.map(skill => `
+                <div class="skill-item" onclick="useSkill('${skill}')">
+                    <div class="skill-name">${skill}</div>
+                    <div class="skill-desc">Click to use this skill</div>
+                </div>
+            `).join('');
+        }
+
+        function useSkill(skill) {
+            toggleSidebar();
+            messageInput.value = `/skill ${skill} `;
+            messageInput.focus();
+        }
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+
+        function toggleVoice() {
+            alert('Voice input not yet implemented');
+        }
+
+        // Event listeners
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', () => sendMessage());
+
+        // Initialize
+        connect();
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
