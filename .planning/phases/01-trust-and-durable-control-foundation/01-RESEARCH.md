@@ -519,22 +519,22 @@ Use explicit length prefixes/domain separators so concatenation is unambiguous. 
 | A6 | Serialized one-connection containment is acceptable until SQLite is upgraded. | Summary / Migration | If existing startup creates multiple trust-store connections, runtime upgrade becomes blocking. |
 | A7 | Process-tree hard-stop enforcement is outside Phase 1; Phase 1 reports unconfirmed residue honestly. | Pitfalls | If roadmap interprets estop as OS process-tree kill, add Windows Job Object work or narrow gate fixture. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Will execution upgrade Python/SQLite before enabling WAL?**
    - What we know: installed SQLite 3.45.1 is in the official affected range. `[VERIFIED: environment]` `[CITED: https://sqlite.org/wal.html]`
    - What's unclear: approved runtime upgrade mechanism for this Windows install.
-   - Recommendation: make “fixed SQLite runtime or proven serialized single-connection containment” a pre-implementation checkpoint, not a post-release note.
+   - Resolution: Phase 1 uses one serialized, long-lived `ControlStore` connection with a hard guard against concurrent connections and manual checkpoints, plus verified online backup/restore. A fixed SQLite runtime remains a permitted later upgrade, but is not required when this containment gate passes. Implemented by Plans 01-05 and 01-14.
 
 2. **What is the operator unlock bootstrap channel?**
    - What we know: exact credential format and UX are at agent discretion.
    - What's unclear: whether Ahmed prefers a CLI-generated one-time code, OS-local file, or re-auth prompt.
-   - Recommendation: generate a high-entropy CLI bootstrap value, display it exactly once, store only a password hash/verifier, and rotate it after first unlock. `[ASSUMED]`
+   - Resolution: use a hidden CLI confirmation prompt for an operator-supplied high-entropy unlock value and store only its salted verifier. Jarvis never prints or generates the credential into output, and no bootstrap secret is written to logs, Graphify, Obsidian, or general configuration. Implemented by Plans 01-06 and 01-10. `[ASSUMED]`
 
 3. **How strong must Phase 1 stop descendant processes?**
    - What we know: durable state must persist and later workers must fail closed; current cancellation may not terminate descendants. `[VERIFIED: CONTEXT and repository]`
    - What's unclear: whether the Phase 1 gate includes spawned process-tree termination or only durable prevention of new side effects plus honest residue.
-   - Recommendation: gate durable state and cooperative checks now; surface `partial/unconfirmed` rather than false success, and do not broaden into Phase 2 capability sandboxing without an explicit decision.
+   - Resolution: Phase 1 delivers durable cooperative stop checks and reports `partial/unconfirmed` until termination is observed. Windows Job Object process-tree enforcement is deferred to Phase 2 capability isolation rather than falsely claimed here. Implemented by Plans 01-07 and 01-14.
 
 ## Environment Availability
 
