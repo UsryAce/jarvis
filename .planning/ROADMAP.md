@@ -179,7 +179,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Trust and Durable Control Foundation | 4/14 | In Progress|  |
+| 1. Trust and Durable Control Foundation | 5/14 | In Progress|  |
 | 2. Capability Policy and Execution Isolation | 0/TBD | Not started | - |
 | 3. Project Isolation, Durable Queue, Scheduling, and Recovery | 0/TBD | Not started | - |
 | 4. Planner-Executor-Verifier Runtime | 0/TBD | Not started | - |

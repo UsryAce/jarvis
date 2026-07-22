@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-05
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-07-22T12:25:03.526Z"
-last_activity: 2026-07-22 -- Completed Plan 01-04 DPAPI, ACL, and redaction primitives
+status: Ready for Plan 01-06
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-07-22T12:36:24.413Z"
+last_activity: 2026-07-22 -- Completed Plan 01-05 serialized control store, verified recovery, and transactional audit chain
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 4
-  percent: 29
+  completed_plans: 5
+  percent: 36
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 5 of 14
-Status: Ready for Plan 01-05
-Last activity: 2026-07-22 -- Completed Plan 01-04 DPAPI, ACL, and redaction primitives
+Plan: 6 of 14
+Status: Ready for Plan 01-06
+Last activity: 2026-07-22 -- Completed Plan 01-05 serialized control store, verified recovery, and transactional audit chain
 
-Progress: [███░░░░░░░] 29%
+Progress: [████░░░░░░] 36%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [███░░░░░░░] 29%
 | Phase 01 P02 | 12min | 3 tasks | 7 files |
 | Phase 01 P03 | 12min | 3 tasks | 5 files |
 | Phase 01 P04 | 17min | 3 tasks | 5 files |
+| Phase 01 P05 | 10min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Credential and provider Wave 0 tests activate automatically with downstream production modules. — Import gates keep the current suite green while preserving strict executable contracts for Plans 01-04, 01-08, and 01-09.
 - [Phase 01]: Bind DPAPI envelopes to the protecting Windows SID so cross-identity access fails with a stable non-secret code. — Wrong-user DPAPI and damaged-ciphertext failures need deterministic safe categorization without OS error text.
 - [Phase 01]: Reject unknown and secret-like payload fields before recursively canonicalizing sink values. — Allowlist-first projection prevents arbitrary nested objects from bypassing redaction.
+- [Phase 01]: Keep the authoritative SQLite trust store in serialized single-owner mode across runtime upgrades. — An upgrade must not silently broaden the authority-store topology.
+- [Phase 01]: Confine public recovery candidates to the protected backup directory while allowing only the internally generated atomic-restore sibling. — Recovery stays bounded while verify-before-swap can use an atomic sibling path.
+- [Phase 01]: Use periodic in-database audit checkpoints and backup-bound heads without claiming whole-database rollback detection. — The local chain detects row tampering but is not an external rollback witness.
 
 ### Pending Todos
 
@@ -92,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-22T12:24:57.449Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-07-22T12:36:24.405Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
