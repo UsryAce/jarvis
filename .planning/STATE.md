@@ -20,4 +20,10 @@ progress:
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
+
+## Session Continuity
+
+Last session: 2026-07-22
+Stopped at: Session resumed; approved requirements written, proceeding to roadmap creation
+Resume file: none (structured handoff consumed)
 Last activity: 2026-07-21 — Milestone v1.0 started
