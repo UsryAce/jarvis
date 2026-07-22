@@ -8,6 +8,7 @@ is not a general-purpose connection pool.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import sqlite3
@@ -565,10 +566,25 @@ class ControlStore:
                 checks["integrity"] = True
                 from src.core.audit import AuditService
 
-                AuditService.verify_connection(connection, protector=self.protector)
+                audit_result = AuditService.verify_connection(
+                    connection, protector=self.protector
+                )
                 checks["audit_chain"] = True
                 self._verify_same_user(connection)
                 checks["same_user_protector"] = True
+                if manifest is not None:
+                    if (
+                        manifest.get("verified") is not True
+                        or int(manifest.get("schema_version", -1))
+                        != _MIGRATIONS[-1].version
+                        or int(manifest.get("audit_sequence", -1))
+                        != audit_result.head_sequence
+                        or not hmac.compare_digest(
+                            str(manifest.get("audit_digest", "")),
+                            audit_result.head_digest,
+                        )
+                    ):
+                        raise RestoreVerificationError("backup_manifest_invalid")
             finally:
                 connection.close()
             return RestoreVerificationReport(candidate, all(checks.values()), checks, digest)
