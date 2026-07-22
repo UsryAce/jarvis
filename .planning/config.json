@@ -1,0 +1,9 @@
+{
+  "graphify": {
+    "enabled": true
+  },
+  "workflow": {
+    "use_worktrees": false,
+    "_auto_chain_active": true
+  }
+}
