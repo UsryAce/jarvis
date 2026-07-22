@@ -123,23 +123,75 @@ Roadmap creation maps every v1.0 requirement to exactly one phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTRL-01..06 | Pending roadmap | Pending |
-| AUTO-01..08 | Pending roadmap | Pending |
-| TOOL-01..08 | Pending roadmap | Pending |
-| TEAM-01..06 | Pending roadmap | Pending |
-| KEYS-01..06 | Pending roadmap | Pending |
-| MODL-01..06 | Pending roadmap | Pending |
-| UI-01..05 | Pending roadmap | Pending |
-| VOIC-01..04 | Pending roadmap | Pending |
-| BRAIN-01..07 | Pending roadmap | Pending |
-| INTG-01..03 | Pending roadmap | Pending |
-| OPER-01..04 | Pending roadmap | Pending |
+| CTRL-01 | Phase 1 | Pending |
+| CTRL-02 | Phase 2 | Pending |
+| CTRL-03 | Phase 2 | Pending |
+| CTRL-04 | Phase 1 | Pending |
+| CTRL-05 | Phase 1 | Pending |
+| CTRL-06 | Phase 2 | Pending |
+| AUTO-01 | Phase 4 | Pending |
+| AUTO-02 | Phase 4 | Pending |
+| AUTO-03 | Phase 3 | Pending |
+| AUTO-04 | Phase 4 | Pending |
+| AUTO-05 | Phase 4 | Pending |
+| AUTO-06 | Phase 3 | Pending |
+| AUTO-07 | Phase 3 | Pending |
+| AUTO-08 | Phase 3 | Pending |
+| TOOL-01 | Phase 3 | Pending |
+| TOOL-02 | Phase 3 | Pending |
+| TOOL-03 | Phase 2 | Pending |
+| TOOL-04 | Phase 5 | Pending |
+| TOOL-05 | Phase 2 | Pending |
+| TOOL-06 | Phase 3 | Pending |
+| TOOL-07 | Phase 2 | Pending |
+| TOOL-08 | Phase 3 | Pending |
+| TEAM-01 | Phase 5 | Pending |
+| TEAM-02 | Phase 5 | Pending |
+| TEAM-03 | Phase 5 | Pending |
+| TEAM-04 | Phase 5 | Pending |
+| TEAM-05 | Phase 5 | Pending |
+| TEAM-06 | Phase 5 | Pending |
+| KEYS-01 | Phase 1 | Pending |
+| KEYS-02 | Phase 1 | Pending |
+| KEYS-03 | Phase 1 | Pending |
+| KEYS-04 | Phase 1 | Pending |
+| KEYS-05 | Phase 1 | Pending |
+| KEYS-06 | Phase 1 | Pending |
+| MODL-01 | Phase 6 | Pending |
+| MODL-02 | Phase 6 | Pending |
+| MODL-03 | Phase 6 | Pending |
+| MODL-04 | Phase 6 | Pending |
+| MODL-05 | Phase 6 | Pending |
+| MODL-06 | Phase 6 | Pending |
+| UI-01 | Phase 7 | Pending |
+| UI-02 | Phase 7 | Pending |
+| UI-03 | Phase 7 | Pending |
+| UI-04 | Phase 7 | Pending |
+| UI-05 | Phase 7 | Pending |
+| VOIC-01 | Phase 8 | Pending |
+| VOIC-02 | Phase 8 | Pending |
+| VOIC-03 | Phase 8 | Pending |
+| VOIC-04 | Phase 8 | Pending |
+| BRAIN-01 | Phase 8 | Pending |
+| BRAIN-02 | Phase 8 | Pending |
+| BRAIN-03 | Phase 8 | Pending |
+| BRAIN-04 | Phase 8 | Pending |
+| BRAIN-05 | Phase 8 | Pending |
+| BRAIN-06 | Phase 8 | Pending |
+| BRAIN-07 | Phase 8 | Pending |
+| INTG-01 | Phase 9 | Pending |
+| INTG-02 | Phase 9 | Pending |
+| INTG-03 | Phase 9 | Pending |
+| OPER-01 | Phase 9 | Pending |
+| OPER-02 | Phase 9 | Pending |
+| OPER-03 | Phase 9 | Pending |
+| OPER-04 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 63 total
-- Mapped to phases: 0
-- Unmapped: 63
+- Mapped to phases: 63
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-22*  
-*Last updated: 2026-07-22 after approved milestone scoping and Brain integration addition*
+*Last updated: 2026-07-22 after v1.0 roadmap creation and traceability mapping*
