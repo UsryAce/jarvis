@@ -47,12 +47,12 @@
 
 ### Credentials and API Keys
 
-- [ ] **KEYS-01**: Ahmed can add a provider API key through a protected dashboard flow without exposing it after submission.
-- [ ] **KEYS-02**: Jarvis encrypts keys with current-user Windows DPAPI and never stores raw keys in frontend state, logs, prompts, Graphify, Obsidian, Chroma, or general configuration.
-- [ ] **KEYS-03**: Ahmed can name, validate, prioritize, drain, disable, rotate, and revoke individual keys.
-- [ ] **KEYS-04**: Jarvis displays only masked identifiers and non-secret provider, status, health, quota, and usage metadata.
-- [ ] **KEYS-05**: Key rotation follows add, validate, promote, drain, and revoke while atomically invalidating affected clients and caches.
-- [ ] **KEYS-06**: Credentials are resolved from opaque handles only immediately before an authorized provider request.
+- [x] **KEYS-01**: Ahmed can add a provider API key through a protected dashboard flow without exposing it after submission.
+- [x] **KEYS-02**: Jarvis encrypts keys with current-user Windows DPAPI and never stores raw keys in frontend state, logs, prompts, Graphify, Obsidian, Chroma, or general configuration.
+- [x] **KEYS-03**: Ahmed can name, validate, prioritize, drain, disable, rotate, and revoke individual keys.
+- [x] **KEYS-04**: Jarvis displays only masked identifiers and non-secret provider, status, health, quota, and usage metadata.
+- [x] **KEYS-05**: Key rotation follows add, validate, promote, drain, and revoke while atomically invalidating affected clients and caches.
+- [x] **KEYS-06**: Credentials are resolved from opaque handles only immediately before an authorized provider request.
 
 ### Models and Provider Resilience
 
@@ -151,12 +151,12 @@ Roadmap creation maps every v1.0 requirement to exactly one phase.
 | TEAM-04 | Phase 5 | Pending |
 | TEAM-05 | Phase 5 | Pending |
 | TEAM-06 | Phase 5 | Pending |
-| KEYS-01 | Phase 1 | Pending |
-| KEYS-02 | Phase 1 | Pending |
-| KEYS-03 | Phase 1 | Pending |
-| KEYS-04 | Phase 1 | Pending |
-| KEYS-05 | Phase 1 | Pending |
-| KEYS-06 | Phase 1 | Pending |
+| KEYS-01 | Phase 1 | Complete |
+| KEYS-02 | Phase 1 | Complete |
+| KEYS-03 | Phase 1 | Complete |
+| KEYS-04 | Phase 1 | Complete |
+| KEYS-05 | Phase 1 | Complete |
+| KEYS-06 | Phase 1 | Complete |
 | MODL-01 | Phase 6 | Pending |
 | MODL-02 | Phase 6 | Pending |
 | MODL-03 | Phase 6 | Pending |
