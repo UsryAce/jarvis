@@ -732,7 +732,10 @@ class ControlStore:
             raise RestoreVerificationError("restore_wrong_identity")
         from src.core.audit import AuditService
 
-        AuditService.unprotect_key(self.protector, bytes(row["protected_key"]), owner_sid)
+        key = AuditService.unprotect_key(
+            self.protector, bytes(row["protected_key"]), owner_sid
+        )
+        key[:] = b"\x00" * len(key)
 
     def _owner_sid(self) -> str:
         owner_sid = getattr(self.protector, "owner_sid", None)
