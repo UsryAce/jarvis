@@ -1,79 +1,46 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-21T22:17:28.436Z",
-  "phase": null,
-  "phase_name": "Milestone requirements and roadmap",
-  "phase_dir": null,
-  "plan": null,
-  "task": 3,
-  "total_tasks": 5,
+  "timestamp": "2026-07-22T06:27:05.026Z",
+  "phase": "1",
+  "phase_name": "Trust and Durable Control Foundation",
+  "phase_dir": ".planning/phases/01-trust-and-durable-control-foundation",
+  "plan": 2,
+  "task": 1,
+  "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
     {
-      "id": 1,
-      "name": "Initialize v1.0 Autonomous Jarvis Agent Platform milestone",
+      "id": "01-01",
+      "name": "Verify pywin32 312 package legitimacy",
       "status": "done",
-      "commit": "8e612a7"
-    },
-    {
-      "id": 2,
-      "name": "Research stack, features, architecture, and pitfalls",
-      "status": "done",
-      "commit": "f40408f"
-    },
-    {
-      "id": 3,
-      "name": "Define milestone requirements",
-      "status": "in_progress",
-      "progress": "Full requirements were presented and Ahmed approved them. Add explicit Codex-and-Jarvis Graphify/Obsidian retrieval requirements before authoring REQUIREMENTS.md."
+      "commit": "5567fdd"
     }
   ],
   "remaining_tasks": [
+    {"id": "01-02", "name": "Create authentication, durable control, audit, and trust-store test contracts", "status": "not_started"},
+    {"id": "01-03..01-14", "name": "Complete remaining Phase 1 waves", "status": "not_started"},
+    {"id": "phases-2..9", "name": "Discuss, plan, execute, review, and verify remaining roadmap phases", "status": "not_started"}
+  ],
+  "blockers": [
     {
-      "id": 3,
-      "name": "Write and commit approved REQUIREMENTS.md with dual Brain integration",
-      "status": "in_progress"
-    },
-    {
-      "id": 4,
-      "name": "Create, review, approve, and commit the nine-phase roadmap",
-      "status": "not_started"
-    },
-    {
-      "id": 5,
-      "name": "Resume autonomous phase planning and implementation",
-      "status": "not_started"
+      "description": "The active Codex workspace roots do not include C:/Users/Usry/OneDrive/Desktop/Jarvis. Subagents can read the repository but managed filesystem permissions stall every edit, so parallel execution cannot make progress safely.",
+      "type": "human_action",
+      "workaround": "Open C:/Users/Usry/OneDrive/Desktop/Jarvis as the active Codex workspace, then resume."
     }
   ],
-  "blockers": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {
+      "action": "Open the Jarvis repository folder as the active Codex workspace and say continue.",
+      "context": "This grants normal workspace write/test permissions to executor agents without per-edit approval stalls.",
+      "blocking": true
+    }
+  ],
   "decisions": [
-    {
-      "decision": "Use one FastAPI control plane backed by normalized SQLite/WAL and bounded artifacts",
-      "rationale": "Matches the single-host Windows deployment while providing durable state, leases, replayable events, and recovery.",
-      "phase": null
-    },
-    {
-      "decision": "Use current-user Windows DPAPI via pywin32 for API keys",
-      "rationale": "Keeps multiple provider credentials backend-only and supports secure lifecycle management without browser storage.",
-      "phase": null
-    },
-    {
-      "decision": "Require capability policy, exact approvals, isolated Git worktrees, and independent verification",
-      "rationale": "Powerful autonomous tools need deterministic authority, reversible mutation boundaries, and evidence-gated completion.",
-      "phase": null
-    },
-    {
-      "decision": "Connect both Jarvis and coding agents to Graphify and Obsidian through retrieval-first context packs",
-      "rationale": "Targeted graph and vault retrieval should replace repeated broad repository scans, reducing token use while preserving provenance and freshness checks.",
-      "phase": null
-    }
+    {"decision": "Use GSD autonomous execution with sequential shared-checkout agents for Phase 1.", "rationale": "Codex automatic worktree isolation is unsupported and was disabled in .planning/config.json.", "phase": "1"},
+    {"decision": "Use the compact Brain protocol.", "rationale": "Agents read AGENTS.md, current phase context, one assigned plan, at most three exact-term vault hits, and targeted graph/source excerpts.", "phase": "1"},
+    {"decision": "Disable unused broad plugins while retaining browser verification.", "rationale": "Reduces recurring tool-schema context cost without removing Phase 1/dashboard browser capability.", "phase": "1"}
   ],
-  "uncommitted_files": [
-    ".planning/config.json",
-    ".planning/graphs/",
-    ".planning/research/.cache/"
-  ],
-  "next_action": "Run $gsd-resume-work, add dual Brain retrieval/update requirements, author REQUIREMENTS.md, then generate the nine-phase roadmap.",
-  "context_notes": "Ahmed approved the proposed v1.0 requirements and paused for sleep. Tomorrow continue without repeating research. Brain integration must provide compact project-context endpoints/commands for Jarvis, Codex, Claude, Cursor, OpenCode, Gemini, and Copilot; retrieve before broad scans; report graph/vault freshness; cite source paths/commits; project only verified redacted outcomes; never store secrets."
+  "uncommitted_files": [],
+  "next_action": "From a Codex task whose workspace root is C:/Users/Usry/OneDrive/Desktop/Jarvis, run $gsd-resume-work and then continue $gsd-autonomous from Phase 1 Plan 01-02.",
+  "context_notes": "Plan 01-01 is complete and committed. pywin32 312 is installed from the verified CPython 3.11 x64 wheel. Two Plan 01-02 executor attempts were not made; one executor attempt stalled before any edit or commit and disk checks confirmed every owned test file and summary remained absent. Do not redispatch until Jarvis is a writable workspace root."
 }
