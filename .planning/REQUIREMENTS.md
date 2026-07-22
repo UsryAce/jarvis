@@ -7,11 +7,11 @@
 
 ### Security and Operator Control
 
-- [ ] **CTRL-01**: Ahmed can authenticate to every privileged local REST, SSE, WebSocket, and audio API.
+- [x] **CTRL-01**: Ahmed can authenticate to every privileged local REST, SSE, WebSocket, and audio API.
 - [ ] **CTRL-02**: Jarvis evaluates every tool request through a deterministic allow, ask, or deny capability policy.
 - [ ] **CTRL-03**: An approval binds to exact resolved arguments, expires, is single-use, and becomes invalid if the request changes.
-- [ ] **CTRL-04**: Ahmed can pause, cancel, or emergency-stop a run from an authoritative backend control.
-- [ ] **CTRL-05**: Jarvis records a redacted, tamper-evident audit event for every consequential command, decision, approval, action, and result.
+- [x] **CTRL-04**: Ahmed can pause, cancel, or emergency-stop a run from an authoritative backend control.
+- [x] **CTRL-05**: Jarvis records a redacted, tamper-evident audit event for every consequential command, decision, approval, action, and result.
 - [ ] **CTRL-06**: High-impact tools enforce canonical project boundaries, minimal environment inheritance, output limits, timeouts, and cancellation.
 
 ### Durable Autonomy
@@ -123,11 +123,11 @@ Roadmap creation maps every v1.0 requirement to exactly one phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTRL-01 | Phase 1 | Pending |
+| CTRL-01 | Phase 1 | Complete |
 | CTRL-02 | Phase 2 | Pending |
 | CTRL-03 | Phase 2 | Pending |
-| CTRL-04 | Phase 1 | Pending |
-| CTRL-05 | Phase 1 | Pending |
+| CTRL-04 | Phase 1 | Complete |
+| CTRL-05 | Phase 1 | Complete |
 | CTRL-06 | Phase 2 | Pending |
 | AUTO-01 | Phase 4 | Pending |
 | AUTO-02 | Phase 4 | Pending |
@@ -188,6 +188,7 @@ Roadmap creation maps every v1.0 requirement to exactly one phase.
 | OPER-04 | Phase 9 | Pending |
 
 **Coverage:**
+
 - v1.0 requirements: 63 total
 - Mapped to phases: 63
 - Unmapped: 0
