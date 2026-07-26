@@ -6,6 +6,7 @@ import { useHomeStore } from './store/useHomeStore'
 import { useSystemStore } from './store/useSystemStore'
 import { TrustBoundary } from './components/trust/TrustBoundary'
 
+const ExactClaudeDesign = lazy(() => import('./pages/ExactClaudeDesign'))
 const VoiceChat = lazy(() => import('./pages/VoiceChat').then(module => ({ default: module.VoiceChat })))
 const HolographicView = lazy(() => import('./pages/HolographicView').then(module => ({ default: module.HolographicView })))
 const VisionDemo = lazy(() => import('./pages/VisionDemo').then(module => ({ default: module.VisionDemo })))
@@ -73,7 +74,8 @@ function ProtectedApplication() {
       <main className="main-content">
         <Suspense fallback={routeFallback}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<ExactClaudeDesign />} />
+            <Route path="/legacy" element={<Dashboard />} />
             <Route path="/voice" element={<VoiceChat />} />
             <Route path="/holographic" element={<HolographicView />} />
             <Route path="/vision" element={<VisionDemo />} />
