@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-10
-stopped_at: Completed 01-09 and 01-12 plans
-last_updated: "2026-07-26T02:26:53.074Z"
-last_activity: 2026-07-26 -- Completed Plans 01-09 provider leases and 01-12 protected trust controls
+status: Ready for Plan 01-14
+stopped_at: Completed 01-10 and 01-13 plans
+last_updated: "2026-07-26T02:55:29.046Z"
+last_activity: 2026-07-26 -- Completed Plans 01-10 secure cutover and 01-13 dashboard trust integration
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 11
-  percent: 79
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 10 of 14
-Status: Ready for Plan 01-10
-Last activity: 2026-07-26 -- Completed Plans 01-09 provider leases and 01-12 protected trust controls
+Plan: 14 of 14
+Status: Ready for Plan 01-14
+Last activity: 2026-07-26 -- Completed Plans 01-10 secure cutover and 01-13 dashboard trust integration
 
-Progress: [████████░░] 79%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -62,6 +62,8 @@ Progress: [████████░░] 79%
 | Phase 01 P08 | 15min | 3 tasks | 4 files |
 | Phase 01 P09 | 17min | 3 tasks | 6 files |
 | Phase 01 P12 | 20min | 3 tasks | 6 files |
+| Phase 01 P10 | 22min | 3 tasks | 7 files |
+| Phase 01 P13 | 22min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -97,6 +99,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Control and credential mutations retain prior authoritative metadata while submitting and accept only greater backend revisions, versions, or generations.
 - [Phase 01]: Credential API payloads are projected through a local allowlist before rendering so backend envelope differences cannot expose arbitrary fields.
 - [Phase 01]: The existing dashboard key-manager control is intercepted inside the owned trust boundary, avoiding changes to the validated dashboard module.
+- [Phase 01]: Persist the operator bootstrap verifier in the trust database and hydrate it before unlock. — Operator unlock must survive a protected backend restart without storing plaintext.
+- [Phase 01]: Treat provider cutover records as the authoritative no-fallback boundary. — A successful protected promotion must prevent legacy configuration from reintroducing plaintext.
+- [Phase 01]: Clear inherited NVIDIA state before the supervisor starts the protected process. — Cutover is complete only after a sanitized current-user restart.
+- [Phase 01]: Keep credential-manager ownership inside TrustBoundary. — Session expiry must unmount protected credential controls and restore focus safely.
+- [Phase 01]: Treat cancel responses as transitional evidence rather than terminal runtime proof. — Only later authoritative backend reads may replace displayed agent and swarm state.
+- [Phase 01]: Scope trust layout rules to protected dashboard and voice roots. — Unrelated routes retain their established visual system.
 
 ### Pending Todos
 
@@ -115,6 +123,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-26T02:25:35.198Z
-Stopped at: Completed 01-09 and 01-12 plans
+Last session: 2026-07-26T02:55:29.035Z
+Stopped at: Completed 01-10 and 01-13 plans
 Resume file: None
