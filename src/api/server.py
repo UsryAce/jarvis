@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from src.core.jarvis import Jarvis
 from src.clients.nvidia_client import NVIDIAClient
+from src.clients.credential_validation import validate_nvidia_credential
 from src.config import config
 from src.api.auth_routes import router as auth_router
 from src.api.control_routes import router as control_router
@@ -87,6 +88,7 @@ async def lifespan(app: FastAPI):
             protector=store.protector,
             audit_service=audit_service,
             clock=app.state.session_clock,
+            validator=validate_nvidia_credential,
         )
         control_service = ControlService(
             store, audit_service=audit_service, clock=app.state.session_clock
@@ -587,8 +589,10 @@ async def status():
 async def models():
     """Return the live NVIDIA model catalog available to this API key."""
     try:
-        async with NVIDIAClient() as client:
-            catalog = await client.list_models()
+        if jarvis is None:
+            raise ValueError("provider_runtime_unavailable")
+        client = await jarvis._require_provider_client()
+        catalog = await client.list_models()
         items = catalog.get("data", [])
         return {"models": items, "count": len(items), "provider": "nvidia"}
     except ValueError as exc:
@@ -601,8 +605,10 @@ async def models():
 async def openai_compatible_models():
     """Expose the live catalog using the OpenAI-compatible NVIDIA schema."""
     try:
-        async with NVIDIAClient() as client:
-            return await client.list_models()
+        if jarvis is None:
+            raise ValueError("provider_runtime_unavailable")
+        client = await jarvis._require_provider_client()
+        return await client.list_models()
     except ValueError as exc:
         raise HTTPException(status_code=503, detail="NVIDIA model catalog is unavailable") from exc
     except Exception as exc:
@@ -1000,6 +1006,7 @@ def _install_security(
             protector=store.protector,
             audit_service=audit_service,
             clock=clock,
+            validator=validate_nvidia_credential,
         )
         application.state.control_service = ControlService(
             store, audit_service=audit_service, clock=clock
