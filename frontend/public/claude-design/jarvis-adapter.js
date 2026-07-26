@@ -64,7 +64,7 @@
   /* Endpoints the adapter will call. Rename here only — the UI never sees URLs. */
   var EXPECTED_ENDPOINTS = {
     snapshot: '/api/ui/snapshot',      // GET  → Snapshot (whole view model)
-    stream: '/ws/ui',                  // WS   → { type:'patch', path:'agent', value:{...} }
+    stream: '/ws/ui',                  // WS   → { type:'snapshot', value:Snapshot }
     screen: '/api/ui/screen/{key}',    // GET  → Screen (lazy, per tab)
     viz: '/api/ui/viz/{key}',          // GET  → Viz
     command: '/api/ui/command',        // POST { action, payload } → { ok, message }
@@ -199,7 +199,7 @@
      so the UI can flip a panel to DEMO instead of showing stale numbers. */
   function connect(opts) {
     opts = opts || {};
-    var base = (opts.baseUrl || '').replace(/\/$/, '');
+    var base = (opts.baseUrl || (window.location && window.location.origin) || '').replace(/\/$/, '');
     var pollMs = Math.max(500, opts.pollMs || 2000);
     var onChange = opts.onChange || function () { };
     var alive = true, ws = null, timer = null, failures = 0;
@@ -222,7 +222,7 @@
 
     function poll() {
       if (!alive || !base) return;
-      fetch(base + EXPECTED_ENDPOINTS.snapshot, { headers: { accept: 'application/json' } })
+      fetch(base + EXPECTED_ENDPOINTS.snapshot, { credentials: 'same-origin', headers: { accept: 'application/json' } })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(accept)
         .catch(function (e) { fail(e.message || e); });
@@ -246,14 +246,43 @@
     if (base) { poll(); openWs(); timer = setInterval(poll, pollMs); }
     else onChange(null, meta({ error: 'no baseUrl configured — running on demo data' }));
 
+    function securePost(path, body) {
+      return fetch(base + '/api/auth/session', {
+        credentials: 'same-origin', headers: { accept: 'application/json' }
+      }).then(function (sessionResponse) {
+        if (!sessionResponse.ok) throw new Error('Authentication required (HTTP ' + sessionResponse.status + ')');
+        return sessionResponse.json();
+      }).then(function (session) {
+        return fetch(base + path, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'content-type': 'application/json', 'X-Jarvis-CSRF': session.csrf_token },
+          body: JSON.stringify(body)
+        });
+      }).then(function (r) {
+        return r.json().then(function (body) {
+          if (!r.ok) return { ok: false, message: body.detail || body.code || ('HTTP ' + r.status) };
+          return Object.assign({ ok: true }, body);
+        });
+      }).catch(function (e) { return { ok: false, message: String(e && e.message || e) }; });
+    }
+
     return {
       dispose: function () { alive = false; clearInterval(timer); if (ws) try { ws.close(); } catch (e) { } },
       command: function (action, payload) {
         if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
-        return fetch(base + EXPECTED_ENDPOINTS.command, {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ action: action, payload: payload || null })
-        }).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, message: String(e) }; });
+        return securePost(EXPECTED_ENDPOINTS.command, { action: action, payload: payload || null });
+      },
+      emergencyStop: function () {
+        if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
+        return fetch(base + '/api/control', {
+          credentials: 'same-origin', headers: { accept: 'application/json' }
+        }).then(function (r) { if (!r.ok) throw new Error('Control state unavailable'); return r.json(); })
+          .then(function (control) {
+            return securePost('/api/control/emergency-stop', {
+              scope_type: 'global', scope_id: 'global', expected_revision: control.revision,
+              client_request_id: 'dashboard-' + Date.now(), reason_code: 'dashboard_emergency_stop'
+            });
+          }).catch(function (e) { return { ok: false, message: String(e && e.message || e) }; });
       }
     };
   }

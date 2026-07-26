@@ -207,7 +207,7 @@
           <sc-for list="{{ providers }}" as="p" hint-placeholder-count="6">
             <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
               <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8FA8B6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#7CFFE6">ONLINE</div>
+              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ p.col }}">{{ p.status }}</div>
               <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#3F5B69">{{ p.ms }}</div>
             </div>
           </sc-for>
@@ -858,7 +858,13 @@ class Component extends DCLogic {
     this.store = A.connect({
       baseUrl: this.props.forceDemo === true ? '' : (this.props.apiBase ?? ''),
       pollMs: this.props.pollMs ?? 2000,
-      onChange: (snap, meta)=> this.setState({live:snap, meta:meta})
+      onChange: (snap, meta)=> this.setState(s=>({
+        live:snap, meta:meta,
+        auto:snap && snap.router ? snap.router.auto : s.auto,
+        model:snap && snap.router && snap.router.primary ? snap.router.primary : s.model,
+        mic:snap && snap.voice ? snap.voice.armed : s.mic,
+        held:snap && snap.agent ? snap.agent.held : s.held
+      }))
     });
   }
 
@@ -1330,15 +1336,26 @@ class Component extends DCLogic {
     this.toastT = setTimeout(()=> this.setState({toastOn:false}), 3600);
   }
   go(tab){ return ()=> this.setState({tab}); }
+  runCommand(action, payload, localUpdate){
+    if (!this.store){ this.toast('Backend connection is not ready'); return Promise.resolve(false); }
+    return this.store.command(action, payload || {}).then((result)=>{
+      this.toast((result && result.message) || (result && result.ok ? 'Command completed' : 'Command failed'));
+      if (result && result.ok){
+        if (localUpdate) localUpdate(result);
+        setTimeout(()=>this.connectBackend(), 150);
+        return true;
+      }
+      return false;
+    });
+  }
   send = ()=>{
     const d = this.state.draft.trim(); if (!d) return;
     const time = new Date().toTimeString().slice(0,8);
     this.setState(s=>({draft:'', extra:s.extra.concat([[time,'AHMED','typed',CY,d]])}));
-    clearTimeout(this.streamT);
-    this.streamT = setTimeout(()=>{
+    this.runCommand('submit_goal', {goal:d, model:this.state.auto?'auto':this.state.model}, (result)=>{
       const t2 = new Date().toTimeString().slice(0,8);
-      this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS','auto-routed · glm-5.2 · 2.1s · 1,120 tok',TE,'Logged as a goal, decomposed into a plan, and queued behind the current mission. Nothing outside the approved workspace runs without your confirmation.']])}));
-    }, 1800);
+      this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS',result.runId||'queued',TE,result.message||'Goal accepted by the durable agent runtime.']])}));
+    });
   };
 
   renderVals(){
@@ -1395,22 +1412,22 @@ class Component extends DCLogic {
       route: s.auto ? 'AUTO → '+s.model : s.model,
       routeSub: 'NVIDIA NIM API · GLM 5.2 PRIMARY',
       autoLabel: s.auto ? 'AUTO ON' : 'AUTO OFF',
-      toggleAuto: ()=> this.setState({auto:!s.auto}),
+      toggleAuto: ()=> this.runCommand('set_auto_mode',{enabled:!s.auto},()=>this.setState({auto:!s.auto})),
       model: s.model,
       modelOptions: council.map(c=>c[1]),
-      setModel: (e)=> this.setState({model:e.target.value}),
-      refresh: ()=> this.toast('Model catalogue refreshed · 29 models across 6 providers'),
+      setModel: (e)=> { const model=e.target.value; this.runCommand('set_primary_model',{model},()=>this.setState({model})); },
+      refresh: ()=> this.runCommand('refresh_catalog',{}),
       notifyKeys: ()=> this.toast('API keys stay in the local vault — never rendered in this view'),
-      estop: ()=> { this.setState({held:true, st:'paused'}); this.toast('EMERGENCY STOP · all agent execution suspended'); },
+      estop: ()=> { if (!this.store || !this.store.emergencyStop) return this.toast('Control plane is not connected'); this.store.emergencyStop().then(result=>{ this.toast(result.message||result.code||(result.ok?'Emergency stop applied':'Emergency stop failed')); if(result.ok) this.setState({held:true,st:'paused'}); }); },
       council: council.map(c=>({
         name:c[0], id:c[1], n:c[2], col:c[3],
         bd: s.model===c[1] ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: s.model===c[1] ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
-        pick: ()=> { this.setState({model:c[1]}); this.toast('Primary route set to '+c[1]); }
+        pick: ()=> this.runCommand('set_primary_model',{model:c[1]},()=>this.setState({model:c[1]}))
       })),
       providers: [
-        {name:'GLM', ms:'118 ms'},{name:'DEEPSEEK', ms:'134 ms'},{name:'META', ms:'96 ms'},
-        {name:'OPENAI', ms:'128 ms'},{name:'MISTRAL', ms:'115 ms'},{name:'KIMI', ms:'165 ms'}
+        {name:'GLM', status:'ONLINE', col:TE, ms:'118 ms'},{name:'DEEPSEEK', status:'ONLINE', col:TE, ms:'134 ms'},{name:'META', status:'ONLINE', col:TE, ms:'96 ms'},
+        {name:'OPENAI', status:'ONLINE', col:TE, ms:'128 ms'},{name:'MISTRAL', status:'ONLINE', col:TE, ms:'115 ms'},{name:'KIMI', status:'ONLINE', col:TE, ms:'165 ms'}
       ],
       flow: [
         {name:'UI INTERFACE', state:'ONLINE', col:TE},{name:'AGENT CORE', state:'ARMED', col:col},
@@ -1437,8 +1454,8 @@ class Component extends DCLogic {
         {k:'MESSAGES', v:String(4 + s.extra.length)}
       ],
       viewSession: ()=> this.toast('Session transcript, tool calls, and costs opened in the audit drawer'),
-      quick: ['SYSTEM SCAN','BROWSER OPEN','NOTE CAPTURE','FILE SEARCH','CODE EXECUTOR','VOICE TEST']
-        .map(q=>({label:q, go:()=> this.toast(q+' queued · demo environment, nothing executes')})),
+      quick: ['SYSTEM SCAN','BROWSER','NOTES','FILES','CODE','VOICE']
+        .map(q=>({label:q, go:q==='SYSTEM SCAN'?()=>this.runCommand('system_scan',{}):this.go(q)})),
       panelTitle: panel[0],
       panelChips: panel[2].map(c=>({label:c, go:()=> this.toast(c+' · '+panel[0])})),
       rows: rowsRaw.map(r=>({time:r[0], who:r[1], meta:r[2], col:r[3], text:r[4]})),
@@ -1448,7 +1465,7 @@ class Component extends DCLogic {
       send: this.send,
       voiceState: s.mic ? 'ARMED' : 'DISARMED',
       voiceBtns: [
-        {label: s.mic?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>{ this.setState({mic:!s.mic}); this.toast(s.mic?'Voice channel disarmed':'Voice channel armed'); }},
+        {label: s.mic?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
         {label:'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:()=> this.toast('Push-to-talk held · capturing 6s window')},
         {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=> this.toast('Input level -18 dBFS · noise floor clean')}
       ],
@@ -1505,12 +1522,12 @@ class Component extends DCLogic {
         {who:'JARVIS', col:TE, text:'Systems nominal. GLM 5.2 is primary and auto-routing is on. Deploy gate is still blocking mission MERIDIAN — say "approve deploy" to release it.'}
       ],
       voiceControls: [
-        {label: s.mic?'DISARM VOICE':'ARM VOICE', dot: s.mic?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>{ this.setState({mic:!s.mic}); this.toast(s.mic?'Voice channel disarmed':'Voice channel armed'); }},
+        {label: s.mic?'DISARM VOICE':'ARM VOICE', dot: s.mic?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
         {label:'PUSH TO TALK', dot:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:()=> this.toast('Push-to-talk held · capturing 6s window')},
         {label:'FREE TALKING', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.toast('Free talking off in this demo · barge-in would stay armed')},
         {label:'CLAP WAKE', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.toast('Clap wake listening for a double transient')},
         {label:'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=> this.toast('Voice profile: en-GB male · 168 wpm')},
-        {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=> this.setState({auto:!s.auto})},
+        {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=>this.runCommand('set_auto_mode',{enabled:!s.auto},()=>this.setState({auto:!s.auto}))},
         {label:'SWARM · 6 AGENTS', dot:col, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:this.go('AGENTS')}
       ],
       toast: s.toast, toastOpacity: s.toastOn ? 1 : 0,
@@ -1523,7 +1540,7 @@ class Component extends DCLogic {
       sourceDetail: s.live
         ? ((s.meta && s.meta.transport ? s.meta.transport.toUpperCase() : 'POLL') + ' · ' + (this.props.apiBase ?? ''))
         : ((s.meta && s.meta.error) ? String(s.meta.error).slice(0,64) : 'no backend attached'),
-      reconnect: ()=> { this.connectBackend(); this.toast('Reconnecting to ' + ((this.props.apiBase ?? '') || 'no endpoint configured')); }
+      reconnect: ()=> { this.connectBackend(); this.toast('Reconnecting to ' + ((this.props.apiBase ?? '') || window.location.origin)); }
     };
     if (s.live) this.applyLive(out, s.live);
     return out;
@@ -1568,10 +1585,14 @@ class Component extends DCLogic {
         col: m.health === 'healthy' ? TE : m.health === 'degraded' ? AM : m.health === 'down' ? RD : DIM,
         bd: out.model===m.id ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: out.model===m.id ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
-        pick: ()=> { this.setState({model:m.id}); this.toast('Primary route set to '+m.id); }
+        pick: ()=> this.runCommand('set_primary_model',{model:m.id},()=>this.setState({model:m.id}))
       }));
     }
-    if (L.providers.length) out.providers = L.providers.map(p=>({name:p.name.toUpperCase(), ms:p.latencyMs+' ms'}));
+    if (L.providers.length) out.providers = L.providers.map(p=>({
+      name:p.name.toUpperCase(), status:p.status.toUpperCase(),
+      col:p.status==='healthy'?TE:p.status==='degraded'?AM:p.status==='down'?RD:DIM,
+      ms:p.latencyMs ? p.latencyMs+' ms' : 'latency not probed'
+    }));
     if (L.voice){
       out.voiceState = L.voice.armed ? 'ARMED' : 'DISARMED';
       out.sens = L.voice.sensitivity + ' / 10';

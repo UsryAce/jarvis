@@ -24,6 +24,7 @@ from src.api.auth_routes import router as auth_router
 from src.api.control_routes import router as control_router
 from src.api.credential_routes import router as credential_router
 from src.api.dashboard_routes import router as dashboard_router
+from src.api.ui_routes import router as ui_router, stream_router as ui_stream_router
 from src.core.audit import AuditService
 from src.core.control import ControlService
 from src.core.control_store import ControlStore
@@ -135,6 +136,8 @@ app.include_router(auth_router)
 app.include_router(control_router)
 app.include_router(credential_router)
 app.include_router(dashboard_router)
+app.include_router(ui_router)
+app.include_router(ui_stream_router)
 
 
 class ChatRequest(BaseModel):
@@ -944,9 +947,11 @@ def _route_policy(path: str, methods: set[str]) -> RoutePolicy:
         "POST" in methods and path == "/api/auth/unlock"
     ):
         return RoutePolicy(public=True)
-    long_lived = path == "/ws" or path == "/api/chat" or "synthesize-stream" in path
+    long_lived = path in {"/ws", "/ws/ui"} or path == "/api/chat" or "synthesize-stream" in path
     if path == "/ws" or "/voice/" in path or "/nvidia/speech/" in path or path == "/api/tts":
         scope = VOICE_USE
+    elif path == "/ws/ui":
+        scope = OPERATOR_READ
     elif path.startswith("/api/keys") or path.startswith("/api/credentials"):
         scope = SECRETS_ADMIN
     elif "emergency" in path:
