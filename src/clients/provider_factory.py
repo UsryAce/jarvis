@@ -372,6 +372,7 @@ class ProviderFactory:
                 code=_credential_error_code(exc), correlation_id=correlation_id
             ) from None
         if current != expected_generation:
+            self.on_generation_changed(provider=provider, generation=current)
             raise ProviderSafeError(
                 code="stale_generation", correlation_id=correlation_id
             )

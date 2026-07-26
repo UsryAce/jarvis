@@ -3,22 +3,36 @@ import asyncio
 import json
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from pathlib import Path
 
 from src.config import config
 from src.clients.nvidia_client import NVIDIAClient, SyncNVIDIAClient
+from src.clients.provider_factory import ProviderFactory, ProviderSafeError
 from src.memory.vector_memory import VectorMemory
 from src.skills.registry import SkillRegistry
-from src.core.model_router import ModelRouter, RouteDecision
+from src.core.model_router import (
+    ModelRouter,
+    ProviderRoutingMetadata,
+    RouteDecision,
+)
 from src.core.agent import AgentRuntime
 from src.core.audit import AuditService
-from src.core.control import ControlBlockedError, ControlService, ControlSnapshot, ControlState
+from src.core.control import (
+    ControlBlockedError,
+    ControlService,
+    ControlSnapshot,
+    ControlState,
+    StopGuard,
+)
 from src.core.control_store import ControlStore
+from src.core.credentials import CredentialService, CredentialState
 from src.core.swarm import MultiAgentOrchestrator
 from src.core.workspaces import WorkspaceRegistry
 from src.security.auth import SessionService
+from src.voice.nvidia_speech import NvidiaSpeechAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +47,40 @@ class Jarvis:
         audit_service: AuditService | None = None,
         session_service: SessionService | None = None,
         control_service: ControlService | None = None,
+        credential_service: CredentialService | None = None,
+        provider_factory: ProviderFactory | None = None,
+        speech_adapter: NvidiaSpeechAdapter | None = None,
     ):
         self.control_store = control_store
         self.audit_service = audit_service
         self.session_service = session_service
         self.control_service = control_service
+        if credential_service is None and provider_factory is not None:
+            credential_service = provider_factory.credential_service
+        if credential_service is None and control_store is not None:
+            credential_service = CredentialService(
+                control_store,
+                protector=control_store.protector,
+                audit_service=audit_service,
+            )
+        self.credential_service = credential_service
+        self.provider_factory = provider_factory or (
+            ProviderFactory(
+                credential_service=credential_service,
+                control_guard=(
+                    StopGuard(control_service) if control_service is not None else None
+                ),
+            )
+            if credential_service is not None
+            else None
+        )
         self.control_snapshot: ControlSnapshot | None = (
             control_service.snapshot() if control_service is not None else None
         )
         self.trust_status = "verified" if control_service is not None else "legacy"
         self.nvidia_client: Optional[NVIDIAClient] = None
-        self.sync_client = SyncNVIDIAClient()
+        self.sync_client: Optional[SyncNVIDIAClient] = None
+        self.speech_adapter = speech_adapter
         self.memory: Optional[VectorMemory] = None
         self.skills = SkillRegistry()
         self.conversation_history: List[Dict] = []
@@ -63,6 +100,24 @@ class Jarvis:
         )
         self._model_catalog: set[str] = set()
         self._model_catalog_cached_at = 0.0
+        self._provider_handle: str | None = None
+        self._provider_generation: int | None = None
+        if self.provider_factory is not None:
+            self.provider_factory.register_invalidator(
+                "text", self._invalidate_provider_client
+            )
+            self.provider_factory.register_invalidator(
+                "client", self._invalidate_provider_client
+            )
+            self.provider_factory.register_invalidator(
+                "model", self._invalidate_model_catalog
+            )
+            self.provider_factory.register_invalidator(
+                "catalog", self._invalidate_model_catalog
+            )
+            self.provider_factory.register_invalidator(
+                "speech", self._invalidate_speech_adapter
+            )
         self._initialized = False
 
     def _get_system_prompt(self) -> str:
@@ -129,12 +184,9 @@ Guidelines:
                 )
                 return
 
-        # Initialize NVIDIA client
-        # Keep one HTTP session warm for model catalog and chat requests.  Creating
-        # a session per turn forced a fresh DNS/TCP/TLS setup before every reply,
-        # which is especially noticeable in the voice interface.
-        self.nvidia_client = NVIDIAClient()
-        await self.nvidia_client.__aenter__()
+        # Warm only a secret-free session.  Provider authorization is leased at
+        # each final request boundary and generation changes rebuild this context.
+        await self._refresh_provider_context(force=True)
 
         # Initialize memory
         self.memory = VectorMemory()
@@ -299,16 +351,14 @@ Guidelines:
 
     async def _get_live_model_catalog(self, ttl_seconds: int = 300) -> set[str]:
         """Return cached live NVIDIA model IDs, retaining a safe stale cache on errors."""
+        await self._refresh_provider_context()
         now = time.monotonic()
         if self._model_catalog and now - self._model_catalog_cached_at < ttl_seconds:
             return set(self._model_catalog)
 
         try:
-            if self.nvidia_client is not None:
-                catalog = await self.nvidia_client.list_models()
-            else:
-                async with NVIDIAClient() as client:
-                    catalog = await client.list_models()
+            client = await self._require_provider_client()
+            catalog = await client.list_models()
             model_ids = self.model_router.normalize_catalog(catalog.get("data", []))
             if model_ids:
                 self._model_catalog = model_ids
@@ -322,13 +372,10 @@ Guidelines:
         self, messages: List[Dict], model: Optional[str], user_message: str, max_tokens: int
     ) -> str:
         """Get non-streaming response."""
-        if self.nvidia_client is not None:
-            response = await self.nvidia_client.chat_completion(
-                messages, model=model, max_tokens=max_tokens
-            )
-        else:
-            async with NVIDIAClient() as client:
-                response = await client.chat_completion(messages, model=model, max_tokens=max_tokens)
+        client = await self._require_provider_client()
+        response = await client.chat_completion(
+            messages, model=model, max_tokens=max_tokens
+        )
         content = response["choices"][0]["message"]["content"]
 
         # Save to history
@@ -350,22 +397,14 @@ Guidelines:
     ) -> AsyncGenerator[str, None]:
         """Stream response."""
         full_response = ""
-        client = self.nvidia_client
-        temporary_client = client is None
-        if temporary_client:
-            client = NVIDIAClient()
-            await client.__aenter__()
-        try:
-            async for chunk in client.chat_completion_stream(
-                messages, model=model, max_tokens=max_tokens
-            ):
-                if chunk.get("choices") and chunk["choices"][0].get("delta", {}).get("content"):
-                    content = chunk["choices"][0]["delta"]["content"]
-                    full_response += content
-                    yield content
-        finally:
-            if temporary_client:
-                await client.__aexit__(None, None, None)
+        client = await self._require_provider_client()
+        async for chunk in client.chat_completion_stream(
+            messages, model=model, max_tokens=max_tokens
+        ):
+            if chunk.get("choices") and chunk["choices"][0].get("delta", {}).get("content"):
+                content = chunk["choices"][0]["delta"]["content"]
+                full_response += content
+                yield content
 
         # Save to history
         assistant_msg = {
@@ -392,29 +431,34 @@ Guidelines:
 
     async def chat_sync(self, message: str, **kwargs) -> str:
         """Synchronous chat for simple use cases."""
-        return self.sync_client.chat_completion(
-            messages=[{"role": "system", "content": self.system_prompt}, {"role": "user", "content": message}],
+        client = await self._require_provider_client()
+        response = await client.chat_completion(
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": message},
+            ],
             **kwargs,
-        )["choices"][0]["message"]["content"]
+        )
+        return response["choices"][0]["message"]["content"]
 
     # Voice methods
     async def transcribe_audio(self, audio_data: bytes, language: str = "en") -> str:
         """Transcribe audio to text."""
-        async with NVIDIAClient() as client:
-            result = await client.transcribe(audio_data, language=language)
-            return result.get("text", "")
+        client = await self._require_provider_client()
+        result = await client.transcribe(audio_data, language=language)
+        return result.get("text", "")
 
     async def synthesize_speech(self, text: str, voice: str = "female") -> bytes:
         """Convert text to speech."""
-        async with NVIDIAClient() as client:
-            return await client.synthesize(text, voice=voice)
+        client = await self._require_provider_client()
+        return await client.synthesize(text, voice=voice)
 
     # Vision methods
     async def analyze_image(self, image_url: str, prompt: str) -> str:
         """Analyze image with vision model."""
-        async with NVIDIAClient() as client:
-            result = await client.vision(image_url, prompt)
-            return result["choices"][0]["message"]["content"]
+        client = await self._require_provider_client()
+        result = await client.vision(image_url, prompt)
+        return result["choices"][0]["message"]["content"]
 
     # Memory methods
     async def remember(self, content: str, metadata: Optional[Dict] = None) -> str:
@@ -449,6 +493,7 @@ Guidelines:
         if self.nvidia_client:
             await self.nvidia_client.__aexit__(None, None, None)
             self.nvidia_client = None
+        self.sync_client = None
         await self._save_history()
         self._initialized = False
 
@@ -463,6 +508,92 @@ Guidelines:
                 snapshot=snapshot,
             )
 
+    async def _require_provider_client(self) -> NVIDIAClient:
+        await self._refresh_provider_context()
+        if self.nvidia_client is None:
+            raise ProviderSafeError(
+                code="credential_unrecoverable",
+                correlation_id=f"provider-{uuid.uuid4()}",
+            )
+        return self.nvidia_client
+
+    async def _refresh_provider_context(self, *, force: bool = False) -> None:
+        """Atomically fence stale objects and bind the active opaque handle."""
+        if self.credential_service is None or self.provider_factory is None:
+            return
+        generation = self.credential_service.generation("nvidia")
+        if (
+            not force
+            and generation.generation == self._provider_generation
+            and self.nvidia_client is not None
+        ):
+            return
+
+        self.provider_factory.on_generation_changed(
+            provider="nvidia", generation=generation.generation
+        )
+        prior_client = self.nvidia_client
+        self.nvidia_client = None
+        self.sync_client = None
+        if prior_client is not None:
+            await prior_client.close()
+
+        self._provider_generation = generation.generation
+        self._provider_handle = generation.active_credential_id
+        metadata = None
+        if generation.active_credential_id is not None:
+            try:
+                metadata = self.credential_service.get(generation.active_credential_id)
+            except Exception:
+                metadata = None
+
+        lifecycle_state = (
+            metadata.state.value if metadata is not None else "unavailable"
+        )
+        validation_category = (
+            metadata.validation_category if metadata is not None else None
+        )
+        if metadata is not None and metadata.state is CredentialState.ACTIVE:
+            self.nvidia_client = NVIDIAClient(
+                provider_factory=self.provider_factory,
+                credential_handle=metadata.credential_id,
+                expected_generation=generation.generation,
+            )
+            await self.nvidia_client.__aenter__()
+            self.sync_client = SyncNVIDIAClient(
+                provider_factory=self.provider_factory,
+                credential_handle=metadata.credential_id,
+                expected_generation=generation.generation,
+            )
+            self.speech_adapter = NvidiaSpeechAdapter(
+                provider_factory=self.provider_factory,
+                credential_handle=metadata.credential_id,
+                expected_generation=generation.generation,
+            )
+
+        self.model_router.update_provider_metadata(
+            ProviderRoutingMetadata(
+                provider="nvidia",
+                credential_handle=self._provider_handle,
+                lifecycle_state=lifecycle_state,
+                generation=generation.generation,
+                validation_category=validation_category,
+                catalog_present=bool(self._model_catalog),
+            )
+        )
+
+    def _invalidate_model_catalog(self) -> None:
+        self._model_catalog.clear()
+        self._model_catalog_cached_at = 0.0
+
+    def _invalidate_provider_client(self) -> None:
+        if self.nvidia_client is not None:
+            self.nvidia_client.invalidate()
+
+    def _invalidate_speech_adapter(self) -> None:
+        if self.speech_adapter is not None:
+            self.speech_adapter.invalidate()
+
     async def _save_history(self):
         """Save conversation history."""
         if self.memory and self.conversation_history:
@@ -473,6 +604,8 @@ Guidelines:
         return {
             "initialized": self._initialized,
             "nvidia_connected": self.nvidia_client is not None,
+            "nvidia_credential_handle": self._provider_handle,
+            "nvidia_provider_generation": self._provider_generation,
             "memory_connected": self.memory is not None and self.memory.is_connected,
             "skills_loaded": len(self.skills.list_skills()),
             "conversation_length": len(self.conversation_history),
