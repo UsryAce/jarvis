@@ -14,11 +14,12 @@ from typing import Any
 from urllib.parse import quote, urlparse
 
 import psutil
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src.config import config
+from src.core.credentials import CredentialMetadata, CredentialService, CredentialState
 from src.core.knowledge_vault import KnowledgeVault
+from src.security.auth import SECRETS_ADMIN, OperatorPrincipal, require_scope
 from src.skills.nvidia_catalog import NvidiaSkillsCatalog
 
 
@@ -162,13 +163,76 @@ async def open_brain(payload: BrainOpenRequest):
     return {"opened": True, "target": payload.target, "path": str(path)}
 
 
+def _credential_status(metadata: CredentialMetadata) -> dict[str, Any]:
+    """Project one credential into compatibility-safe dashboard metadata."""
+
+    return {
+        "credential_id": metadata.credential_id,
+        "display_id": metadata.display_id,
+        "provider": metadata.provider,
+        "label": metadata.label,
+        "state": metadata.state.value,
+        "priority": metadata.priority,
+        "version": metadata.version,
+        "provider_generation": metadata.provider_generation,
+        "validation": {
+            "category": metadata.validation_category,
+            "observed_at": metadata.validated_at,
+            "display": metadata.validation_category or "Validation not run",
+        },
+        "health": {
+            "status": metadata.health_status,
+            "observed_at": metadata.health_observed_at,
+            "display": metadata.health_status or "Health not confirmed",
+        },
+        "quota": {
+            "value": metadata.quota_value,
+            "source": metadata.quota_source,
+            "observed_at": metadata.quota_observed_at,
+            "display": (
+                str(metadata.quota_value)
+                if metadata.quota_value is not None
+                else "Quota not reported"
+            ),
+        },
+        "usage": {
+            "value": metadata.usage_value,
+            "source": metadata.usage_source,
+            "observed_at": metadata.usage_observed_at,
+            "display": (
+                str(metadata.usage_value)
+                if metadata.usage_value is not None
+                else "Usage not reported"
+            ),
+        },
+        "last_checked": metadata.validated_at or "Last checked —",
+        "lease_count": metadata.lease_count,
+        "replaces_display_id": metadata.replaces_display_id,
+        "replacement_display_id": metadata.replacement_display_id,
+        "allowed_actions": metadata.allowed_actions,
+    }
+
+
 @router.get("/keys/status")
-async def key_status():
-    key = config.get("nvidia.api_key") or os.getenv("NVIDIA_API_KEY")
+async def key_status(
+    request: Request,
+    _principal: OperatorPrincipal = Depends(require_scope(SECRETS_ADMIN)),
+):
+    service: CredentialService = request.app.state.credential_service
+    credentials = service.list(provider="nvidia")
+    visible = tuple(_credential_status(metadata) for metadata in credentials)
+    configured = any(
+        metadata.state not in {CredentialState.REVOKED, CredentialState.UNRECOVERABLE}
+        for metadata in credentials
+    )
     return {
         "provider": "nvidia",
-        "configured": bool(key),
-        "masked": f"{key[:5]}…{key[-4:]}" if key and len(key) >= 10 else None,
+        "configured": configured,
+        "active": any(metadata.state is CredentialState.ACTIVE for metadata in credentials),
+        "credentials": visible,
+        "count": len(visible),
+        "deprecated": True,
+        "inventory_endpoint": "/api/credentials",
     }
 
 
