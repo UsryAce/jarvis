@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-06
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-07-22T12:36:24.413Z"
-last_activity: 2026-07-22 -- Completed Plan 01-05 serialized control store, verified recovery, and transactional audit chain
+status: Ready for Plan 01-07
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-07-26T01:11:54.108Z"
+last_activity: 2026-07-26 -- Completed Plan 01-06 opaque operator sessions and default-deny API authorization
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 5
-  percent: 36
+  completed_plans: 6
+  percent: 43
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 6 of 14
-Status: Ready for Plan 01-06
-Last activity: 2026-07-22 -- Completed Plan 01-05 serialized control store, verified recovery, and transactional audit chain
+Plan: 7 of 14
+Status: Ready for Plan 01-07
+Last activity: 2026-07-26 -- Completed Plan 01-06 opaque operator sessions and default-deny API authorization
 
-Progress: [████░░░░░░] 36%
+Progress: [████░░░░░░] 43%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [████░░░░░░] 36%
 | Phase 01 P03 | 12min | 3 tasks | 5 files |
 | Phase 01 P04 | 17min | 3 tasks | 5 files |
 | Phase 01 P05 | 10min | 3 tasks | 2 files |
+| Phase 01 P06 | 11min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Keep the authoritative SQLite trust store in serialized single-owner mode across runtime upgrades. — An upgrade must not silently broaden the authority-store topology.
 - [Phase 01]: Confine public recovery candidates to the protected backup directory while allowing only the internally generated atomic-restore sibling. — Recovery stays bounded while verify-before-swap can use an atomic sibling path.
 - [Phase 01]: Use periodic in-database audit checkpoints and backup-bound heads without claiming whole-database rollback detection. — The local chain detects row tampering but is not an external rollback witness.
+- [Phase 01]: Keep only GET /, GET /health, and POST /api/auth/unlock public; classify every other route with an explicit scope.
+- [Phase 01]: Authenticate WebSockets before accept and periodically recheck durable session and stop-state truth for long-lived transports.
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-22T12:36:24.405Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-07-26T01:11:45.419Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
