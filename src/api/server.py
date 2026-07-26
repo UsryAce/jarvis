@@ -58,22 +58,49 @@ speech = NvidiaSpeechAdapter(api_key=config.get("nvidia.api_key"))
 async def lifespan(app: FastAPI):
     """Application lifespan."""
     global jarvis
-    store = ControlStore(app.state.control_path)
-    app.state.control_store = store
-    audit_service = AuditService(store, protector=store.protector, clock=app.state.session_clock)
-    app.state.audit_service = audit_service
-    app.state.session_service = SessionService(store, clock=app.state.session_clock)
-    app.state.control_service = ControlService(
-        store, audit_service=audit_service, clock=app.state.session_clock
-    )
-    jarvis = Jarvis()
-    await jarvis.initialize()
-    app.state.jarvis = jarvis
+    store = None
+    jarvis = None
+    app.state.trust_status = "starting"
+    app.state.trust_failure_code = None
+    try:
+        # Store construction performs DACL, runtime, migration, integrity, and
+        # audit verification before any consequential runtime is constructed.
+        store = ControlStore(app.state.control_path)
+        app.state.control_store = store
+        audit_service = AuditService(
+            store, protector=store.protector, clock=app.state.session_clock
+        )
+        app.state.audit_service = audit_service
+        app.state.session_service = SessionService(store, clock=app.state.session_clock)
+        control_service = ControlService(
+            store, audit_service=audit_service, clock=app.state.session_clock
+        )
+        app.state.control_service = control_service
+        jarvis = Jarvis(
+            control_store=store,
+            audit_service=audit_service,
+            session_service=app.state.session_service,
+            control_service=control_service,
+        )
+        app.state.jarvis = jarvis
+        await jarvis.initialize()
+        app.state.trust_status = (
+            "ready" if jarvis._initialized else jarvis.trust_status
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", None) or (
+            f"{type(exc).__name__.removesuffix('Error').casefold()}_error"
+        )
+        app.state.trust_status = "integrity_locked"
+        app.state.trust_failure_code = str(code)[:128]
+        logger.error("JARVIS trust preflight failed with safe code %s", code)
     try:
         yield
     finally:
-        await jarvis.shutdown()
-        store.close()
+        if jarvis is not None:
+            await jarvis.shutdown()
+        if store is not None:
+            store.close()
 
 
 app = FastAPI(
@@ -521,12 +548,20 @@ async def project_workspace_delete(project_id: str):
 @app.get("/api/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "healthy", "initialized": jarvis._initialized if jarvis else False}
+    return {
+        "status": getattr(app.state, "trust_status", "starting"),
+        "initialized": jarvis._initialized if jarvis else False,
+    }
 
 
 @app.get("/api/status")
 async def status():
     """Get system status."""
+    if jarvis is None:
+        return {
+            "status": getattr(app.state, "trust_status", "integrity_locked"),
+            "code": getattr(app.state, "trust_failure_code", "trust_preflight_failed"),
+        }
     return jarvis.get_status()
 
 
