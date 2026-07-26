@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-07
-stopped_at: Completed 01-06-PLAN.md
-last_updated: "2026-07-26T01:11:54.108Z"
-last_activity: 2026-07-26 -- Completed Plan 01-06 opaque operator sessions and default-deny API authorization
+status: Ready for Plan 01-08
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-07-26T01:38:35.718Z"
+last_activity: 2026-07-26 -- Completed Plan 01-07 durable backend control authority and trust-first startup
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 6
-  percent: 43
+  completed_plans: 7
+  percent: 50
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 7 of 14
-Status: Ready for Plan 01-07
-Last activity: 2026-07-26 -- Completed Plan 01-06 opaque operator sessions and default-deny API authorization
+Plan: 8 of 14
+Status: Ready for Plan 01-08
+Last activity: 2026-07-26 -- Completed Plan 01-07 durable backend control authority and trust-first startup
 
-Progress: [████░░░░░░] 43%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [████░░░░░░] 43%
 | Phase 01 P04 | 17min | 3 tasks | 5 files |
 | Phase 01 P05 | 10min | 3 tasks | 2 files |
 | Phase 01 P06 | 11min | 2 tasks | 4 files |
+| Phase 01 P07 | 22min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Use periodic in-database audit checkpoints and backup-bound heads without claiming whole-database rollback detection. — The local chain detects row tampering but is not an external rollback witness.
 - [Phase 01]: Keep only GET /, GET /health, and POST /api/auth/unlock public; classify every other route with an explicit scope.
 - [Phase 01]: Authenticate WebSockets before accept and periodically recheck durable session and stop-state truth for long-lived transports.
+- [Phase 01]: Persist request idempotency and stop evidence in chained audit_events while control_states remains authoritative. — Avoids a second authority schema while preserving restart-safe evidence.
+- [Phase 01]: Treat asyncio cancellation as cooperative stopping evidence only; terminal stopped requires observed confirmation. — Direct task return cannot prove descendant or external-effect termination.
+- [Phase 01]: Treat occupied ports as transport evidence only; supervisor readiness requires SID/audit/control preflight. — A listener does not prove the process or trust state is ready.
 
 ### Pending Todos
 
@@ -99,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-26T01:11:45.419Z
-Stopped at: Completed 01-06-PLAN.md
+Last session: 2026-07-26T01:38:35.698Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
