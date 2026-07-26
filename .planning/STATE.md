@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-08
-stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-07-26T01:38:35.718Z"
-last_activity: 2026-07-26 -- Completed Plan 01-07 durable backend control authority and trust-first startup
+status: Ready for Plan 01-09
+stopped_at: Completed 01-08-PLAN.md
+last_updated: "2026-07-26T02:00:09.931Z"
+last_activity: 2026-07-26 -- Completed Plan 01-08 protected credential lifecycle and metadata-only API
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 7
-  percent: 50
+  completed_plans: 9
+  percent: 64
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 8 of 14
-Status: Ready for Plan 01-08
-Last activity: 2026-07-26 -- Completed Plan 01-07 durable backend control authority and trust-first startup
+Plan: 9 of 14
+Status: Ready for Plan 01-09
+Last activity: 2026-07-26 -- Completed Plan 01-08 protected credential lifecycle and metadata-only API
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 64%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [█████░░░░░] 50%
 | Phase 01 P05 | 10min | 3 tasks | 2 files |
 | Phase 01 P06 | 11min | 2 tasks | 4 files |
 | Phase 01 P07 | 22min | 3 tasks | 7 files |
+| Phase 01 P08 | 15min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Persist request idempotency and stop evidence in chained audit_events while control_states remains authoritative. — Avoids a second authority schema while preserving restart-safe evidence.
 - [Phase 01]: Treat asyncio cancellation as cooperative stopping evidence only; terminal stopped requires observed confirmation. — Direct task return cannot prove descendant or external-effect termination.
 - [Phase 01]: Treat occupied ports as transport evidence only; supervisor readiness requires SID/audit/control preflight. — A listener does not prove the process or trust state is ready.
+- [Phase 01]: Credential display IDs use independent randomness and never secret-derived prefixes, suffixes, hashes, or fingerprints.
+- [Phase 01]: Browser rotation stages a pending linked replacement; validation and promotion remain separate authoritative commands.
+- [Phase 01]: Provider generations fence new leases immediately while acquired buffers may finish and are zeroized on release.
 
 ### Pending Todos
 
@@ -103,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-26T01:38:35.698Z
-Stopped at: Completed 01-07-PLAN.md
+Last session: 2026-07-26T02:00:09.907Z
+Stopped at: Completed 01-08-PLAN.md
 Resume file: None
