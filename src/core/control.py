@@ -360,6 +360,59 @@ class ControlService:
             scope_id=scope_id,
         )
 
+    def record_runtime_event(
+        self,
+        *,
+        action: str,
+        outcome: str,
+        boundary: str,
+        snapshot: ControlSnapshot,
+        run_id: str | None = None,
+        task_id: str | None = None,
+        code: str | None = None,
+        applied: bool | None = None,
+    ) -> str:
+        """Append safe runtime/effect evidence without using mutable run events as truth."""
+
+        correlation_id = str(uuid.uuid4())
+        payload: dict[str, object] = {
+            "status": outcome,
+            "state": snapshot.state.value,
+            "action": action,
+            "outcome": outcome,
+            "reason_code": boundary,
+            "revision": snapshot.revision,
+            "residue": {
+                "confirmed_count": snapshot.confirmed_count,
+                "total_count": snapshot.total_count,
+                "residue_count": snapshot.residue_count,
+            },
+            "correlation_id": correlation_id,
+        }
+        if run_id is not None:
+            payload["run_id"] = run_id
+        if task_id is not None:
+            payload["task_id"] = task_id
+        if code is not None:
+            payload["code"] = code
+        if applied is not None:
+            payload["applied"] = applied
+        with self.store.immediate_transaction() as tx:
+            event = tx.append_audit(
+                self.audit,
+                actor_id="runtime",
+                session_digest="runtime",
+                event_type="runtime",
+                action=action,
+                outcome=outcome,
+                correlation_id=correlation_id,
+                causation_id=correlation_id,
+                subject=self._subject(snapshot.scope_type, snapshot.scope_id),
+                revision=snapshot.revision,
+                payload=payload,
+            )
+        return event.event_id
+
     def _record_evidence_transition(
         self,
         expected_revision: int,
@@ -691,7 +744,24 @@ class StopGuard:
             raise ValueError("invalid_control_boundary")
         snapshot = self.snapshot()
         if snapshot.state.value in _BLOCKING_STATES:
+            self.control_service.record_runtime_event(
+                action="effect_boundary",
+                outcome="blocked",
+                boundary=boundary,
+                snapshot=snapshot,
+                run_id=self.run_id,
+                code="control_blocked",
+                applied=False,
+            )
             raise ControlBlockedError(boundary=boundary, snapshot=snapshot)
+        self.control_service.record_runtime_event(
+            action="effect_boundary",
+            outcome="allowed",
+            boundary=boundary,
+            snapshot=snapshot,
+            run_id=self.run_id,
+            applied=False,
+        )
         return snapshot
 
     def effect_allowed(self, *, boundary: str) -> bool:
