@@ -189,7 +189,7 @@ Guidelines:
         await self._refresh_provider_context(force=True)
 
         # Initialize memory
-        self.memory = VectorMemory()
+        self.memory = VectorMemory(nvidia_client=self.nvidia_client)
         await self.memory.initialize()
 
         # Load skills
@@ -535,6 +535,8 @@ Guidelines:
         prior_client = self.nvidia_client
         self.nvidia_client = None
         self.sync_client = None
+        if self.memory is not None:
+            self.memory.nvidia_client = None
         if prior_client is not None:
             await prior_client.close()
 
@@ -570,6 +572,10 @@ Guidelines:
                 credential_handle=metadata.credential_id,
                 expected_generation=generation.generation,
             )
+            if self.memory is not None:
+                self.memory.nvidia_client = self.nvidia_client
+                self.memory._embedding_disabled_until = 0.0
+                self.memory._embedding_failures = 0
 
         self.model_router.update_provider_metadata(
             ProviderRoutingMetadata(

@@ -216,6 +216,16 @@ function safeExceptionFromAxios(error: AxiosError): SafeApiException {
   if (isSafeApiError(error.response?.data)) {
     return new SafeApiException(error.response.data, error.response?.status);
   }
+  if (error.response?.status === 422) {
+    return new SafeApiException(
+      {
+        code: "invalid_request",
+        retryable: false,
+        applied: false,
+      },
+      422,
+    );
+  }
   const timedOut = error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
   return new SafeApiException(
     {

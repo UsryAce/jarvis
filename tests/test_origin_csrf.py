@@ -171,6 +171,24 @@ def test_unlock_requires_exact_origin_and_sets_strict_http_only_cookie(
         _safe("domain=" not in cookie, "session cookie sets Domain")
 
 
+def test_unlock_validation_uses_stable_safe_error_envelope(
+    isolated_control_path, fake_clock
+):
+    app = _app(isolated_control_path, fake_clock)
+    with TestClient(app, base_url=APP_ORIGIN) as client:
+        response = client.post(
+            "/api/auth/unlock",
+            headers={"Origin": APP_ORIGIN},
+            json={"credential": "short"},
+        )
+    payload = response.json()
+    _safe(response.status_code == 422, "invalid unlock payload status changed")
+    _safe(payload.get("code") == "invalid_request", "validation leaked raw detail")
+    _safe(payload.get("retryable") is False, "invalid unlock marked retryable")
+    _safe(payload.get("applied") is False, "invalid unlock lacks no-apply proof")
+    _safe("detail" not in payload, "FastAPI validation detail escaped safe envelope")
+
+
 def test_csrf_rejection_is_retryable_only_with_explicit_no_apply_evidence(
     isolated_control_path, fake_clock, operator_session_factory
 ):

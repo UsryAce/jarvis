@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class VectorMemory:
     """Vector-based memory system using ChromaDB and NVIDIA embeddings."""
 
-    def __init__(self):
+    def __init__(self, *, nvidia_client: Optional[NVIDIAClient] = None):
         self.client: Optional[chromadb.Client] = None
         self.collection = None
         self.embedding_model = config.get("memory.embedding_model", "nvidia/nv-embedqa-e5-v5")
-        self.nvidia_client: Optional[NVIDIAClient] = None
+        self.nvidia_client = nvidia_client
         self._initialized = False
 
     async def initialize(self):
@@ -50,14 +50,11 @@ class VectorMemory:
                 metadata={"hnsw:space": "cosine"},
             )
 
-            # Initialize NVIDIA client for embeddings
-            self.nvidia_client = NVIDIAClient()
-
             self._initialized = True
             logger.info(f"Memory initialized at {memory_path}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize memory: {e}")
+            logger.error("Failed to initialize memory with safe code %s", type(e).__name__)
             raise
 
     @property
@@ -67,7 +64,7 @@ class VectorMemory:
     async def _get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for texts using NVIDIA API with fallback."""
         if not self.nvidia_client:
-            raise RuntimeError("NVIDIA client not initialized")
+            return self._fallback_embeddings(texts)
 
         try:
             async with NVIDIAClient() as client:

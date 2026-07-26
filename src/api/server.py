@@ -11,6 +11,7 @@ from typing import Literal, Optional
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect, Depends
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -1004,6 +1005,16 @@ def _install_security(
             store, audit_service=audit_service, clock=clock
         )
         application.router.on_shutdown.append(store.close)
+
+    @application.exception_handler(RequestValidationError)
+    async def safe_validation_error(_request, _exc):
+        error = SafeError(
+            code="invalid_request",
+            correlation_id=str(uuid.uuid4()),
+            retryable=False,
+            applied=False,
+        )
+        return JSONResponse(status_code=422, content=error.to_payload())
 
     @application.exception_handler(Exception)
     async def safe_internal_error(_request, _exc):

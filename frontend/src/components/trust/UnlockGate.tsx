@@ -82,6 +82,9 @@ function safeUnlockMessage(error: unknown): string {
   if (error.safe.code === "rate_limited" || error.status === 429) {
     return "Unlock attempts are temporarily limited. Wait before trying again.";
   }
+  if (error.safe.code === "invalid_request" || error.status === 422) {
+    return "The operator code must contain at least 16 characters.";
+  }
   return "Jarvis could not unlock this session. Check the code and try again.";
 }
 
@@ -121,6 +124,11 @@ export function UnlockGate({
   const [message, setMessage] = useState<string | null>(null);
   const fieldRef = useRef<HTMLInputElement>(null);
   const canUnlock = state === "locked" || state === "expired";
+  const unlockInputReady = code.length >= 16;
+  const unlockHint =
+    code.length > 0 && !unlockInputReady
+      ? "Use the operator unlock value you created during trust bootstrap (16+ characters, not a 4-digit PIN)."
+      : null;
 
   useEffect(() => {
     if (canUnlock && !submitting) fieldRef.current?.focus();
@@ -232,15 +240,16 @@ export function UnlockGate({
           type="password"
           autoComplete="current-password"
           required
+          minLength={16}
           value={code}
           disabled={submitting}
           onChange={(event) => setCode(event.target.value)}
           style={controlStyle}
-          aria-describedby={message ? "unlock-message" : undefined}
+          aria-describedby="unlock-message"
         />
         <button
           type="submit"
-          disabled={submitting || !code}
+          disabled={submitting || !unlockInputReady}
           style={{ ...buttonStyle, marginTop: 16 }}
         >
           {submitting ? "UNLOCKING…" : "Unlock Jarvis"}
@@ -251,7 +260,7 @@ export function UnlockGate({
           aria-live="polite"
           style={{ color: message ? "#FFAE19" : "#7897A1", lineHeight: 1.5, minHeight: 48, paddingTop: 12 }}
         >
-          {message || "Local control plane · Cookie-protected session"}
+          {message || unlockHint || "Local control plane · Cookie-protected session"}
         </div>
       </form>
     </main>
