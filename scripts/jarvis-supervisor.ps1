@@ -21,32 +21,39 @@ function Test-Port([int]$Port) {
 }
 
 function Invoke-TrustPreflight([string]$PythonPath) {
-    $preflightCode = @'
-import sys
-from src.core.audit import AuditService
-from src.core.control import ControlService
-from src.core.control_store import ControlStore
-from src.security.secrets import ProtectedPathAcl
+    Push-Location -LiteralPath $projectRoot
+    try {
+        & $PythonPath -m src.cli.main trust verify --quiet *> $null
+        return $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+}
 
-store = None
-try:
-    store = ControlStore()
-    current_sid = ProtectedPathAcl.current_user_sid()
-    owner_sid = store.query_value("SELECT owner_sid FROM audit_keyring WHERE state = 'active'")
-    if owner_sid is not None and str(owner_sid) != current_sid:
-        raise RuntimeError("preflight_identity_mismatch")
-    audit = AuditService(store, protector=store.protector)
-    if not audit.verify_chain().valid:
-        raise RuntimeError("preflight_audit_invalid")
-    ControlService(store, audit_service=audit).snapshot()
-except Exception:
-    sys.exit(20)
-finally:
-    if store is not None:
-        store.close()
-'@
-    & $PythonPath -c $preflightCode *> $null
-    return $LASTEXITCODE
+function Invoke-CredentialCutoverStatus([string]$PythonPath) {
+    Push-Location -LiteralPath $projectRoot
+    try {
+        & $PythonPath -m src.cli.main credentials cutover-status --provider nvidia --quiet *> $null
+        return $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+}
+
+function Confirm-SanitizedRestart([string]$PythonPath) {
+    Push-Location -LiteralPath $projectRoot
+    try {
+        & $PythonPath -m src.cli.main credentials mark-restarted --provider nvidia *> $null
+        return $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+}
+
+function Remove-LegacyNvidiaEnvironment {
+    if (Test-Path Env:NVIDIA_API_KEY) {
+        Remove-Item Env:NVIDIA_API_KEY
+    }
 }
 
 function Test-BackendTrustReady {
@@ -65,18 +72,44 @@ try {
     Write-SupervisorLog 'SUPERVISOR_STARTED'
     while ($true) {
         $python = (Get-Command python -ErrorAction Stop).Source
-        $preflightExit = Invoke-TrustPreflight $python
-        if ($preflightExit -ne 0) {
-            Write-SupervisorLog "TRUST_PREFLIGHT_FAILED_$preflightExit"
-            Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))
-            continue
-        }
-
         if (-not (Test-Port 8000)) {
+            # The CLI owns the trust store only while the backend is stopped.
+            # This verifies the scheduled/current user SID through DPAPI without
+            # passing any credential or environment content to a child command.
+            $preflightExit = Invoke-TrustPreflight $python
+            if ($preflightExit -ne 0) {
+                Write-SupervisorLog "TRUST_PREFLIGHT_FAILED_$preflightExit"
+                Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))
+                continue
+            }
+
+            $cutoverExit = Invoke-CredentialCutoverStatus $python
+            if ($cutoverExit -eq 31) {
+                # No backend owns control.db at this point. Clear inherited
+                # plaintext before acknowledging and launching the fresh process.
+                Remove-LegacyNvidiaEnvironment
+                $ackExit = Confirm-SanitizedRestart $python
+                if ($ackExit -ne 0) {
+                    Write-SupervisorLog "CREDENTIAL_RESTART_ACK_FAILED_$ackExit"
+                    Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))
+                    continue
+                }
+                Write-SupervisorLog 'CREDENTIAL_CUTOVER_RESTART_REQUESTED'
+            } elseif ($cutoverExit -eq 0) {
+                Remove-LegacyNvidiaEnvironment
+            } elseif ($cutoverExit -ne 30) {
+                Write-SupervisorLog "CREDENTIAL_CUTOVER_PREFLIGHT_FAILED_$cutoverExit"
+                Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))
+                continue
+            }
+
             Start-Process -FilePath $python -ArgumentList '-m','uvicorn','src.api.server:app','--host','127.0.0.1','--port','8000' -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
             Write-SupervisorLog 'BACKEND_START_REQUESTED'
             for ($attempt = 0; $attempt -lt 20 -and -not (Test-BackendTrustReady); $attempt++) {
                 Start-Sleep -Milliseconds 500
+            }
+            if ($cutoverExit -in @(0, 31) -and (Test-BackendTrustReady)) {
+                Write-SupervisorLog 'CREDENTIAL_CUTOVER_RESTART_VERIFIED'
             }
         }
 
