@@ -15,6 +15,7 @@ import api, {
   SafeApiException,
   SessionSnapshot,
 } from "../../services/api";
+import { UnlockGate } from "./UnlockGate";
 
 export type TrustBoundaryState =
   | "checking"
@@ -100,7 +101,6 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
       setSession(authoritativeSession);
       setControl(snapshot);
       setSafeReferenceId(snapshot.audit_id);
-      setReconciliationRequired(false);
       setState(stateForSnapshot(snapshot));
     },
     [],
@@ -195,18 +195,14 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
       {protectedState ? (
         children
       ) : (
-        <main
-          className="trust-gate trust-gate--checking"
-          role="status"
-          aria-live="polite"
-          aria-busy={state === "checking"}
-        >
-          <div className="trust-gate__panel">
-            <span className="trust-gate__wordmark">JARVIS</span>
-            <h1>VERIFYING LOCAL CONTROL PLANE</h1>
-            <p>Protected systems remain offline until local authority is confirmed.</p>
-          </div>
-        </main>
+        <UnlockGate
+          state={state}
+          safeReferenceId={safeReferenceId}
+          reconciliationRequired={reconciliationRequired}
+          onUnlocked={completeUnlock}
+          onRetry={initializeProtectedSession}
+          onLogout={logout}
+        />
       )}
     </TrustSessionContext.Provider>
   );
