@@ -53,7 +53,14 @@ logger = logging.getLogger(__name__)
 
 # Global Jarvis instance - will be initialized in lifespan
 jarvis: Jarvis = None
-speech = NvidiaSpeechAdapter(api_key=config.get("nvidia.api_key"))
+_unconfigured_speech = NvidiaSpeechAdapter()
+
+
+def _nvidia_speech_adapter() -> NvidiaSpeechAdapter:
+    """Resolve the current generation-fenced adapter without plaintext config."""
+    if jarvis is not None and jarvis.speech_adapter is not None:
+        return jarvis.speech_adapter
+    return _unconfigured_speech
 
 
 @asynccontextmanager
@@ -89,6 +96,7 @@ async def lifespan(app: FastAPI):
             audit_service=audit_service,
             session_service=app.state.session_service,
             control_service=control_service,
+            credential_service=app.state.credential_service,
         )
         app.state.jarvis = jarvis
         await jarvis.initialize()
@@ -641,12 +649,13 @@ def _speech_error(exc: Exception) -> HTTPException:
 
 @app.get("/api/nvidia/speech/status")
 async def nvidia_speech_status(probe: bool = Query(default=False)):
-    return await asyncio.to_thread(speech.status, probe_catalog=probe)
+    adapter = _nvidia_speech_adapter()
+    return await asyncio.to_thread(adapter.status, probe_catalog=probe)
 
 
 @app.get("/api/nvidia/speech/capabilities")
 async def nvidia_speech_capabilities():
-    return speech.capabilities()
+    return _nvidia_speech_adapter().capabilities()
 
 
 @app.post("/api/nvidia/speech/transcribe")
@@ -657,7 +666,7 @@ async def nvidia_transcribe(
     function_name: Optional[str] = Form(default=None),
 ):
     try:
-        text = await speech.transcribe_async(
+        text = await _nvidia_speech_adapter().transcribe_async(
             await file.read(),
             filename=file.filename or "audio.wav",
             language_code=language_code,
@@ -672,7 +681,7 @@ async def nvidia_transcribe(
 @app.post("/api/voice/synthesize")
 async def nvidia_synthesize(request: NvidiaTTSRequest):
     try:
-        wav = await speech.synthesize_async(
+        wav = await _nvidia_speech_adapter().synthesize_async(
             request.text,
             voice_name=request.voice_name,
             language_code=request.language_code,
@@ -688,7 +697,7 @@ async def nvidia_synthesize(request: NvidiaTTSRequest):
 @app.post("/api/voice/synthesize-stream")
 async def nvidia_synthesize_stream(request: NvidiaTTSRequest, http_request: Request):
     """Stream raw PCM16 so Jarvis can start speaking before the full clip exists."""
-    iterator = speech.synthesize_stream(
+    iterator = _nvidia_speech_adapter().synthesize_stream(
         request.text,
         voice_name=request.voice_name,
         language_code=request.language_code,
@@ -803,7 +812,7 @@ async def synthesize_voice_auto(request: VoiceSynthesisRequest):
         )
 
     async def nvidia_audio() -> Response:
-        wav = await speech.synthesize_async(
+        wav = await _nvidia_speech_adapter().synthesize_async(
             request.text.strip(),
             voice_name=request.nvidia_voice_name,
             language_code=request.language_code,
