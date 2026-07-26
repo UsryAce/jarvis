@@ -16,6 +16,7 @@ import api, {
   SessionSnapshot,
 } from "../../services/api";
 import { UnlockGate } from "./UnlockGate";
+import { EmergencyControlRail } from "./EmergencyControlRail";
 
 export type TrustBoundaryState =
   | "checking"
@@ -192,11 +193,22 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
 
   return (
     <TrustSessionContext.Provider value={value}>
-      {protectedState ? (
-        children
+      {protectedState && control ? (
+        <div className="trust-protected-root">
+          <EmergencyControlRail
+            initialSnapshot={control}
+            readOnly={state === "read_only"}
+            onSnapshot={(snapshot) => {
+              setControl(snapshot);
+              setState(stateForSnapshot(snapshot));
+            }}
+            onMutationPending={() => setReconciliationRequired(true)}
+          />
+          <div className="trust-protected-content">{children}</div>
+        </div>
       ) : (
         <UnlockGate
-          state={state}
+          state={state as Exclude<TrustBoundaryState, "unlocked" | "read_only">}
           safeReferenceId={safeReferenceId}
           reconciliationRequired={reconciliationRequired}
           onUnlocked={completeUnlock}
