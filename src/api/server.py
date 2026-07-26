@@ -19,7 +19,10 @@ from src.core.jarvis import Jarvis
 from src.clients.nvidia_client import NVIDIAClient
 from src.config import config
 from src.api.auth_routes import router as auth_router
+from src.api.control_routes import router as control_router
 from src.api.dashboard_routes import router as dashboard_router
+from src.core.audit import AuditService
+from src.core.control import ControlService
 from src.core.control_store import ControlStore
 from src.security.auth import (
     APPROVALS_WRITE,
@@ -57,7 +60,12 @@ async def lifespan(app: FastAPI):
     global jarvis
     store = ControlStore(app.state.control_path)
     app.state.control_store = store
+    audit_service = AuditService(store, protector=store.protector, clock=app.state.session_clock)
+    app.state.audit_service = audit_service
     app.state.session_service = SessionService(store, clock=app.state.session_clock)
+    app.state.control_service = ControlService(
+        store, audit_service=audit_service, clock=app.state.session_clock
+    )
     jarvis = Jarvis()
     await jarvis.initialize()
     app.state.jarvis = jarvis
@@ -78,6 +86,7 @@ app = FastAPI(
     openapi_url=None,
 )
 app.include_router(auth_router)
+app.include_router(control_router)
 app.include_router(dashboard_router)
 
 
@@ -929,7 +938,12 @@ def _install_security(
     if initialize_store:
         store = ControlStore(application.state.control_path)
         application.state.control_store = store
+        audit_service = AuditService(store, protector=store.protector, clock=clock)
+        application.state.audit_service = audit_service
         application.state.session_service = SessionService(store, clock=clock)
+        application.state.control_service = ControlService(
+            store, audit_service=audit_service, clock=clock
+        )
         application.router.on_shutdown.append(store.close)
 
     @application.exception_handler(Exception)
