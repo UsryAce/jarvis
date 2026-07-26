@@ -234,6 +234,11 @@ class CredentialService:
         actor_id: str,
         client_request_id: str,
     ) -> CredentialMetadata:
+        request_id = self._identifier(client_request_id, "invalid_client_request_id")
+        replay = self._replay(request_id, "add")
+        if replay is not None:
+            self._zero_input(secret_buffer)
+            return replay
         current = self.get(credential_id)
         if current.version != self._version(expected_version):
             self._zero_input(secret_buffer)
@@ -246,8 +251,9 @@ class CredentialService:
             label=label,
             secret_buffer=secret_buffer,
             actor_id=actor_id,
-            client_request_id=client_request_id,
+            client_request_id=request_id,
             replacement_for=current.credential_id,
+            replacement_expected_version=current.version,
         )
 
     def _add(
@@ -259,6 +265,7 @@ class CredentialService:
         actor_id: str,
         client_request_id: str,
         replacement_for: str | None,
+        replacement_expected_version: int | None = None,
     ) -> CredentialMetadata:
         ciphertext = bytearray()
         entropy = bytearray()
@@ -289,6 +296,19 @@ class CredentialService:
                 replay = self._replay_tx(tx, request_id, "add")
                 if replay is not None:
                     return replay
+                if replacement_for is not None:
+                    source = tx.fetchone(
+                        "SELECT version, state, provider FROM credentials WHERE credential_id = ?",
+                        (replacement_for,),
+                    )
+                    if source is None:
+                        raise CredentialNotFoundError()
+                    if int(source["version"]) != replacement_expected_version:
+                        raise StaleCredentialVersionError()
+                    if str(source["state"]) == CredentialState.REVOKED.value:
+                        raise CredentialTransitionError("transition_not_allowed")
+                    if str(source["provider"]) != provider:
+                        raise CredentialTransitionError("provider_mismatch")
                 self._ensure_provider_tx(tx, provider, now)
                 tx.execute(
                     """INSERT INTO credentials(
