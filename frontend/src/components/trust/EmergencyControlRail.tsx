@@ -328,6 +328,7 @@ export function EmergencyControlRail({
           {canStop ? (
             <button
               type="button"
+              data-trust-action="emergency_stop"
               className="trust-button--danger trust-control-rail__primary"
               onClick={() => {
                 setOpenedByShortcut(false);
@@ -339,6 +340,7 @@ export function EmergencyControlRail({
           ) : canReset ? (
             <button
               type="button"
+              data-trust-action="reset"
               className="trust-button--danger trust-control-rail__primary"
               onClick={() => setDialog("reset")}
             >
