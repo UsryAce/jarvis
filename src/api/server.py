@@ -287,7 +287,7 @@ async def chat(request: ChatRequest, http_request: Request):
         response_stream = await jarvis.chat(
             request.message,
             stream=True,
-            model=routing.model,
+            model=request.model,
             use_memory=request.use_memory,
             use_skills=request.use_skills,
             max_tokens=max_tokens,
@@ -331,13 +331,13 @@ async def chat(request: ChatRequest, http_request: Request):
         )
 
     response = await jarvis.chat(
-        request.message, model=routing.model, use_memory=request.use_memory,
+        request.message, model=request.model, use_memory=request.use_memory,
         use_skills=request.use_skills, max_tokens=max_tokens,
         interaction_mode=request.interaction_mode,
     )
     return ChatResponse(
         response=response,
-        model=routing.model,
+        model=jarvis.response_model or routing.model,
         task_category=routing.task_category,
         routing_reason=routing.reason,
         auto_mode=routing.auto_mode,

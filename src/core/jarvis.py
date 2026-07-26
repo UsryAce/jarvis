@@ -4,6 +4,7 @@ import json
 import logging
 import time
 import uuid
+from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from pathlib import Path
@@ -100,6 +101,10 @@ class Jarvis:
         )
         self._model_catalog: set[str] = set()
         self._model_catalog_cached_at = 0.0
+        self._model_disabled_until: dict[str, float] = {}
+        self._response_model: ContextVar[str | None] = ContextVar(
+            "jarvis_response_model", default=None
+        )
         self._provider_handle: str | None = None
         self._provider_generation: int | None = None
         if self.provider_factory is not None:
@@ -238,6 +243,7 @@ Guidelines:
         interaction_mode: str = "chat",
     ) -> AsyncGenerator[str, None] | str:
         """Main chat interface."""
+        self._response_model.set(None)
         if not self._initialized:
             await self.initialize()
         self._require_runtime_effect("provider")
@@ -312,7 +318,14 @@ Guidelines:
         if stream:
             return self._stream_response(messages, resolved_model, message, max_tokens)
         else:
-            return await self._get_response(messages, resolved_model, message, max_tokens)
+            candidates = routing.considered_models if routing.auto_mode else ()
+            return await self._get_response(
+                messages,
+                resolved_model,
+                message,
+                max_tokens,
+                fallback_models=candidates,
+            )
 
     @staticmethod
     def _voice_needs_long_term_memory(message: str) -> bool:
@@ -369,13 +382,48 @@ Guidelines:
         return set(self._model_catalog)
 
     async def _get_response(
-        self, messages: List[Dict], model: Optional[str], user_message: str, max_tokens: int
+        self,
+        messages: List[Dict],
+        model: Optional[str],
+        user_message: str,
+        max_tokens: int,
+        *,
+        fallback_models: tuple[str, ...] = (),
     ) -> str:
         """Get non-streaming response."""
         client = await self._require_provider_client()
-        response = await client.chat_completion(
-            messages, model=model, max_tokens=max_tokens
-        )
+        selected = model or self.model_router.PRIMARY_MODEL
+        ordered = tuple(dict.fromkeys((selected, *fallback_models)))
+        now = time.monotonic()
+        available = self._model_catalog
+        candidates = tuple(
+            candidate
+            for candidate in ordered
+            if (not available or candidate in available)
+            and self._model_disabled_until.get(candidate, 0.0) <= now
+        ) or (selected,)
+        response = None
+        last_error: BaseException | None = None
+        timeout_seconds = float(config.get("nvidia.model_attempt_timeout_seconds", 6))
+        for candidate in candidates:
+            try:
+                response = await asyncio.wait_for(
+                    client.chat_completion(
+                        messages, model=candidate, max_tokens=max_tokens
+                    ),
+                    timeout=timeout_seconds,
+                )
+                self._model_disabled_until.pop(candidate, None)
+                self._response_model.set(candidate)
+                break
+            except (ProviderSafeError, asyncio.TimeoutError, TimeoutError, OSError) as exc:
+                last_error = exc
+                self._model_disabled_until[candidate] = time.monotonic() + 300
+                logger.warning("Model temporarily unavailable; failover armed for %s", candidate)
+        if response is None:
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("model_response_unavailable")
         content = response["choices"][0]["message"]["content"]
 
         # Save to history
@@ -391,6 +439,11 @@ Guidelines:
             asyncio.create_task(self._save_conversation(user_message, content))
 
         return content
+
+    @property
+    def response_model(self) -> str | None:
+        """Model that produced the current request's final response."""
+        return self._response_model.get()
 
     async def _stream_response(
         self, messages: List[Dict], model: Optional[str], user_message: str, max_tokens: int

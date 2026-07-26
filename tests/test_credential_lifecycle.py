@@ -363,6 +363,26 @@ def test_inflight_lease_can_finish_after_drain_but_new_leases_are_rejected(
         store.close()
 
 
+def test_provider_failure_inside_lease_does_not_destroy_valid_credential(
+    isolated_control_path, fake_clock, crash_point
+) -> None:
+    store, service, _protector, _validator = _services(
+        isolated_control_path, fake_clock, crash_point, "valid"
+    )
+    try:
+        active = _active(service, _add(service))
+        with pytest.raises(TimeoutError):
+            with service.lease_secret(
+                active.credential_id, expected_generation=active.provider_generation
+            ):
+                raise TimeoutError("provider timed out")
+        current = service.get(active.credential_id)
+        _safe(current.state is CredentialState.ACTIVE, "provider failure destroyed credential")
+        _safe(current.lease_count == 0, "provider failure leaked credential lease")
+    finally:
+        store.close()
+
+
 def test_wrong_identity_marks_credential_unrecoverable_without_env_fallback(
     isolated_control_path, fake_clock, crash_point, monkeypatch
 ) -> None:

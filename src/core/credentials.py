@@ -748,14 +748,12 @@ class CredentialService:
                     (credential_id,),
                 )
                 acquired = True
-            plaintext = self._unprotect_row(self._raw_credential(credential_id))
-            yield plaintext
-        except CredentialError:
-            raise
-        except BaseException:
-            if acquired:
+            try:
+                plaintext = self._unprotect_row(self._raw_credential(credential_id))
+            except BaseException:
                 self._mark_unrecoverable(credential_id)
-            raise CredentialTransitionError("credential_unrecoverable") from None
+                raise CredentialTransitionError("credential_unrecoverable") from None
+            yield plaintext
         finally:
             self._zero(plaintext)
             if acquired:

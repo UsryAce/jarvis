@@ -98,10 +98,15 @@ class ModelRouter:
             "moonshotai/kimi-k2.6",
             "meta/llama-4-maverick-17b-128e-instruct",
             "qwen/qwen3-next-80b-a3b-instruct",
-            "mistralai/mistral-large-3-675b-instruct-2512",
+            "mistralai/mistral-small-4-119b-2603",
             PRIMARY_MODEL,
         ),
-        "general": (PRIMARY_MODEL,),
+        "general": (
+            PRIMARY_MODEL,
+            "mistralai/mistral-small-4-119b-2603",
+            "deepseek-ai/deepseek-v4-flash",
+            "nvidia/nemotron-3-nano-30b-a3b",
+        ),
     }
 
     _PATTERNS: Mapping[str, tuple[str, ...]] = {

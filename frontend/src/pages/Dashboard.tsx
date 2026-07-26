@@ -269,7 +269,7 @@ const featuredModels = [
   },
   {
     name: "MISTRAL",
-    route: "mistralai/mistral-large-3-675b-instruct-2512",
+    route: "mistralai/mistral-small-4-119b-2603",
     count: 12,
     latency: "LIVE",
     tone: "white",

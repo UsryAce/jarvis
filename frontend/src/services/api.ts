@@ -471,7 +471,7 @@ class APIClient {
     options?: Record<string, unknown>,
   ) {
     const requestedModel = String(options?.model || "auto");
-    const fallbackModel = "meta/llama-3.1-8b-instruct";
+    const fallbackModel = "deepseek-ai/deepseek-v4-flash";
     const canFallback =
       requestedModel === "auto" || requestedModel === "z-ai/glm-5.2";
 
@@ -531,10 +531,18 @@ class APIClient {
           !receivedContent &&
           canFallback &&
           model !== fallbackModel &&
+          controller.signal.aborted
+        ) {
+          return run(fallbackModel, 15_000);
+        }
+        if (
+          !receivedContent &&
+          canFallback &&
+          model !== fallbackModel &&
           error instanceof SafeApiException &&
           error.safe.applied === false
         ) {
-          return run(fallbackModel, 20_000);
+          return run(fallbackModel, 15_000);
         }
         if (controller.signal.aborted) {
           throw new SafeApiException({
