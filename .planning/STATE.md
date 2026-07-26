@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-09
-stopped_at: Completed 01-08-PLAN.md
-last_updated: "2026-07-26T02:00:09.931Z"
-last_activity: 2026-07-26 -- Completed Plan 01-08 protected credential lifecycle and metadata-only API
+status: Ready for Plan 01-10
+stopped_at: Completed 01-09 and 01-12 plans
+last_updated: "2026-07-26T02:26:53.074Z"
+last_activity: 2026-07-26 -- Completed Plans 01-09 provider leases and 01-12 protected trust controls
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 14
-  completed_plans: 9
-  percent: 64
+  completed_plans: 11
+  percent: 79
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 ## Current Position
 
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 9 of 14
-Status: Ready for Plan 01-09
-Last activity: 2026-07-26 -- Completed Plan 01-08 protected credential lifecycle and metadata-only API
+Plan: 10 of 14
+Status: Ready for Plan 01-10
+Last activity: 2026-07-26 -- Completed Plans 01-09 provider leases and 01-12 protected trust controls
 
-Progress: [██████░░░░] 64%
+Progress: [████████░░] 79%
 
 ## Performance Metrics
 
@@ -60,6 +60,8 @@ Progress: [██████░░░░] 64%
 | Phase 01 P06 | 11min | 2 tasks | 4 files |
 | Phase 01 P07 | 22min | 3 tasks | 7 files |
 | Phase 01 P08 | 15min | 3 tasks | 4 files |
+| Phase 01 P09 | 17min | 3 tasks | 6 files |
+| Phase 01 P12 | 20min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -89,6 +91,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Credential display IDs use independent randomness and never secret-derived prefixes, suffixes, hashes, or fingerprints.
 - [Phase 01]: Browser rotation stages a pending linked replacement; validation and promotion remain separate authoritative commands.
 - [Phase 01]: Provider generations fence new leases immediately while acquired buffers may finish and are zeroized on release.
+- [Phase 01]: Explicit legacy NVIDIA constructor inputs are immediately DPAPI-sealed behind opaque process-local handles; runtime clients never use environment or config fallback.
+- [Phase 01]: Provider generation mismatches invalidate text, catalog, model, speech, and client caches before stale work is rejected.
+- [Phase 01]: Catalog presence remains capability metadata only; GLM 5.2 stays the preferred general route and Phase 6 health/quota routing remains deferred.
+- [Phase 01]: Control and credential mutations retain prior authoritative metadata while submitting and accept only greater backend revisions, versions, or generations.
+- [Phase 01]: Credential API payloads are projected through a local allowlist before rendering so backend envelope differences cannot expose arbitrary fields.
+- [Phase 01]: The existing dashboard key-manager control is intercepted inside the owned trust boundary, avoiding changes to the validated dashboard module.
 
 ### Pending Todos
 
@@ -107,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-26T02:00:09.907Z
-Stopped at: Completed 01-08-PLAN.md
+Last session: 2026-07-26T02:25:35.198Z
+Stopped at: Completed 01-09 and 01-12 plans
 Resume file: None
