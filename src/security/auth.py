@@ -47,6 +47,10 @@ ALL_SCOPES = frozenset(
 
 _SESSION_DOMAIN = b"jarvis.operator.session.v1\0"
 _CSRF_DOMAIN = b"jarvis.operator.csrf.v1\0"
+_SCRYPT_N = 2**14
+_SCRYPT_R = 8
+_SCRYPT_P = 1
+_SCRYPT_DKLEN = 32
 
 
 class AuthenticationError(RuntimeError):
@@ -128,6 +132,7 @@ class SessionService:
         self._bootstrap_digest: bytes | None = None
         self._unlock_failures = 0
         self._unlock_not_before: datetime | None = None
+        self._load_bootstrap_verifier()
 
     def configure_bootstrap(self, credential: str) -> None:
         """Install the verifier supplied by the explicit bootstrap command.
@@ -138,13 +143,82 @@ class SessionService:
         """
 
         self._validate_bootstrap_input(credential)
-        salt = secrets.token_bytes(32)
-        digest = self._derive_bootstrap(credential, salt)
+        salt = bytearray(secrets.token_bytes(32))
+        digest = bytearray(self._derive_bootstrap(credential, salt))
+        now = self._timestamp(self._now())
+        try:
+            with self.store.immediate_transaction() as tx:
+                current = tx.fetchone(
+                    "SELECT version FROM operator_bootstrap WHERE singleton = 1"
+                )
+                version = 1 if current is None else int(current["version"]) + 1
+                tx.execute(
+                    """INSERT INTO operator_bootstrap(
+                           singleton, algorithm, salt, verifier, scrypt_n,
+                           scrypt_r, scrypt_p, dklen, version, configured_at
+                       ) VALUES(1, 'scrypt', ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(singleton) DO UPDATE SET
+                           algorithm = excluded.algorithm,
+                           salt = excluded.salt,
+                           verifier = excluded.verifier,
+                           scrypt_n = excluded.scrypt_n,
+                           scrypt_r = excluded.scrypt_r,
+                           scrypt_p = excluded.scrypt_p,
+                           dklen = excluded.dklen,
+                           version = excluded.version,
+                           configured_at = excluded.configured_at""",
+                    (
+                        bytes(salt),
+                        bytes(digest),
+                        _SCRYPT_N,
+                        _SCRYPT_R,
+                        _SCRYPT_P,
+                        _SCRYPT_DKLEN,
+                        version,
+                        now,
+                    ),
+                )
+                self._append_auth_audit(
+                    tx,
+                    actor_id="operator",
+                    session_digest="bootstrap",
+                    action="bootstrap_configure",
+                    outcome="accepted",
+                    reason_code="verifier_stored",
+                )
+        finally:
+            stored_salt = bytes(salt)
+            stored_digest = bytes(digest)
+            salt[:] = b"\x00" * len(salt)
+            digest[:] = b"\x00" * len(digest)
         with self._bootstrap_lock:
-            self._bootstrap_salt = salt
-            self._bootstrap_digest = digest
+            self._bootstrap_salt = stored_salt
+            self._bootstrap_digest = stored_digest
             self._unlock_failures = 0
             self._unlock_not_before = None
+
+    def _load_bootstrap_verifier(self) -> None:
+        with self.store._lock:
+            row = self.store._require_connection().execute(
+                """SELECT algorithm, salt, verifier, scrypt_n, scrypt_r,
+                          scrypt_p, dklen
+                   FROM operator_bootstrap WHERE singleton = 1"""
+            ).fetchone()
+        if row is None:
+            return
+        if (
+            str(row["algorithm"]) != "scrypt"
+            or int(row["scrypt_n"]) != _SCRYPT_N
+            or int(row["scrypt_r"]) != _SCRYPT_R
+            or int(row["scrypt_p"]) != _SCRYPT_P
+            or int(row["dklen"]) != _SCRYPT_DKLEN
+            or len(bytes(row["salt"])) < 16
+            or len(bytes(row["verifier"])) != _SCRYPT_DKLEN
+        ):
+            raise AuthenticationError("bootstrap_verifier_invalid")
+        with self._bootstrap_lock:
+            self._bootstrap_salt = bytes(row["salt"])
+            self._bootstrap_digest = bytes(row["verifier"])
 
     def bootstrap_verifier_metadata(self) -> dict[str, str]:
         with self._bootstrap_lock:
@@ -467,7 +541,12 @@ class SessionService:
     @staticmethod
     def _derive_bootstrap(credential: str, salt: bytes) -> bytes:
         return hashlib.scrypt(
-            credential.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32
+            credential.encode("utf-8"),
+            salt=salt,
+            n=_SCRYPT_N,
+            r=_SCRYPT_R,
+            p=_SCRYPT_P,
+            dklen=_SCRYPT_DKLEN,
         )
 
     @staticmethod

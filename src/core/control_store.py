@@ -198,6 +198,33 @@ _MIGRATIONS = (
             )""",
         ),
     ),
+    _Migration(
+        3,
+        "operator_bootstrap_and_provider_cutover",
+        (
+            """CREATE TABLE operator_bootstrap (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                algorithm TEXT NOT NULL CHECK(algorithm = 'scrypt'),
+                salt BLOB NOT NULL,
+                verifier BLOB NOT NULL,
+                scrypt_n INTEGER NOT NULL CHECK(scrypt_n >= 2),
+                scrypt_r INTEGER NOT NULL CHECK(scrypt_r >= 1),
+                scrypt_p INTEGER NOT NULL CHECK(scrypt_p >= 1),
+                dklen INTEGER NOT NULL CHECK(dklen >= 16),
+                version INTEGER NOT NULL CHECK(version >= 1),
+                configured_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE provider_cutovers (
+                provider TEXT PRIMARY KEY,
+                active_credential_id TEXT NOT NULL,
+                provider_generation INTEGER NOT NULL CHECK(provider_generation >= 1),
+                source_kind TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                restart_required INTEGER NOT NULL DEFAULT 1 CHECK(restart_required IN (0, 1)),
+                FOREIGN KEY(active_credential_id) REFERENCES credentials(credential_id)
+            )""",
+        ),
+    ),
 )
 
 
@@ -551,7 +578,8 @@ class ControlStore:
                 required = {
                     "schema_migrations", "operator_sessions", "control_states",
                     "credentials", "provider_generations", "audit_keyring",
-                    "audit_events", "audit_checkpoints",
+                    "audit_events", "audit_checkpoints", "operator_bootstrap",
+                    "provider_cutovers",
                 }
                 if not required.issubset(names):
                     raise RestoreVerificationError("restore_schema_invalid")
