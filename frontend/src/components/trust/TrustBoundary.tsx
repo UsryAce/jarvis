@@ -17,6 +17,7 @@ import api, {
 } from "../../services/api";
 import { UnlockGate } from "./UnlockGate";
 import { EmergencyControlRail } from "./EmergencyControlRail";
+import { CredentialManager } from "./CredentialManager";
 
 export type TrustBoundaryState =
   | "checking"
@@ -83,6 +84,7 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
   const [control, setControl] = useState<ControlSnapshot | null>(null);
   const [safeReferenceId, setSafeReferenceId] = useState<string | null>(null);
   const [reconciliationRequired, setReconciliationRequired] = useState(false);
+  const [credentialManagerOpen, setCredentialManagerOpen] = useState(false);
   const sessionRef = useRef<SessionSnapshot | null>(null);
   const generationRef = useRef(0);
 
@@ -91,6 +93,7 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
     sessionRef.current = null;
     setSession(null);
     setControl(null);
+    setCredentialManagerOpen(false);
   }, []);
 
   const loadAuthoritativeControl = useCallback(
@@ -203,8 +206,28 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
               setState(stateForSnapshot(snapshot));
             }}
             onMutationPending={() => setReconciliationRequired(true)}
+            onOpenCredentials={() => setCredentialManagerOpen(true)}
           />
-          <div className="trust-protected-content">{children}</div>
+          <div
+            className="trust-protected-content"
+            onClickCapture={(event) => {
+              const button = (event.target as HTMLElement).closest("button");
+              const label = button?.textContent?.replace(/\s+/g, " ").trim().toUpperCase();
+              if (label === "API KEY MANAGER") {
+                event.preventDefault();
+                event.stopPropagation();
+                setCredentialManagerOpen(true);
+              }
+            }}
+          >
+            {children}
+          </div>
+          <CredentialManager
+            open={credentialManagerOpen}
+            readOnly={state === "read_only"}
+            onClose={() => setCredentialManagerOpen(false)}
+            onMutationPending={() => setReconciliationRequired(true)}
+          />
         </div>
       ) : (
         <UnlockGate
