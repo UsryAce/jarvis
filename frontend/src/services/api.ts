@@ -20,6 +20,20 @@ export interface SessionSnapshot {
   expires_at: string;
 }
 
+export interface JarvisUISnapshot {
+  at: string;
+  source: "live";
+  agent: { state: string; detail: string; since: string; autonomy: number; held: boolean };
+  telemetry: { uptimeSec: number; cpuPct: number; ramPct: number; gpuPct: number; diskPct: number; netUpMbs: number; netDownMbs: number };
+  session: { id: string; startedAt: string; durationSec: number; route: string; messages: number } | null;
+  workspace: { project: string; branch: string; dirtyFiles: number; agentsActive: number; agentsTotal: number; tasksComplete: number; tasksTotal: number } | null;
+  graph: { nodes: number; edges: number; vaultNotes: number; health: string } | null;
+  router: { auto: boolean; primary: string; models: Array<{ id: string; name: string; provider: string; health: string }> } | null;
+  providers: Array<{ id: string; name: string; status: string }>;
+  voice: { armed: boolean; profile: string; sensitivity: number } | null;
+  events: Array<{ at: string; who: string; meta: string; text: string; level: string }>;
+}
+
 export interface SafeApiError {
   code:
     | "authentication_required"
@@ -1020,6 +1034,18 @@ class APIClient {
         created?: number;
         owned_by?: string;
       }>;
+    };
+  }
+
+  async getUiSnapshot(): Promise<JarvisUISnapshot> {
+    return (await this.client.get<JarvisUISnapshot>("/api/ui/snapshot")).data;
+  }
+
+  async sendUiCommand(action: string, payload: Record<string, unknown> = {}) {
+    return (await this.client.post("/api/ui/command", { action, payload })).data as {
+      ok: boolean;
+      message: string;
+      runId?: string;
     };
   }
 

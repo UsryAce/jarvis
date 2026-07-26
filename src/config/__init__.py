@@ -134,6 +134,12 @@ class Config:
 
     def _load_env_vars(self):
         """Load configuration from environment variables."""
+        allowed_origins = os.getenv("JARVIS_ALLOWED_ORIGINS", "").strip()
+        if allowed_origins:
+            self._set_nested(
+                "security.allowed_origins",
+                [origin.strip() for origin in allowed_origins.split(",") if origin.strip()],
+            )
         env_mappings = {
             "NVIDIA_API_BASE": "nvidia.api_base",
             "JARVIS_WAKE_WORD": "jarvis.wake_word",
