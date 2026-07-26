@@ -12,7 +12,6 @@ const VisionDemo = lazy(() => import('./pages/VisionDemo').then(module => ({ def
 const HomeControl = lazy(() => import('./pages/HomeControl').then(module => ({ default: module.HomeControl })))
 const SystemMonitor = lazy(() => import('./pages/SystemMonitor').then(module => ({ default: module.SystemMonitor })))
 const Settings = lazy(() => import('./pages/Settings').then(module => ({ default: module.Settings })))
-const CommandCenterNext = lazy(() => import('./pages/CommandCenterNext'))
 
 const routeFallback = (
   <div className="jarvis-route-loading" role="status" aria-live="polite">
@@ -81,7 +80,6 @@ function ProtectedApplication() {
             <Route path="/home" element={<HomeControl />} />
             <Route path="/system" element={<SystemMonitor />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/next" element={<CommandCenterNext />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
