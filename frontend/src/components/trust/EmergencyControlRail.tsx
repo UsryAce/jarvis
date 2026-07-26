@@ -36,17 +36,27 @@ function requestId(): string {
 }
 
 function isTransitional(snapshot: ControlSnapshot): boolean {
-  return ["accepted", "pausing", "cancelling", "stopping"].includes(
-    snapshot.state,
+  return [
+    "accepted",
+    "pausing",
+    "cancelling",
+    "cancel_requested",
+    "emergency_stopped",
+    "stopping",
+  ].includes(
+    String(snapshot.state),
   );
 }
 
 function snapshotCopy(snapshot: ControlSnapshot): string {
-  switch (snapshot.state) {
+  switch (String(snapshot.state)) {
+    case "running":
     case "operational":
       return "CONTROL PLANE READY — No stop is active.";
+    case "emergency_stopped":
     case "accepted":
       return `STOP REQUEST ACCEPTED — Revision ${snapshot.revision}. Awaiting worker confirmation.`;
+    case "cancel_requested":
     case "pausing":
     case "cancelling":
     case "stopping":
@@ -61,6 +71,8 @@ function snapshotCopy(snapshot: ControlSnapshot): string {
       return "STOP STATUS UNCONFIRMED — The command was accepted, but final shutdown evidence is unavailable. New work is blocked; descendants or external effects may remain.";
     case "integrity_locked":
       return "INTEGRITY CHECK FAILED — Privileged changes are locked.";
+    default:
+      return "CONTROL STATE UNKNOWN — Refresh authoritative state before using protected controls.";
   }
 }
 
@@ -78,15 +90,16 @@ function toneFor(
   snapshot: ControlSnapshot,
   localState: LocalActionState,
 ): "ready" | "warning" | "critical" {
+  const state = String(snapshot.state);
   if (localState !== "idle" || isTransitional(snapshot)) return "warning";
   if (
     ["stopped", "partial", "unconfirmed", "integrity_locked"].includes(
-      snapshot.state,
+      state,
     )
   ) {
     return "critical";
   }
-  return "ready";
+  return ["running", "operational"].includes(state) ? "ready" : "warning";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -172,7 +185,7 @@ export function EmergencyControlRail({
     localState === "idle" &&
     !readOnly &&
     snapshot.allowed_actions.includes("reset") &&
-    ["stopped", "partial", "unconfirmed"].includes(snapshot.state);
+    ["stopped", "partial", "unconfirmed"].includes(String(snapshot.state));
 
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
@@ -270,7 +283,7 @@ export function EmergencyControlRail({
 
   const semanticKey = `${snapshot.revision}:${snapshot.state}:${localState}`;
   const shouldAlert =
-    ["partial", "unconfirmed", "integrity_locked"].includes(snapshot.state) ||
+    ["partial", "unconfirmed", "integrity_locked"].includes(String(snapshot.state)) ||
     localState === "ambiguous";
   const liveText = announcedRef.current === semanticKey ? "" : presentation;
   useEffect(() => {
@@ -329,13 +342,13 @@ export function EmergencyControlRail({
               className="trust-button--danger trust-control-rail__primary"
               onClick={() => setDialog("reset")}
             >
-              {snapshot.state === "stopped" ? "Reset stop" : "Review & reset"}
+              {String(snapshot.state) === "stopped" ? "Reset stop" : "Review & reset"}
             </button>
           ) : localState === "offline" ||
             localState === "ambiguous" ||
-            snapshot.state === "unconfirmed" ? (
+            String(snapshot.state) === "unconfirmed" ? (
             <button type="button" onClick={() => void refresh()}>
-              {snapshot.state === "unconfirmed" ? "Retry status" : "Retry connection"}
+              {String(snapshot.state) === "unconfirmed" ? "Retry status" : "Retry connection"}
             </button>
           ) : (
             <span className="trust-control-rail__locked">No action allowed</span>

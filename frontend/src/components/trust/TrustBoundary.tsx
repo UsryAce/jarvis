@@ -18,6 +18,8 @@ import api, {
 import { UnlockGate } from "./UnlockGate";
 import { EmergencyControlRail } from "./EmergencyControlRail";
 import { CredentialManager } from "./CredentialManager";
+import { AuthoritativeNotice } from "./AuthoritativeNotice";
+import "./trust.css";
 
 export type TrustBoundaryState =
   | "checking"
@@ -47,7 +49,7 @@ export const TrustSessionContext = createContext<TrustSessionContextValue | null
 
 function stateForSnapshot(control: ControlSnapshot): TrustBoundaryState {
   if (control.state === "integrity_locked") return "integrity_locked";
-  return control.allowed_actions.length === 0 ? "read_only" : "unlocked";
+  return control.reason_code === "read_only" ? "read_only" : "unlocked";
 }
 
 function boundaryStateForError(
@@ -192,7 +194,10 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
     ],
   );
 
-  const protectedState = state === "unlocked" || state === "read_only";
+  const protectedState =
+    state === "unlocked" ||
+    state === "read_only" ||
+    state === "integrity_locked";
 
   return (
     <TrustSessionContext.Provider value={value}>
@@ -220,11 +225,24 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
               }
             }}
           >
-            {children}
+            {state === "integrity_locked" ? (
+              <main className="trust-integrity-surface">
+                <AuthoritativeNotice
+                  tone="critical"
+                  heading="INTEGRITY CHECK FAILED"
+                  message="Privileged changes are locked. Use the protected recovery procedure."
+                  referenceId={safeReferenceId}
+                  alert
+                />
+              </main>
+            ) : (
+              children
+            )}
           </div>
           <CredentialManager
             open={credentialManagerOpen}
             readOnly={state === "read_only"}
+            integrityLocked={state === "integrity_locked"}
             onClose={() => setCredentialManagerOpen(false)}
             onMutationPending={() => setReconciliationRequired(true)}
           />
