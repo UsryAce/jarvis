@@ -45,12 +45,17 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { api } from "../services/api";
+import {
+  api,
+  type ControlSnapshot,
+  SafeApiException,
+} from "../services/api";
 import WorkspacePanel from "../components/WorkspacePanel";
 import AgentSwarmPanel, {
   type AgentCollaborationMode,
 } from "../components/AgentSwarmPanel";
 import { ClapDetector } from "../lib/clapDetector";
+import { useTrustSession } from "../components/trust/TrustBoundary";
 import "./Dashboard.css";
 
 type TranscriptItem = {
@@ -90,6 +95,22 @@ type Diagnostics = {
   brainEdges: number;
 };
 type AudioDeviceChoice = { id: string; label: string };
+type RunControlKind = "agent" | "swarm";
+type RunControlPhase =
+  | "loading"
+  | "ready"
+  | "submitting"
+  | "stale"
+  | "ambiguous"
+  | "blocked"
+  | "offline";
+type RunControlFeedback = {
+  scopeId: string;
+  phase: RunControlPhase;
+  snapshot: ControlSnapshot | null;
+  priorRuntimeState: string;
+  referenceId: string | null;
+};
 
 const GLM_MODEL = "z-ai/glm-5.2";
 const DURABLE_VOICE_AGENT_PATTERN =
@@ -105,6 +126,91 @@ function requestsRealAction(message: string) {
     ACTION_INTENT_PATTERN.test(normalized) &&
     !CONSULTATIVE_REQUEST_PATTERN.test(normalized)
   );
+}
+
+function clientRequestId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `request-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+}
+
+function safeReferenceId(value: unknown): string | null {
+  return typeof value === "string" &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(value)
+    ? value
+    : null;
+}
+
+function safeRuntimeState(value: unknown): string {
+  const state = typeof value === "string" ? value.toLowerCase() : "";
+  return [
+    "queued",
+    "pending",
+    "running",
+    "awaiting_confirmation",
+    "completed",
+    "failed",
+    "cancelled",
+    "canceled",
+  ].includes(state)
+    ? state.replace(/_/g, " ").toUpperCase()
+    : "UNKNOWN";
+}
+
+function isRunControlTransitional(snapshot: ControlSnapshot | null): boolean {
+  return Boolean(
+    snapshot &&
+      [
+        "accepted",
+        "pausing",
+        "cancelling",
+        "cancel_requested",
+        "stopping",
+      ].includes(String(snapshot.state)),
+  );
+}
+
+function runControlCopy(feedback: RunControlFeedback): string {
+  const revision = feedback.snapshot?.revision;
+  if (feedback.phase === "loading") {
+    return "LOADING AUTHORITATIVE CONTROL STATE — No action has been sent.";
+  }
+  if (feedback.phase === "submitting") {
+    return `CANCEL REQUESTED — ${feedback.priorRuntimeState} remains the last runtime state until newer backend evidence arrives.`;
+  }
+  if (feedback.phase === "stale") {
+    return `CONTROL REVISION CHANGED — Loaded REV ${revision ?? "—"}. Review it before sending another action.`;
+  }
+  if (feedback.phase === "ambiguous") {
+    return "STATUS UNKNOWN — Repeat cancellation is blocked until authoritative reconciliation completes.";
+  }
+  if (feedback.phase === "blocked") {
+    return `CANCEL NOT ALLOWED — REV ${revision ?? "—"} does not authorize a scoped cancel action.`;
+  }
+  if (feedback.phase === "offline") {
+    return "CONTROL STATE UNAVAILABLE — No stop result can be claimed or repeated safely.";
+  }
+  switch (String(feedback.snapshot?.state || "unknown")) {
+    case "accepted":
+    case "cancel_requested":
+      return `CANCEL ACCEPTED — REV ${revision}. ${feedback.priorRuntimeState} remains the last confirmed runtime state.`;
+    case "cancelling":
+    case "stopping":
+      return `STOPPING — REV ${revision}. Waiting for newer runtime evidence.`;
+    case "stopped":
+      return `STOPPED — Authoritative control REV ${revision} confirms the scoped stop.`;
+    case "partial":
+      return `PARTIAL STOP — ${feedback.snapshot?.residue_count ?? "Unknown"} item(s) remain unconfirmed. No descendant termination is inferred.`;
+    case "unconfirmed":
+      return "STOP UNCONFIRMED — The request is durable, but descendant or external effects may remain.";
+    case "running":
+    case "operational":
+      return `CONTROL READY — REV ${revision}; runtime ${feedback.priorRuntimeState}.`;
+    default:
+      return `CONTROL STATE UNKNOWN — REV ${revision ?? "—"}. Review authoritative evidence before acting.`;
+  }
 }
 const VOICE_PROFILES = [
   {
@@ -251,6 +357,44 @@ function Metric({
           <b style={{ width: `${bar}%` }} />
         </i>
       )}
+    </div>
+  );
+}
+
+function RunControlNotice({
+  feedback,
+  onReconcile,
+  onReview,
+}: {
+  feedback: RunControlFeedback | null;
+  onReconcile: () => void;
+  onReview: () => void;
+}) {
+  if (!feedback) return null;
+  const needsReconcile = ["ambiguous", "offline"].includes(feedback.phase);
+  const needsReview = feedback.phase === "stale";
+  const auditId = safeReferenceId(feedback.snapshot?.audit_id);
+  return (
+    <div
+      className={`run-control-notice run-control-notice--${feedback.phase}`}
+      role={feedback.phase === "ambiguous" ? "alert" : "status"}
+    >
+      <strong>{runControlCopy(feedback)}</strong>
+      <span>
+        SCOPE RUN/{feedback.scopeId}
+        {auditId ? ` · AUDIT ${auditId}` : ""}
+        {feedback.referenceId ? ` · REF ${feedback.referenceId}` : ""}
+      </span>
+      {needsReconcile ? (
+        <button type="button" onClick={onReconcile}>
+          RECONCILE STATUS
+        </button>
+      ) : null}
+      {needsReview ? (
+        <button type="button" onClick={onReview}>
+          REVIEW REVISION
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -653,6 +797,7 @@ function encodeMonoWav(chunks: Float32Array[], sampleRate: number) {
 }
 
 function Dashboard() {
+  const { markReconciliationRequired } = useTrustSession();
   const [now, setNow] = useState(new Date());
   const [model, setModel] = useState(GLM_MODEL);
   const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() =>
@@ -674,6 +819,8 @@ function Dashboard() {
     localStorage.getItem("jarvis_agent_autonomy") === "guarded" ? "guarded" : "full",
   );
   const [agentRun, setAgentRun] = useState<Record<string, any> | null>(null);
+  const [agentControl, setAgentControl] =
+    useState<RunControlFeedback | null>(null);
   const [, setAgentRuntime] = useState<Record<string, any> | null>(null);
   const [swarmMode, setSwarmMode] = useState<AgentCollaborationMode>(() => {
     const saved = localStorage.getItem("jarvis_swarm_mode");
@@ -684,6 +831,8 @@ function Dashboard() {
     return Number.isFinite(saved) ? Math.min(8, Math.max(2, saved)) : 8;
   });
   const [swarmRun, setSwarmRun] = useState<Record<string, any> | null>(null);
+  const [swarmControl, setSwarmControl] =
+    useState<RunControlFeedback | null>(null);
   const [swarmRuntime, setSwarmRuntime] = useState<Record<string, any> | null>(
     null,
   );
@@ -1950,14 +2099,182 @@ function Dashboard() {
     }
   };
 
-  const cancelAgentRun = async () => {
-    if (!agentRun?.id) return;
-    try {
-      setAgentRun(await api.cancelAgentRun(agentRun.id));
-      toast("Agent run cancelled");
-    } catch {
-      toast("Agent run could not be cancelled", "warn");
+  const updateRunControl = useCallback(
+    (kind: RunControlKind, feedback: RunControlFeedback) => {
+      if (kind === "agent") setAgentControl(feedback);
+      else setSwarmControl(feedback);
+    },
+    [],
+  );
+
+  const loadRunControl = useCallback(
+    async (
+      kind: RunControlKind,
+      run: Record<string, any>,
+      reviewRequired = false,
+    ) => {
+      const scopeId = String(run.id || "");
+      if (!scopeId) return;
+      const priorRuntimeState = safeRuntimeState(run.status);
+      updateRunControl(kind, {
+        scopeId,
+        phase: "loading",
+        snapshot: null,
+        priorRuntimeState,
+        referenceId: null,
+      });
+      try {
+        const snapshot = await api.getControl("run", scopeId);
+        updateRunControl(kind, {
+          scopeId,
+          phase: reviewRequired ? "stale" : "ready",
+          snapshot,
+          priorRuntimeState,
+          referenceId: safeReferenceId(snapshot.audit_id),
+        });
+      } catch (error) {
+        const safe = error instanceof SafeApiException ? error.safe : null;
+        updateRunControl(kind, {
+          scopeId,
+          phase: safe?.applied === null ? "ambiguous" : "offline",
+          snapshot: null,
+          priorRuntimeState,
+          referenceId: safeReferenceId(
+            safe?.correlation_id || safe?.audit_id,
+          ),
+        });
+      }
+    },
+    [updateRunControl],
+  );
+
+  const reviewRunControl = useCallback((kind: RunControlKind) => {
+    if (kind === "agent") {
+      setAgentControl((current) =>
+        current ? { ...current, phase: "ready" } : current,
+      );
+    } else {
+      setSwarmControl((current) =>
+        current ? { ...current, phase: "ready" } : current,
+      );
     }
+  }, []);
+
+  const requestRunCancellation = useCallback(
+    async (kind: RunControlKind, run: Record<string, any>) => {
+      const scopeId = String(run.id || "");
+      if (!scopeId) return;
+      const current = kind === "agent" ? agentControl : swarmControl;
+      if (
+        !current ||
+        current.scopeId !== scopeId ||
+        current.phase !== "ready" ||
+        !current.snapshot
+      ) {
+        if (!current || current.scopeId !== scopeId) {
+          await loadRunControl(kind, run);
+        }
+        return;
+      }
+      if (!current.snapshot.allowed_actions.includes("cancel")) {
+        updateRunControl(kind, { ...current, phase: "blocked" });
+        return;
+      }
+
+      updateRunControl(kind, { ...current, phase: "submitting" });
+      markReconciliationRequired();
+      try {
+        const outcome = await api.mutateControl({
+          action: "cancel",
+          scope_type: "run",
+          scope_id: scopeId,
+          expected_revision: current.snapshot.revision,
+          client_request_id: clientRequestId(),
+          reason_code: "operator_requested",
+        });
+        if (outcome.status === "authoritative") {
+          updateRunControl(kind, {
+            ...current,
+            phase: "ready",
+            snapshot: outcome.value,
+            referenceId: safeReferenceId(outcome.value.audit_id),
+          });
+          return;
+        }
+        const reconciled =
+          outcome.authoritative && !Array.isArray(outcome.authoritative)
+            ? outcome.authoritative
+            : current.snapshot;
+        updateRunControl(kind, {
+          ...current,
+          phase: outcome.reason === "stale" ? "stale" : "ambiguous",
+          snapshot: reconciled,
+          referenceId: safeReferenceId(
+            outcome.error.correlation_id || outcome.error.audit_id,
+          ),
+        });
+      } catch (error) {
+        const safe = error instanceof SafeApiException ? error.safe : null;
+        updateRunControl(kind, {
+          ...current,
+          phase: safe?.applied === null ? "ambiguous" : "offline",
+          referenceId: safeReferenceId(
+            safe?.correlation_id || safe?.audit_id,
+          ),
+        });
+      }
+    },
+    [
+      agentControl,
+      loadRunControl,
+      markReconciliationRequired,
+      swarmControl,
+      updateRunControl,
+    ],
+  );
+
+  useEffect(() => {
+    if (!agentRun?.id || agentControl?.scopeId === String(agentRun.id)) return;
+    void loadRunControl("agent", agentRun);
+  }, [agentControl?.scopeId, agentRun, loadRunControl]);
+
+  useEffect(() => {
+    if (!swarmRun?.id || swarmControl?.scopeId === String(swarmRun.id)) return;
+    void loadRunControl("swarm", swarmRun);
+  }, [loadRunControl, swarmControl?.scopeId, swarmRun]);
+
+  useEffect(() => {
+    if (!agentRun?.id || !isRunControlTransitional(agentControl?.snapshot ?? null)) {
+      return;
+    }
+    const interval = window.setInterval(async () => {
+      try {
+        const [controlSnapshot, runtimeSnapshot] = await Promise.all([
+          api.getControl("run", String(agentRun.id)),
+          api.getAgentRun(String(agentRun.id)),
+        ]);
+        setAgentControl((current) =>
+          current &&
+          controlSnapshot.revision >= (current.snapshot?.revision ?? -1)
+            ? {
+                ...current,
+                phase: "ready",
+                snapshot: controlSnapshot,
+                priorRuntimeState: safeRuntimeState(runtimeSnapshot.status),
+                referenceId: safeReferenceId(controlSnapshot.audit_id),
+              }
+            : current,
+        );
+        setAgentRun(runtimeSnapshot);
+      } catch {
+        // Keep the last authoritative snapshot; the operator can reconcile inline.
+      }
+    }, 2_000);
+    return () => window.clearInterval(interval);
+  }, [agentControl?.snapshot?.revision, agentControl?.snapshot?.state, agentRun?.id]);
+
+  const cancelAgentRun = async () => {
+    if (agentRun?.id) await requestRunCancellation("agent", agentRun);
   };
 
   const refreshSwarm = async () => {
@@ -2023,14 +2340,38 @@ function Dashboard() {
     }
   };
 
-  const cancelSwarm = async () => {
-    if (!swarmRun?.id) return;
-    try {
-      setSwarmRun(await api.cancelSwarmRun(swarmRun.id));
-      toast("Swarm mission aborted");
-    } catch {
-      toast("Swarm mission could not be cancelled", "warn");
+  useEffect(() => {
+    if (!swarmRun?.id || !isRunControlTransitional(swarmControl?.snapshot ?? null)) {
+      return;
     }
+    const interval = window.setInterval(async () => {
+      try {
+        const [controlSnapshot, runtimeSnapshot] = await Promise.all([
+          api.getControl("run", String(swarmRun.id)),
+          api.getSwarmRun(String(swarmRun.id)),
+        ]);
+        setSwarmControl((current) =>
+          current &&
+          controlSnapshot.revision >= (current.snapshot?.revision ?? -1)
+            ? {
+                ...current,
+                phase: "ready",
+                snapshot: controlSnapshot,
+                priorRuntimeState: safeRuntimeState(runtimeSnapshot.status),
+                referenceId: safeReferenceId(controlSnapshot.audit_id),
+              }
+            : current,
+        );
+        setSwarmRun(runtimeSnapshot);
+      } catch {
+        // Keep the last authoritative snapshot; the operator can reconcile inline.
+      }
+    }, 2_000);
+    return () => window.clearInterval(interval);
+  }, [swarmControl?.snapshot?.revision, swarmControl?.snapshot?.state, swarmRun?.id]);
+
+  const cancelSwarm = async () => {
+    if (swarmRun?.id) await requestRunCancellation("swarm", swarmRun);
   };
 
   const integrateSwarm = async () => {
@@ -3291,6 +3632,15 @@ function Dashboard() {
                     onIntegrate={integrateSwarm}
                     onRejectIntegration={rejectSwarmIntegration}
                   />
+                  <RunControlNotice
+                    feedback={swarmControl}
+                    onReconcile={() => {
+                      if (swarmRun?.id) {
+                        void loadRunControl("swarm", swarmRun, true);
+                      }
+                    }}
+                    onReview={() => reviewRunControl("swarm")}
+                  />
                 </>
               )}
               {modal === "agent" && (
@@ -3369,6 +3719,15 @@ function Dashboard() {
                           },
                         )}
                       </div>
+                      <RunControlNotice
+                        feedback={agentControl}
+                        onReconcile={() => {
+                          if (agentRun?.id) {
+                            void loadRunControl("agent", agentRun, true);
+                          }
+                        }}
+                        onReview={() => reviewRunControl("agent")}
+                      />
                       {agentRun.status === "awaiting_confirmation" && (
                         <div className="agent-approval">
                           <ShieldCheck />
@@ -3382,7 +3741,15 @@ function Dashboard() {
                           >
                             APPROVE STEP
                           </button>
-                          <button onClick={() => void cancelAgentRun()}>
+                          <button
+                            onClick={() => void cancelAgentRun()}
+                            disabled={
+                              agentControl?.phase !== "ready" ||
+                              !agentControl.snapshot?.allowed_actions.includes(
+                                "cancel",
+                              )
+                            }
+                          >
                             CANCEL RUN
                           </button>
                         </div>
