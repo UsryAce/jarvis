@@ -20,10 +20,12 @@ from src.clients.nvidia_client import NVIDIAClient
 from src.config import config
 from src.api.auth_routes import router as auth_router
 from src.api.control_routes import router as control_router
+from src.api.credential_routes import router as credential_router
 from src.api.dashboard_routes import router as dashboard_router
 from src.core.audit import AuditService
 from src.core.control import ControlService
 from src.core.control_store import ControlStore
+from src.core.credentials import CredentialService
 from src.security.auth import (
     APPROVALS_WRITE,
     AuthBoundaryMiddleware,
@@ -72,6 +74,12 @@ async def lifespan(app: FastAPI):
         )
         app.state.audit_service = audit_service
         app.state.session_service = SessionService(store, clock=app.state.session_clock)
+        app.state.credential_service = CredentialService(
+            store,
+            protector=store.protector,
+            audit_service=audit_service,
+            clock=app.state.session_clock,
+        )
         control_service = ControlService(
             store, audit_service=audit_service, clock=app.state.session_clock
         )
@@ -114,6 +122,7 @@ app = FastAPI(
 )
 app.include_router(auth_router)
 app.include_router(control_router)
+app.include_router(credential_router)
 app.include_router(dashboard_router)
 
 
@@ -976,6 +985,12 @@ def _install_security(
         audit_service = AuditService(store, protector=store.protector, clock=clock)
         application.state.audit_service = audit_service
         application.state.session_service = SessionService(store, clock=clock)
+        application.state.credential_service = CredentialService(
+            store,
+            protector=store.protector,
+            audit_service=audit_service,
+            clock=clock,
+        )
         application.state.control_service = ControlService(
             store, audit_service=audit_service, clock=clock
         )
