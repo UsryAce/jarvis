@@ -1335,7 +1335,18 @@ class Component extends DCLogic {
     clearTimeout(this.toastT);
     this.toastT = setTimeout(()=> this.setState({toastOn:false}), 3600);
   }
-  go(tab){ return ()=> this.setState({tab}); }
+  bridge(action, payload){
+    try { window.parent.postMessage({source:'jarvis-design',action:action,payload:payload||{}}, window.location.origin); }
+    catch(err){ this.toast('Interface bridge unavailable'); }
+  }
+  go(tab){
+    const embedded = ['DASHBOARD','MISSIONS','AGENTS','PROJECTS','BRAIN','SECURITY'];
+    if (embedded.includes(tab)) return ()=> this.setState({tab});
+    if (tab === 'VOICE') return ()=> this.bridge('navigate',{to:'/voice'});
+    if (tab === 'SETTINGS') return ()=> this.bridge('navigate',{to:'/settings'});
+    if (tab === 'DEVICES') return ()=> this.bridge('navigate',{to:'/home'});
+    return ()=> this.bridge('workspace',{name:tab});
+  }
   runCommand(action, payload, localUpdate){
     if (!this.store){ this.toast('Backend connection is not ready'); return Promise.resolve(false); }
     return this.store.command(action, payload || {}).then((result)=>{
@@ -1417,7 +1428,7 @@ class Component extends DCLogic {
       modelOptions: council.map(c=>c[1]),
       setModel: (e)=> { const model=e.target.value; this.runCommand('set_primary_model',{model},()=>this.setState({model})); },
       refresh: ()=> this.runCommand('refresh_catalog',{}),
-      notifyKeys: ()=> this.toast('API keys stay in the local vault — never rendered in this view'),
+      notifyKeys: ()=> this.bridge('credentials',{}),
       estop: ()=> { if (!this.store || !this.store.emergencyStop) return this.toast('Control plane is not connected'); this.store.emergencyStop().then(result=>{ this.toast(result.message||result.code||(result.ok?'Emergency stop applied':'Emergency stop failed')); if(result.ok) this.setState({held:true,st:'paused'}); }); },
       council: council.map(c=>({
         name:c[0], id:c[1], n:c[2], col:c[3],
@@ -1446,14 +1457,14 @@ class Component extends DCLogic {
         {k:'FIELD', v: s.held ? 'DAMPED' : 'STABLE', col: s.held?AM:TE}
       ],
       holdLabel: s.held ? 'RELEASE HOLD' : 'HOLD TO SPEAK',
-      hold: ()=> { this.setState({held:!s.held}); this.toast(s.held ? 'Hold released · autonomy resumed' : 'Voice hold engaged'); },
+      hold: ()=> this.bridge('navigate',{to:'/voice'}),
       cref: this.cref, onMove: this.onMove, onLeave: this.onLeave, pulse: this.pulse,
       session: [
         {k:'SESSION ID', v:'sess_20260726_0041'},{k:'STARTED', v:'00:41:02'},
         {k:'DURATION', v:'00:0'+(1+s.t%5)+':16'},{k:'ROUTE', v: s.auto?'AUTO':'PINNED'},
         {k:'MESSAGES', v:String(4 + s.extra.length)}
       ],
-      viewSession: ()=> this.toast('Session transcript, tool calls, and costs opened in the audit drawer'),
+      viewSession: ()=> this.bridge('workspace',{name:'CHAT'}),
       quick: ['SYSTEM SCAN','BROWSER','NOTES','FILES','CODE','VOICE']
         .map(q=>({label:q, go:q==='SYSTEM SCAN'?()=>this.runCommand('system_scan',{}):this.go(q)})),
       panelTitle: panel[0],
@@ -1466,8 +1477,8 @@ class Component extends DCLogic {
       voiceState: s.mic ? 'ARMED' : 'DISARMED',
       voiceBtns: [
         {label: s.mic?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
-        {label:'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:()=> this.toast('Push-to-talk held · capturing 6s window')},
-        {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=> this.toast('Input level -18 dBFS · noise floor clean')}
+        {label:'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:()=> this.bridge('navigate',{to:'/voice'})},
+        {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})}
       ],
       sens: '6 / 10', sensW: '60%',
       tokenStats: [
@@ -1481,7 +1492,7 @@ class Component extends DCLogic {
         s: (4 + Math.round(this.rnd(i+53)*5))+'px', col: i%5===0 ? TE : col, o: (0.4 + this.rnd(i+61)*0.6).toFixed(2)
       })),
       graphStats: [{v:'3,475', k:'NODES'},{v:'8,504', k:'EDGES'},{v:'62', k:'VAULT NOTES'}],
-      openGraph: ()=> this.toast('Brain graph opened · 3,475 nodes · clustered by domain'),
+      openGraph: ()=> this.setState({tab:'BRAIN'}),
       envRows: [
         {k:'CPU LOAD', v:cpu+'%', col:col, w:cpu+'%'},
         {k:'MEMORY', v:ram+'%', col:AM, w:ram+'%'},
@@ -1523,10 +1534,10 @@ class Component extends DCLogic {
       ],
       voiceControls: [
         {label: s.mic?'DISARM VOICE':'ARM VOICE', dot: s.mic?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
-        {label:'PUSH TO TALK', dot:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:()=> this.toast('Push-to-talk held · capturing 6s window')},
-        {label:'FREE TALKING', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.toast('Free talking off in this demo · barge-in would stay armed')},
-        {label:'CLAP WAKE', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.toast('Clap wake listening for a double transient')},
-        {label:'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=> this.toast('Voice profile: en-GB male · 168 wpm')},
+        {label:'PUSH TO TALK', dot:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:()=> this.bridge('navigate',{to:'/voice'})},
+        {label:'FREE TALKING', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})},
+        {label:'CLAP WAKE', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})},
+        {label:'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=> this.bridge('navigate',{to:'/voice'})},
         {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=>this.runCommand('set_auto_mode',{enabled:!s.auto},()=>this.setState({auto:!s.auto}))},
         {label:'SWARM · 6 AGENTS', dot:col, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:this.go('AGENTS')}
       ],
@@ -1576,7 +1587,7 @@ class Component extends DCLogic {
     if (L.router){
       out.route = (L.router.auto ? 'AUTO → ' : '') + L.router.primary;
       out.autoLabel = L.router.auto ? 'AUTO ON' : 'AUTO OFF';
-      out.modelOptions = L.router.models.map(m=>m.id);
+      out.modelOptions = L.router.models.filter(m=>m.selectable).map(m=>m.id);
       out.model = s.model && L.router.models.some(m=>m.id===s.model) ? s.model : L.router.primary;
       out.routeSub = L.router.models.length + ' MODELS · ' + (L.providers.length) + ' PROVIDERS';
       out.councilStatus = L.router.models.filter(m=>m.health==='healthy').length + '/' + L.router.models.length + ' ONLINE';
@@ -1585,7 +1596,9 @@ class Component extends DCLogic {
         col: m.health === 'healthy' ? TE : m.health === 'degraded' ? AM : m.health === 'down' ? RD : DIM,
         bd: out.model===m.id ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: out.model===m.id ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
-        pick: ()=> this.runCommand('set_primary_model',{model:m.id},()=>this.setState({model:m.id}))
+        pick: ()=> m.selectable
+          ? this.runCommand('set_primary_model',{model:m.id},()=>this.setState({model:m.id}))
+          : this.toast(m.name+' is configured but not available in the live NVIDIA catalog')
       }));
     }
     if (L.providers.length) out.providers = L.providers.map(p=>({

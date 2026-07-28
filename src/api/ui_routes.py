@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dashboard_routes import DATA_DIR, KNOWLEDGE, PREFERENCES_FILE, _read_preferences
 from src.core.model_router import PRIMARY_MODEL
+from src.models.nvidia_models import ModelType, get_models_by_type
 from src.security.auth import (
     OPERATOR_EXECUTE,
     OPERATOR_READ,
@@ -82,6 +83,42 @@ def _model_name(model_id: str) -> str:
 
 def _model_provider(model_id: str) -> str:
     return model_id.split("/", 1)[0] if "/" in model_id else "nvidia"
+
+
+def _looks_chat_compatible(model_id: str) -> bool:
+    """Keep non-generative NVIDIA endpoints out of the chat model picker."""
+    lowered = model_id.casefold()
+    excluded = (
+        "embed", "rerank", "retrieval", "parakeet", "canary", "fastpitch",
+        "hifigan", "tts", "asr", "whisper", "segformer",
+    )
+    return not any(marker in lowered for marker in excluded)
+
+
+def _model_inventory(jarvis: Any, primary: str) -> list[dict[str, Any]]:
+    """Merge configured knowledge with live availability without inventing health."""
+    configured = {
+        model.id: model
+        for model in get_models_by_type(ModelType.CHAT)
+        if not model.deprecated
+    }
+    live = set(getattr(jarvis, "_model_catalog", set()))
+    model_ids = set(configured) | live | {primary}
+    rows: list[dict[str, Any]] = []
+    for model_id in sorted(model_ids, key=lambda value: (value != primary, value)):
+        metadata = configured.get(model_id)
+        selectable = model_id in live and _looks_chat_compatible(model_id)
+        rows.append({
+            "id": model_id,
+            "name": metadata.name if metadata else _model_name(model_id),
+            "provider": _model_provider(model_id),
+            "variants": 1,
+            "health": "healthy" if selectable else ("down" if live else "unknown"),
+            "latencyMs": 0,
+            "selectable": selectable,
+            "catalogSource": "live" if model_id in live else "configured",
+        })
+    return rows
 
 
 def _gpu_percent() -> float:
@@ -162,12 +199,9 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
         asyncio.to_thread(_git_state), asyncio.to_thread(_gpu_percent)
     )
     net_up, net_down = _network_rates()
-    models = set(getattr(jarvis, "_model_catalog", set()))
-    if not models:
-        models.add(PRIMARY_MODEL)
     primary = str(preferences.get("primary_model") or PRIMARY_MODEL)
-    if primary not in models:
-        models.add(primary)
+    model_rows = _model_inventory(jarvis, primary)
+    selectable_models = [row for row in model_rows if row["selectable"]]
     control = request.app.state.control_service.snapshot()
     held = control.state.value != "running"
     state, detail, since = _agent_projection(agent_runs, held)
@@ -189,15 +223,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
 
     graph = knowledge["graph"]
     vault = knowledge["vault"]
-    provider_health = "unknown" if jarvis.get_status().get("nvidia_connected") else "down"
-    model_rows = [
-        {
-            "id": model_id, "name": _model_name(model_id),
-            "provider": _model_provider(model_id), "variants": 1,
-            "health": "unknown", "latencyMs": 0,
-        }
-        for model_id in sorted(models, key=lambda value: (value != primary, value))
-    ]
+    provider_health = "healthy" if jarvis.get_status().get("nvidia_connected") else "down"
     project_rows = jarvis.workspace_registry.list()
     screens = {
         "AGENTS": {
@@ -245,7 +271,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             {"name": "UI INTERFACE", "state": "ONLINE", "tone": "ok"},
             {"name": "AGENT CORE", "state": "ONLINE" if agent_status["worker_online"] else "DEGRADED", "tone": "ok" if agent_status["worker_online"] else "warn"},
             {"name": "VOICE SYSTEM", "state": "ARMED" if preferences.get("auto_mic", True) else "DISARMED", "tone": "info"},
-            {"name": "API ROUTER", "state": f"{len(models)} CACHED", "tone": "ok" if models else "warn"},
+            {"name": "API ROUTER", "state": f"{len(selectable_models)} READY / {len(model_rows)} KNOWN", "tone": "ok" if selectable_models else "warn"},
             {"name": "BRAIN GRAPH", "state": f"{graph['node_count']} NODES", "tone": "ok" if knowledge["health"] == "good" else "warn"},
         ],
         "graph": {"nodes": graph["node_count"], "edges": graph["edge_count"], "vaultNotes": vault["markdown_count"], "health": "healthy" if knowledge["health"] == "good" else "degraded"},
@@ -304,9 +330,14 @@ async def command(
         model = str(payload.get("model", "")).strip()
         if not model or len(model) > 200:
             raise HTTPException(status_code=422, detail="A valid model id is required")
-        catalog = set(getattr(jarvis, "_model_catalog", set()))
-        if catalog and model not in catalog:
-            raise HTTPException(status_code=409, detail="Model is not in the current NVIDIA catalog")
+        selectable = {
+            row["id"] for row in _model_inventory(jarvis, model)
+            if row["selectable"]
+        }
+        if not selectable:
+            raise HTTPException(status_code=409, detail="The live NVIDIA model catalog is not ready")
+        if model not in selectable:
+            raise HTTPException(status_code=409, detail="Model is not a live chat-compatible NVIDIA route")
         _write_preferences({"primary_model": model})
         return {"ok": True, "message": f"Primary route set to {model}"}
     if command.action == "set_voice_armed":

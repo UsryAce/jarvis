@@ -2541,6 +2541,18 @@ function Dashboard() {
     void openBrain();
   };
 
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search)
+      .get("workspace")
+      ?.toUpperCase();
+    if (!requested) return;
+    setActiveNav(requested);
+    setModal(
+      requested === "CHAT" ? "chat" : requested === "SWARM" ? "swarm" : "nav",
+    );
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
   const openActiveWorkspace = () => {
     if (activeNav === "DASHBOARD") {
       void runSystemScan();

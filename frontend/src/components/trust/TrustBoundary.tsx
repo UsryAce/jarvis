@@ -170,6 +170,12 @@ export function TrustBoundary({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, [clearProtectedMemory, initializeProtectedSession]);
 
+  useEffect(() => {
+    const openCredentials = () => setCredentialManagerOpen(true);
+    window.addEventListener("jarvis:open-credentials", openCredentials);
+    return () => window.removeEventListener("jarvis:open-credentials", openCredentials);
+  }, []);
+
   const value = useMemo<TrustSessionContextValue>(
     () => ({
       state,

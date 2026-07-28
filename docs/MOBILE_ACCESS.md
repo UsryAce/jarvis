@@ -23,6 +23,21 @@ Only the frontend reverse proxy is tunneled. FastAPI stays bound to
 `127.0.0.1`; protected APIs still require Operator Unlock, scoped permissions,
 CSRF protection, and the durable emergency control plane.
 
+## Recover a forgotten Operator Unlock value
+
+Jarvis never stores the plaintext unlock value, so it cannot be displayed or
+recovered. From the laptop, run the following command and choose a new value of
+at least 16 characters:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\reset-operator-access.ps1
+```
+
+The prompt is hidden. The script stops only Jarvis-owned backend processes,
+replaces the salted verifier, and restarts the scheduled supervisor. Afterward,
+unlock the dashboard with the new value and use the authenticated **Reset**
+control to clear any durable emergency stop.
+
 ## Trusted home network
 
 Run:

@@ -28,7 +28,8 @@
  *   graph: { nodes, edges, vaultNotes, health }   BRAIN GRAPH rail counters
  *   router: {
  *     auto: boolean, primary: string,
- *     models: [{ id, name, provider, variants, health: Health, latencyMs }]
+ *     models: [{ id, name, provider, variants, health: Health, latencyMs,
+ *                selectable, catalogSource }]
  *   }
  *   providers: [{ id, name, status: Health, latencyMs, circuit: 'closed'|'open'|'half' }]
  *   voice: { armed, inputDevice, outputDevice, profile, sensitivity, level: number 0..1 }
@@ -107,7 +108,8 @@
         models: (raw.router.models || []).map(function (m) {
           return {
             id: str(m.id), name: str(m.name, m.id), provider: str(m.provider),
-            variants: num(m.variants, 1), health: str(m.health, 'unknown'), latencyMs: num(m.latencyMs)
+            variants: num(m.variants, 1), health: str(m.health, 'unknown'), latencyMs: num(m.latencyMs),
+            selectable: m.selectable === true, catalogSource: str(m.catalogSource, 'configured')
           };
         })
       } : null,

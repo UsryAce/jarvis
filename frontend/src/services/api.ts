@@ -28,7 +28,7 @@ export interface JarvisUISnapshot {
   session: { id: string; startedAt: string; durationSec: number; route: string; messages: number } | null;
   workspace: { project: string; branch: string; dirtyFiles: number; agentsActive: number; agentsTotal: number; tasksComplete: number; tasksTotal: number } | null;
   graph: { nodes: number; edges: number; vaultNotes: number; health: string } | null;
-  router: { auto: boolean; primary: string; models: Array<{ id: string; name: string; provider: string; health: string }> } | null;
+  router: { auto: boolean; primary: string; models: Array<{ id: string; name: string; provider: string; health: string; selectable?: boolean; catalogSource?: string }> } | null;
   providers: Array<{ id: string; name: string; status: string }>;
   voice: { armed: boolean; profile: string; sensitivity: number } | null;
   events: Array<{ at: string; who: string; meta: string; text: string; level: string }>;
