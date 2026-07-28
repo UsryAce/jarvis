@@ -51,5 +51,6 @@ do {
 if (-not $health) { throw 'Jarvis backend did not become healthy.' }
 
 $url = "http://${lanAddress}:$Port/mobile"
-Write-Host "JARVIS MOBILE READY: $url"
-Write-Host 'Use only on a trusted private network. Operator Unlock remains required.'
+Write-Host "JARVIS LAN MOBILE READY: $url"
+Write-Host 'For cellular/remote HTTPS access, use scripts/start-remote-mobile.ps1.'
+Write-Host 'Operator Unlock remains required.'

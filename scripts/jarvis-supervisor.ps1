@@ -5,6 +5,8 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $frontendRoot = Join-Path $projectRoot 'frontend'
 $dataRoot = Join-Path $projectRoot 'data'
 $logPath = Join-Path $dataRoot 'supervisor.log'
+$tunnelLogPath = Join-Path $dataRoot 'mobile-tunnel.log'
+$mobileAccessPath = Join-Path $dataRoot 'mobile-access.json'
 New-Item -ItemType Directory -Path $dataRoot -Force | Out-Null
 
 $createdNew = $false
@@ -18,6 +20,84 @@ function Write-SupervisorLog([string]$Message) {
 
 function Test-Port([int]$Port) {
     return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Get-CloudflaredPath {
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'cloudflared\cloudflared.exe'),
+        (Join-Path $env:USERPROFILE '.cloudflared\cloudflared.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) { return $candidate }
+    }
+    $command = Get-Command cloudflared.exe -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    return $null
+}
+
+function Get-JarvisTunnelProcess {
+    return Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -eq 'cloudflared.exe' -and
+            $_.CommandLine -match 'tunnel' -and
+            $_.CommandLine -match '127\.0\.0\.1:4173'
+        } |
+        Select-Object -First 1
+}
+
+function Publish-MobileAccess {
+    if (-not (Test-Path -LiteralPath $tunnelLogPath)) { return $false }
+    $content = Get-Content -LiteralPath $tunnelLogPath -Raw -ErrorAction SilentlyContinue
+    $match = [regex]::Match($content, 'https://[a-z0-9-]+\.trycloudflare\.com')
+    if (-not $match.Success) { return $false }
+    $existingTunnel = $null
+    if (Test-Path -LiteralPath $mobileAccessPath) {
+        try {
+            $existingTunnel = (Get-Content -LiteralPath $mobileAccessPath -Raw | ConvertFrom-Json).tunnel
+        } catch {}
+    }
+    if ($existingTunnel -ne $match.Value) {
+        try {
+            $probe = Invoke-WebRequest -UseBasicParsing "$($match.Value)/mobile" -TimeoutSec 3
+            if ($probe.StatusCode -ne 200) { return $false }
+        } catch {
+            return $false
+        }
+    }
+    [ordered]@{
+        url = "$($match.Value)/mobile"
+        tunnel = $match.Value
+        updated_at = (Get-Date).ToUniversalTime().ToString('o')
+        security = 'operator-unlock-required'
+    } | ConvertTo-Json | Set-Content -LiteralPath $mobileAccessPath -Encoding UTF8
+    return $true
+}
+
+function Ensure-RemoteMobileTunnel {
+    if (Get-JarvisTunnelProcess) {
+        [void](Publish-MobileAccess)
+        return
+    }
+    $cloudflared = Get-CloudflaredPath
+    if (-not $cloudflared) {
+        Write-SupervisorLog 'MOBILE_TUNNEL_UNAVAILABLE_CLOUDFLARED_MISSING'
+        return
+    }
+    Remove-Item -LiteralPath $tunnelLogPath -Force -ErrorAction SilentlyContinue
+    Start-Process -FilePath $cloudflared `
+        -ArgumentList 'tunnel','--no-autoupdate','--protocol','http2','--metrics','127.0.0.1:20242','--url','http://127.0.0.1:4173' `
+        -RedirectStandardError $tunnelLogPath `
+        -WindowStyle Hidden | Out-Null
+    Write-SupervisorLog 'MOBILE_TUNNEL_START_REQUESTED'
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        Start-Sleep -Seconds 1
+        if (Publish-MobileAccess) {
+            Write-SupervisorLog 'MOBILE_TUNNEL_READY'
+            return
+        }
+    }
+    Write-SupervisorLog 'MOBILE_TUNNEL_URL_PENDING'
 }
 
 function Invoke-TrustPreflight([string]$PythonPath) {
@@ -124,6 +204,10 @@ try {
             $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
             Start-Process -FilePath $npm -ArgumentList 'run','dev','--','--host','127.0.0.1','--port','4173' -WorkingDirectory $frontendRoot -WindowStyle Hidden | Out-Null
             Write-SupervisorLog 'DASHBOARD_START_REQUESTED'
+        }
+
+        if (Test-Port 4173) {
+            Ensure-RemoteMobileTunnel
         }
 
         Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))

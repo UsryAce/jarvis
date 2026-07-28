@@ -5,6 +5,24 @@ desktop control plane: operator authentication, scoped permissions, CSRF protect
 Auto Mode, agent state, Brain state, chat, and voice controls are not duplicated or
 weakened for mobile.
 
+## Anywhere access (cellular or another Wi-Fi)
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-remote-mobile.ps1
+```
+
+The command prints an HTTPS `trycloudflare.com/mobile` URL. The
+`JarvisAutonomous` scheduled supervisor keeps Jarvis and the tunnel alive, and
+writes the current address to `data/mobile-access.json`. Quick-tunnel hostnames
+rotate if the tunnel process restarts, so rerun the command to print the current
+address.
+
+Only the frontend reverse proxy is tunneled. FastAPI stays bound to
+`127.0.0.1`; protected APIs still require Operator Unlock, scoped permissions,
+CSRF protection, and the durable emergency control plane.
+
 ## Trusted home network
 
 Run:
