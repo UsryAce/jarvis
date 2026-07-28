@@ -22,6 +22,42 @@ function Test-Port([int]$Port) {
     return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 }
 
+function Get-PublishedMobileOrigin {
+    if (-not (Test-Path -LiteralPath $mobileAccessPath)) { return $null }
+    try {
+        $origin = [string](Get-Content -LiteralPath $mobileAccessPath -Raw | ConvertFrom-Json).tunnel
+    } catch {
+        return $null
+    }
+    if ($origin -match '^https://[a-z0-9-]+\.trycloudflare\.com$') { return $origin }
+    return $null
+}
+
+function Set-JarvisAllowedOriginsEnvironment {
+    $origins = @(
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:4173',
+        'http://127.0.0.1:4173',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173'
+    )
+    $mobileOrigin = Get-PublishedMobileOrigin
+    if ($mobileOrigin) { $origins += $mobileOrigin }
+    $env:JARVIS_ALLOWED_ORIGINS = $origins -join ','
+}
+
+function Restart-JarvisBackendForOriginChange {
+    $listeners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+    foreach ($listener in $listeners) {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" -ErrorAction SilentlyContinue
+        if ($process.CommandLine -and $process.CommandLine.Contains('uvicorn src.api.server:app')) {
+            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+            Write-SupervisorLog 'BACKEND_RESTARTED_FOR_MOBILE_ORIGIN_CHANGE'
+        }
+    }
+}
+
 function Get-CloudflaredPath {
     $candidates = @(
         (Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'),
@@ -57,7 +93,8 @@ function Publish-MobileAccess {
             $existingTunnel = (Get-Content -LiteralPath $mobileAccessPath -Raw | ConvertFrom-Json).tunnel
         } catch {}
     }
-    if ($existingTunnel -ne $match.Value) {
+    $originChanged = $existingTunnel -ne $match.Value
+    if ($originChanged) {
         try {
             $probe = Invoke-WebRequest -UseBasicParsing "$($match.Value)/mobile" -TimeoutSec 3
             if ($probe.StatusCode -ne 200) { return $false }
@@ -71,6 +108,7 @@ function Publish-MobileAccess {
         updated_at = (Get-Date).ToUniversalTime().ToString('o')
         security = 'operator-unlock-required'
     } | ConvertTo-Json | Set-Content -LiteralPath $mobileAccessPath -Encoding UTF8
+    if ($originChanged) { Restart-JarvisBackendForOriginChange }
     return $true
 }
 
@@ -183,6 +221,7 @@ try {
                 continue
             }
 
+            Set-JarvisAllowedOriginsEnvironment
             Start-Process -FilePath $python -ArgumentList '-m','uvicorn','src.api.server:app','--host','127.0.0.1','--port','8000' -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
             Write-SupervisorLog 'BACKEND_START_REQUESTED'
             for ($attempt = 0; $attempt -lt 20 -and -not (Test-BackendTrustReady); $attempt++) {
