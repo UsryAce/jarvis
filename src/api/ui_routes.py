@@ -150,9 +150,16 @@ def _network_rates() -> tuple[float, float]:
 def _agent_projection(agent_runs: list[dict[str, Any]], held: bool) -> tuple[str, str, str]:
     if held:
         return "paused", "Execution is held by the operator control plane.", datetime.now().isoformat()
-    if not agent_runs:
+    run = next(
+        (
+            candidate
+            for candidate in agent_runs
+            if candidate.get("status") in ACTIVE_STATES | {"awaiting_confirmation"}
+        ),
+        None,
+    )
+    if run is None:
         return "idle", "Ready for Ahmed's directive.", datetime.now().isoformat()
-    run = agent_runs[0]
     raw = str(run.get("status", "idle"))
     state = {
         "queued": "delegating", "planning": "thinking", "running": "executing",
@@ -184,6 +191,17 @@ def _events(history: list[dict[str, Any]], agent_runs: list[dict[str, Any]]) -> 
     return sorted(events, key=lambda item: item["at"])[-12:]
 
 
+def _active_swarm_task_count(swarm_runs: list[dict[str, Any]]) -> int:
+    """Count runnable child work only while its parent swarm is live."""
+
+    return sum(
+        task.get("status") in ACTIVE_STATES
+        for run in swarm_runs
+        if run.get("status") in ACTIVE_STATES
+        for task in run.get("tasks", [])
+    )
+
+
 async def build_snapshot(request: Request) -> dict[str, Any]:
     jarvis = _jarvis(request)
     preferences = _read_preferences()
@@ -206,10 +224,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
     held = control.state.value != "running"
     state, detail, since = _agent_projection(agent_runs, held)
     active_agent_runs = sum(run.get("status") in ACTIVE_STATES for run in agent_runs)
-    active_swarm_tasks = sum(
-        task.get("status") in ACTIVE_STATES
-        for run in swarm_runs for task in run.get("tasks", [])
-    )
+    active_swarm_tasks = _active_swarm_task_count(swarm_runs)
     completed_tasks = sum(
         task.get("status") == "completed"
         for run in swarm_runs for task in run.get("tasks", [])

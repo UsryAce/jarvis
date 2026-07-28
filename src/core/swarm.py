@@ -213,6 +213,21 @@ class MultiAgentOrchestrator:
                 run.tasks = {item["id"]: SwarmTask.from_dict(item) for item in persisted_tasks}
             run.events = self.store.load_events(run.id)
             self.runs[run.id] = run
+        for run in self.runs.values():
+            if run.status not in TERMINAL_STATUSES:
+                continue
+            reconciled = self._terminalize_remaining_tasks(
+                run,
+                status="cancelled",
+                error=f"Parent swarm already ended as {run.status}",
+            )
+            if reconciled:
+                self._event(
+                    run,
+                    "reconciled",
+                    "Stale non-terminal tasks were closed during startup recovery",
+                    {"task_count": reconciled},
+                )
         for payload in self.store.load_unfinished():
             run = self.runs.get(payload["id"])
             if not run or run.status == "awaiting_confirmation":
@@ -444,6 +459,11 @@ class MultiAgentOrchestrator:
             code = self._safe_error_code(exc)
             logger.error("Swarm %s failed with safe code %s", run.id, code)
             run.status, run.error = "failed", code
+            self._terminalize_remaining_tasks(
+                run,
+                status="cancelled",
+                error="Parent swarm failed before this task could finish",
+            )
             self._event(run, "failed", "Swarm execution failed", {"code": code})
 
     async def _dispatch_graph(self, run: SwarmRun) -> None:
@@ -461,6 +481,11 @@ class MultiAgentOrchestrator:
                     if any(dep in failed for dep in task.dependencies):
                         task.status, task.error = "failed", "A dependency failed or was cancelled"
                         self._save_task(task)
+                self._terminalize_remaining_tasks(
+                    run,
+                    status="cancelled",
+                    error="Parent swarm failed before this task could start",
+                )
                 run.status = "failed"
                 run.error = "One or more specialist tasks failed"
                 self._event(run, "failed", run.error)
@@ -799,6 +824,27 @@ Project: {run.project_id}"""
 
     def _save_task(self, task: SwarmTask) -> None:
         self.store.save_task(task.to_dict())
+
+    def _terminalize_remaining_tasks(
+        self,
+        run: SwarmRun,
+        *,
+        status: str,
+        error: str,
+    ) -> int:
+        """Close orphaned task rows whenever their parent run is terminal."""
+
+        changed = 0
+        timestamp = datetime.now().isoformat()
+        for task in run.tasks.values():
+            if task.status in TERMINAL_STATUSES:
+                continue
+            task.status = status
+            task.error = error
+            task.updated_at = timestamp
+            self._save_task(task)
+            changed += 1
+        return changed
 
     def _require_global_effect(self, boundary: str) -> None:
         if self.stop_guard is not None:
