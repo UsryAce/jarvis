@@ -2,7 +2,11 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ExactClaudeDesign.css";
 
-export default function ExactClaudeDesign() {
+interface ExactClaudeDesignProps {
+  mobile?: boolean;
+}
+
+export default function ExactClaudeDesign({ mobile = false }: ExactClaudeDesignProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const navigate = useNavigate();
 
@@ -29,8 +33,8 @@ export default function ExactClaudeDesign() {
   return (
     <iframe
       ref={frameRef}
-      className="exact-claude-design"
-      src="/claude-design/JARVIS%20Core.dc.html"
+      className={`exact-claude-design${mobile ? " exact-claude-design--mobile" : ""}`}
+      src={`/claude-design/JARVIS%20Core.dc.html${mobile ? "?layout=mobile" : ""}`}
       title="JARVIS Core"
       allow="microphone; autoplay"
     />

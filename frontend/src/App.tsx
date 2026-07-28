@@ -7,7 +7,6 @@ import { useSystemStore } from './store/useSystemStore'
 import { TrustBoundary } from './components/trust/TrustBoundary'
 
 const ExactClaudeDesign = lazy(() => import('./pages/ExactClaudeDesign'))
-const MobileJarvis = lazy(() => import('./pages/MobileJarvis'))
 const VoiceChat = lazy(() => import('./pages/VoiceChat').then(module => ({ default: module.VoiceChat })))
 const HolographicView = lazy(() => import('./pages/HolographicView').then(module => ({ default: module.HolographicView })))
 const VisionDemo = lazy(() => import('./pages/VisionDemo').then(module => ({ default: module.VisionDemo })))
@@ -24,14 +23,16 @@ const routeFallback = (
 )
 
 function ProtectedApplication() {
-  const initialize = useVoiceStore(state => state.initialize)
   const { initialize: initHome } = useHomeStore()
   const { initialize: initSystem } = useSystemStore()
 
   useEffect(() => {
     let disposed = false
     const initializeRuntime = async () => {
-      await Promise.all([initialize(), initHome(), initSystem()])
+      // Microphone permission must follow an explicit voice interaction. Asking
+      // during dashboard startup breaks remote/mobile sessions that have not
+      // granted capture yet and creates duplicate permission prompts.
+      await Promise.all([initHome(), initSystem()])
       if (disposed) shutdownProtectedRuntime()
     }
     const shutdownProtectedRuntime = () => {
@@ -58,7 +59,7 @@ function ProtectedApplication() {
       disposed = true
       shutdownProtectedRuntime()
     }
-  }, [initHome, initSystem, initialize])
+  }, [initHome, initSystem])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -76,7 +77,7 @@ function ProtectedApplication() {
         <Suspense fallback={routeFallback}>
           <Routes>
             <Route path="/" element={<ExactClaudeDesign />} />
-            <Route path="/mobile" element={<MobileJarvis />} />
+            <Route path="/mobile" element={<ExactClaudeDesign mobile />} />
             <Route path="/legacy" element={<Dashboard />} />
             <Route path="/voice" element={<VoiceChat />} />
             <Route path="/holographic" element={<HolographicView />} />

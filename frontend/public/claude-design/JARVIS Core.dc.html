@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  if (new URLSearchParams(location.search).get('layout') === 'mobile') {
+    document.documentElement.classList.add('jarvis-mobile-layout');
+  }
+</script>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
-<meta name="viewport" content="width=1920">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -29,6 +33,72 @@
   @keyframes jBlink { 0%,100% { opacity:1; } 50% { opacity:.2; } }
   @keyframes jSweep { from { transform:translateX(-100%); } to { transform:translateX(340%); } }
   @keyframes jRise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @media (max-width:700px) {
+    html, body { width:100%; min-height:100%; overflow-x:hidden; }
+    .jarvis-shell { width:100vw !important; min-height:100dvh !important; height:auto !important; overflow:visible !important; }
+    .jarvis-control { position:sticky !important; top:0; z-index:40; min-height:48px; height:auto !important; padding:7px 10px !important; overflow-x:auto; scrollbar-width:none; }
+    .jarvis-control::-webkit-scrollbar, .jarvis-command-header::-webkit-scrollbar, .jarvis-ribbon::-webkit-scrollbar, .jarvis-tabs::-webkit-scrollbar { display:none; }
+    .jarvis-control > * { flex:none !important; }
+    .jarvis-event { position:sticky !important; top:48px; z-index:39; min-height:34px; height:auto !important; padding:5px 10px !important; }
+    .jarvis-dashboard { overflow:visible !important; min-height:calc(100dvh - 82px); }
+    .jarvis-command-header { min-height:74px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
+    .jarvis-command-header > * { flex:none !important; }
+    .jarvis-ribbon { min-height:54px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
+    .jarvis-ribbon > * { min-width:190px !important; flex:none !important; }
+    .jarvis-stage-viewport { flex:none !important; min-height:0 !important; perspective:none !important; overflow:visible !important; }
+    .jarvis-stage { height:auto !important; display:flex !important; flex-direction:column !important; gap:10px !important; padding:10px !important; transform:none !important; }
+    .jarvis-center { order:1; min-height:1160px !important; }
+    .jarvis-left { order:2; min-height:680px !important; }
+    .jarvis-right { order:3; min-height:760px !important; }
+    .jarvis-left, .jarvis-center, .jarvis-right { width:100% !important; box-sizing:border-box; }
+    .jarvis-flow-row { overflow-x:auto; scrollbar-width:none; }
+    .jarvis-flow-row::-webkit-scrollbar { display:none; }
+    .jarvis-flow-row > * { min-width:122px !important; flex:none !important; }
+    .jarvis-core-row { flex:1 !important; min-height:830px !important; flex-direction:column !important; }
+    .jarvis-reactor { order:1; flex:none !important; width:100% !important; min-height:380px !important; }
+    .jarvis-assistant { order:2; width:100% !important; min-height:210px !important; }
+    .jarvis-session { order:3; width:100% !important; min-height:220px !important; }
+    .jarvis-tabs { position:sticky !important; bottom:0; z-index:45; min-height:66px; height:auto !important; padding:0 8px !important; overflow-x:auto; scrollbar-width:none; }
+    .jarvis-tabs > div:nth-child(2) { min-width:1450px; }
+    .jarvis-voice { min-height:100dvh !important; overflow:visible !important; }
+    .jarvis-voice-header { padding:18px 16px 0 !important; flex-wrap:wrap; }
+    .jarvis-voice-body { display:flex !important; flex-direction:column !important; gap:20px !important; padding:20px 16px !important; }
+    .jarvis-voice-body > * { width:100% !important; box-sizing:border-box; }
+    .jarvis-voice-body > :nth-child(2) { height:360px !important; min-height:360px !important; }
+    .jarvis-voice-controls { display:grid !important; grid-template-columns:1fr 1fr !important; padding:12px 16px 84px !important; }
+  }
+  html.jarvis-mobile-layout, html.jarvis-mobile-layout body { width:100%; min-height:100%; overflow-x:hidden; }
+  html.jarvis-mobile-layout .jarvis-shell { width:100vw !important; min-height:100dvh !important; height:auto !important; overflow:visible !important; }
+  html.jarvis-mobile-layout .jarvis-control { position:sticky !important; top:0; z-index:40; min-height:48px; height:auto !important; padding:7px 10px !important; overflow-x:auto; scrollbar-width:none; }
+  html.jarvis-mobile-layout .jarvis-control::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-command-header::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-ribbon::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-tabs::-webkit-scrollbar { display:none; }
+  html.jarvis-mobile-layout .jarvis-control > * { flex:none !important; }
+  html.jarvis-mobile-layout .jarvis-event { position:sticky !important; top:48px; z-index:39; min-height:34px; height:auto !important; padding:5px 10px !important; }
+  html.jarvis-mobile-layout .jarvis-dashboard { overflow:visible !important; min-height:calc(100dvh - 82px); }
+  html.jarvis-mobile-layout .jarvis-command-header { min-height:74px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
+  html.jarvis-mobile-layout .jarvis-command-header > * { flex:none !important; }
+  html.jarvis-mobile-layout .jarvis-ribbon { min-height:54px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
+  html.jarvis-mobile-layout .jarvis-ribbon > * { min-width:190px !important; flex:none !important; }
+  html.jarvis-mobile-layout .jarvis-stage-viewport { flex:none !important; min-height:0 !important; perspective:none !important; overflow:visible !important; }
+  html.jarvis-mobile-layout .jarvis-stage { height:auto !important; display:flex !important; flex-direction:column !important; gap:10px !important; padding:10px !important; transform:none !important; }
+  html.jarvis-mobile-layout .jarvis-center { order:1; min-height:1160px !important; }
+  html.jarvis-mobile-layout .jarvis-left { order:2; min-height:680px !important; }
+  html.jarvis-mobile-layout .jarvis-right { order:3; min-height:760px !important; }
+  html.jarvis-mobile-layout .jarvis-left, html.jarvis-mobile-layout .jarvis-center, html.jarvis-mobile-layout .jarvis-right { width:100% !important; box-sizing:border-box; }
+  html.jarvis-mobile-layout .jarvis-flow-row { overflow-x:auto; scrollbar-width:none; }
+  html.jarvis-mobile-layout .jarvis-flow-row::-webkit-scrollbar { display:none; }
+  html.jarvis-mobile-layout .jarvis-flow-row > * { min-width:122px !important; flex:none !important; }
+  html.jarvis-mobile-layout .jarvis-core-row { flex:1 !important; min-height:830px !important; flex-direction:column !important; }
+  html.jarvis-mobile-layout .jarvis-reactor { order:1; flex:none !important; width:100% !important; min-height:380px !important; }
+  html.jarvis-mobile-layout .jarvis-assistant { order:2; width:100% !important; min-height:210px !important; }
+  html.jarvis-mobile-layout .jarvis-session { order:3; width:100% !important; min-height:220px !important; }
+  html.jarvis-mobile-layout .jarvis-tabs { position:sticky !important; bottom:0; z-index:45; min-height:66px; height:auto !important; padding:0 8px !important; overflow-x:auto; scrollbar-width:none; }
+  html.jarvis-mobile-layout .jarvis-tabs > div:nth-child(2) { min-width:1450px; }
+  html.jarvis-mobile-layout .jarvis-voice { min-height:100dvh !important; overflow:visible !important; }
+  html.jarvis-mobile-layout .jarvis-voice-header { padding:18px 16px 0 !important; flex-wrap:wrap; }
+  html.jarvis-mobile-layout .jarvis-voice-body { display:flex !important; flex-direction:column !important; gap:20px !important; padding:20px 16px !important; }
+  html.jarvis-mobile-layout .jarvis-voice-body > * { width:100% !important; box-sizing:border-box; }
+  html.jarvis-mobile-layout .jarvis-voice-body > :nth-child(2) { height:360px !important; min-height:360px !important; }
+  html.jarvis-mobile-layout .jarvis-voice-controls { display:grid !important; grid-template-columns:1fr 1fr !important; padding:12px 16px 84px !important; }
 </style>
 <script src="./jarvis-adapter.js"></script>
 <script>
@@ -43,7 +113,7 @@
 </script>
 </helmet>
 
-<div style="width:1920px;min-height:1080px;display:flex;flex-direction:column;background:#03060A;font-family:'JetBrains Mono',ui-monospace,monospace;color:#DCE8F2;position:relative;overflow:hidden">
+<div class="jarvis-shell" style="width:1920px;min-height:1080px;display:flex;flex-direction:column;background:#03060A;font-family:'JetBrains Mono',ui-monospace,monospace;color:#DCE8F2;position:relative;overflow:hidden">
 
   <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(1500px 900px at 50% -10%, rgba(53,214,255,.10), transparent 62%), radial-gradient(1100px 800px at 92% 62%, rgba(76,140,255,.06), transparent 60%), radial-gradient(900px 700px at 5% 84%, rgba(0,229,196,.05), transparent 60%)"></div>
   <div style="position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(53,214,255,.024) 1px,transparent 1px),linear-gradient(90deg,rgba(53,214,255,.024) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(1250px 780px at 50% 34%,#000,transparent 92%)"></div>
@@ -51,7 +121,7 @@
   <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:{{ motionOpacity }}"><div style="position:absolute;left:0;right:0;height:180px;background:linear-gradient(180deg,transparent,rgba(53,214,255,.035),transparent);animation:jScan 15s linear infinite"></div></div>
   <div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 320px 90px rgba(0,0,0,.8)"></div>
 
-  <div style="position:relative;display:flex;align-items:center;height:30px;padding:0 16px;gap:14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(6,11,18,.9)">
+  <div class="jarvis-control" style="position:relative;display:flex;align-items:center;height:30px;padding:0 16px;gap:14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(6,11,18,.9)">
     <div style="display:flex;align-items:center;gap:8px;font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#7CFFE6">
       <div style="width:6px;height:6px;border-radius:50%;background:#00E5C4;box-shadow:0 0 10px #00E5C4;animation:jBlink 2.4s ease-in-out infinite"></div>
       CONTROL PLANE {{ planeState }} — NO STOP IS ACTIVE
@@ -67,15 +137,15 @@
     <div onClick="{{ estop }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(255,77,109,.38);background:rgba(255,77,109,.09);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#FF8FA3" style-hover="background:rgba(255,77,109,.2)">EMERGENCY STOP</div>
   </div>
 
-  <div style="position:relative;display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;border-bottom:1px solid rgba(53,214,255,.10);background:rgba(4,9,15,.85)">
+  <div class="jarvis-event" style="position:relative;display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;border-bottom:1px solid rgba(53,214,255,.10);background:rgba(4,9,15,.85)">
     <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#3F5B69;flex:none">EVENT</div>
     <div style="width:5px;height:5px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 8px {{ stateColor }};flex:none;opacity:{{ toastOpacity }}"></div>
     <div style="font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#9BE9FF;opacity:{{ toastOpacity }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toast }}</div>
   </div>
 
   <sc-if value="{{ dashOn }}" hint-placeholder-val="{{ true }}">
-  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
-  <div style="position:relative;display:flex;align-items:stretch;height:74px;border-bottom:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#070C14,#03060A)">
+  <div class="jarvis-dashboard" style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+  <div class="jarvis-command-header" style="position:relative;display:flex;align-items:stretch;height:74px;border-bottom:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#070C14,#03060A)">
     <div style="display:flex;align-items:center;gap:12px;padding:0 18px;width:250px;flex:none;border-right:1px solid rgba(255,255,255,.05)">
       <div style="position:relative;width:38px;height:38px;flex:none">
         <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.5);border-top-color:transparent;animation:jSpin 6s linear infinite"></div>
@@ -124,7 +194,7 @@
     </div>
   </div>
 
-  <div style="position:relative;display:flex;align-items:stretch;height:44px;border-bottom:1px solid rgba(53,214,255,.12);background:rgba(6,11,18,.6)">
+  <div class="jarvis-ribbon" style="position:relative;display:flex;align-items:stretch;height:44px;border-bottom:1px solid rgba(53,214,255,.12);background:rgba(6,11,18,.6)">
     <sc-for list="{{ ribbon }}" as="r" hint-placeholder-count="5">
       <div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid rgba(255,255,255,.05)">
         <div style="width:6px;height:6px;border-radius:50%;background:{{ r.col }};box-shadow:0 0 9px {{ r.col }};flex:none"></div>
@@ -141,10 +211,10 @@
     </div>
   </div>
 
-  <div style="position:relative;flex:1;min-height:0;perspective:2200px;perspective-origin:50% 45%">
-  <div ref="{{ stageRef }}" style="height:100%;display:grid;grid-template-columns:312px 1fr 348px;gap:14px;padding:14px 16px 8px;box-sizing:border-box;transform-style:preserve-3d;transition:transform .25s cubic-bezier(.2,.7,.3,1);will-change:transform">
+  <div class="jarvis-stage-viewport" style="position:relative;flex:1;min-height:0;perspective:2200px;perspective-origin:50% 45%">
+  <div class="jarvis-stage" ref="{{ stageRef }}" style="height:100%;display:grid;grid-template-columns:312px 1fr 348px;gap:14px;padding:14px 16px 8px;box-sizing:border-box;transform-style:preserve-3d;transition:transform .25s cubic-bezier(.2,.7,.3,1);will-change:transform">
 
-    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div class="jarvis-left" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));position:relative">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">MODEL ROUTER</div>
@@ -215,13 +285,13 @@
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div class="jarvis-center" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.9),rgba(5,9,15,.9))">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">OPERATIONS FLOW</div>
           <div style="padding:3px 7px;border:1px solid {{ srcFlow.bd }};background:{{ srcFlow.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcFlow.col }}">{{ srcFlow.label }}</div>
         </div>
-        <div style="padding:11px;display:flex;align-items:center;gap:8px">
+        <div class="jarvis-flow-row" style="padding:11px;display:flex;align-items:center;gap:8px">
           <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
             <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid {{ f.bd }};background:{{ f.bg }};position:relative;overflow:hidden">
               <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(53,214,255,.10),transparent);width:40%;animation:jSweep 3.6s linear infinite;opacity:{{ motionOpacity }}"></div>
@@ -300,8 +370,8 @@
       </sc-if>
 
       <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
-      <div style="flex:1;display:flex;gap:12px;min-height:0">
-        <div style="width:204px;flex:none;display:flex;flex-direction:column;gap:12px">
+      <div class="jarvis-core-row" style="flex:1;display:flex;gap:12px;min-height:0">
+        <div class="jarvis-assistant" style="width:204px;flex:none;display:flex;flex-direction:column;gap:12px">
           <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1;display:flex;flex-direction:column">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
               <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ASSISTANT STATUS</div>
@@ -331,7 +401,7 @@
           </div>
         </div>
 
-        <div onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="flex:1;min-width:0;position:relative;border:1px solid rgba(53,214,255,.14);background:radial-gradient(circle at 50% 50%, rgba(9,22,34,.95), rgba(3,6,10,.98) 72%);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:crosshair">
+        <div class="jarvis-reactor" onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="flex:1;min-width:0;position:relative;border:1px solid rgba(53,214,255,.14);background:radial-gradient(circle at 50% 50%, rgba(9,22,34,.95), rgba(3,6,10,.98) 72%);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:crosshair">
           <canvas ref="{{ cref }}" width="880" height="720" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
           <div style="position:absolute;left:0;top:0;width:22px;height:22px;border-left:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
           <div style="position:absolute;right:0;top:0;width:22px;height:22px;border-right:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
@@ -353,7 +423,7 @@
           <div onClick="{{ hold }}" style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:7px 18px;border:1px solid rgba(53,214,255,.36);background:rgba(4,10,16,.8);font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.17em;color:#9BE9FF;cursor:pointer" style-hover="background:rgba(53,214,255,.18)">{{ holdLabel }}</div>
         </div>
 
-        <div style="width:212px;flex:none;display:flex;flex-direction:column;gap:12px">
+        <div class="jarvis-session" style="width:212px;flex:none;display:flex;flex-direction:column;gap:12px">
           <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
               <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ACTIVE SESSION</div>
@@ -406,13 +476,18 @@
           </sc-for>
         </div>
         <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid rgba(53,214,255,.14)">
+          <select value="{{ dispatch }}" onChange="{{ setDispatch }}" title="Dispatch mode" style="width:112px;flex:none;padding:10px 8px;background:rgba(4,8,13,.9);border:1px solid rgba(255,180,60,.3);color:#FFD38A;font-size:9px;outline:none">
+            <option value="agent">AGENT</option>
+            <option value="swarm">SWARM · 8</option>
+            <option value="council">COUNCIL</option>
+          </select>
           <input value="{{ draft }}" onChange="{{ setDraft }}" onKeyDown="{{ onKey }}" placeholder="Give Jarvis a goal to plan and execute..." style="flex:1;padding:10px 12px;background:rgba(4,8,13,.9);border:1px solid rgba(53,214,255,.2);color:#EAF6FF;font-size:11px;outline:none">
           <div onClick="{{ send }}" style="cursor:pointer;padding:10px 20px;border:1px solid rgba(0,229,196,.42);background:rgba(0,229,196,.1);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#7CFFE6" style-hover="background:rgba(0,229,196,.22)">SEND</div>
         </div>
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div class="jarvis-right" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">VOICE AUTHORITY</div>
@@ -523,7 +598,7 @@
 
   </div>
 
-  <div style="position:relative;display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
+  <div class="jarvis-tabs" style="position:relative;display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
     <div style="position:relative;width:40px;height:40px;flex:none">
       <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.35);animation:jSpin 8s linear infinite"></div>
       <div style="position:absolute;inset:11px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 16px {{ stateColor }};animation:jBreathe 2.4s ease-in-out infinite"></div>
@@ -545,8 +620,8 @@
   </sc-if>
 
   <sc-if value="{{ voiceOn }}" hint-placeholder-val="{{ false }}">
-  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
-    <div style="display:flex;align-items:center;gap:18px;padding:22px 44px 0">
+  <div class="jarvis-voice" style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+    <div class="jarvis-voice-header" style="display:flex;align-items:center;gap:18px;padding:22px 44px 0">
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="font:700 30px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF;text-shadow:0 0 30px rgba(53,214,255,.5)">J.A.R.V.I.S.</div>
         <div style="font:400 9px/1 'JetBrains Mono',monospace;letter-spacing:.22em;color:#5C7C8C">VOICE COMMAND INTERFACE</div>
@@ -559,7 +634,7 @@
       <div onClick="{{ goDash }}" style="cursor:pointer;padding:13px 24px;border:1px solid rgba(53,214,255,.32);background:rgba(53,214,255,.06);font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.18)">DASHBOARD</div>
     </div>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 640px 1fr;gap:34px;align-items:center;padding:10px 44px 0;min-height:0">
+    <div class="jarvis-voice-body" style="flex:1;display:grid;grid-template-columns:1fr 640px 1fr;gap:34px;align-items:center;padding:10px 44px 0;min-height:0">
       <div style="display:flex;flex-direction:column;gap:22px">
         <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:#9BE9FF">VOICE AUTHORITY</div>
         <div style="font:700 84px/.9 'Space Grotesk',sans-serif;letter-spacing:.03em;color:{{ stateColor }};text-shadow:0 0 60px {{ stateColor }}">{{ stateLabel }}</div>
@@ -594,7 +669,7 @@
       </div>
     </div>
 
-    <div style="display:flex;align-items:stretch;gap:10px;padding:20px 44px 24px">
+    <div class="jarvis-voice-controls" style="display:flex;align-items:stretch;gap:10px;padding:20px 44px 24px">
       <sc-for list="{{ voiceControls }}" as="v" hint-placeholder-count="7">
         <div onClick="{{ v.go }}" style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:9px;padding:19px 8px;border:1px solid {{ v.bd }};background:{{ v.bg }}" style-hover="border-color:rgba(53,214,255,.55)">
           <div style="width:6px;height:6px;border-radius:50%;background:{{ v.dot }};box-shadow:0 0 9px {{ v.dot }};flex:none"></div>
@@ -818,7 +893,7 @@ const VIZ = {
 
 class Component extends DCLogic {
   state = {
-    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:true,
+    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:true, dispatch:'agent',
     model:'z-ai/glm-5.2', draft:'', extra:[], toast:'Deploy gate is blocking mission MERIDIAN — approval required', toastOn:true
   };
 
@@ -1340,11 +1415,7 @@ class Component extends DCLogic {
     catch(err){ this.toast('Interface bridge unavailable'); }
   }
   go(tab){
-    const embedded = ['DASHBOARD','MISSIONS','AGENTS','PROJECTS','BRAIN','SECURITY'];
-    if (embedded.includes(tab)) return ()=> this.setState({tab});
-    if (tab === 'VOICE') return ()=> this.bridge('navigate',{to:'/voice'});
-    if (tab === 'SETTINGS') return ()=> this.bridge('navigate',{to:'/settings'});
-    if (tab === 'DEVICES') return ()=> this.bridge('navigate',{to:'/home'});
+    if (TABS.includes(tab)) return ()=> this.setState({tab});
     return ()=> this.bridge('workspace',{name:tab});
   }
   runCommand(action, payload, localUpdate){
@@ -1363,7 +1434,7 @@ class Component extends DCLogic {
     const d = this.state.draft.trim(); if (!d) return;
     const time = new Date().toTimeString().slice(0,8);
     this.setState(s=>({draft:'', extra:s.extra.concat([[time,'AHMED','typed',CY,d]])}));
-    this.runCommand('submit_goal', {goal:d, model:this.state.auto?'auto':this.state.model}, (result)=>{
+    this.runCommand('submit_goal', {goal:d, model:this.state.auto?'auto':this.state.model, dispatch:this.state.dispatch, maxAgents:8}, (result)=>{
       const t2 = new Date().toTimeString().slice(0,8);
       this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS',result.runId||'queued',TE,result.message||'Goal accepted by the durable agent runtime.']])}));
     });
@@ -1471,6 +1542,8 @@ class Component extends DCLogic {
       panelChips: panel[2].map(c=>({label:c, go:()=> this.toast(c+' · '+panel[0])})),
       rows: rowsRaw.map(r=>({time:r[0], who:r[1], meta:r[2], col:r[3], text:r[4]})),
       draft: s.draft,
+      dispatch: s.dispatch,
+      setDispatch: (e)=> this.setState({dispatch:e.target.value}),
       setDraft: (e)=> this.setState({draft:e.target.value}),
       onKey: (e)=> { if (e.key === 'Enter') this.send(); },
       send: this.send,
@@ -1611,10 +1684,14 @@ class Component extends DCLogic {
       out.sens = L.voice.sensitivity + ' / 10';
       out.sensW = Math.round(L.voice.sensitivity*10) + '%';
     }
-    if (L.usage) out.tokenStats = [
+    if (L.usage) out.tokenStats = L.usage.metered ? [
       {k:'REQUESTS', v:String(L.usage.requests), col:col},
       {k:'TOKENS', v:(L.usage.tokens>=1000 ? (L.usage.tokens/1000).toFixed(1)+'k' : String(L.usage.tokens)), col:TE},
-      {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
+      {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.capUsd && L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
+    ] : [
+      {k:'REQUESTS', v:String(L.usage.requests), col:col},
+      {k:'TOKENS', v:'NOT METERED', col:DIM},
+      {k:'SPEND', v:'NOT METERED', col:DIM}
     ];
     if (L.events.length) out.rows = L.events.map(e=>({
       time:(e.at||'').slice(11,19), who:e.who, meta:e.meta, text:e.text,
@@ -1662,9 +1739,10 @@ class Component extends DCLogic {
     out.srcSession = SRC(!!L.session); out.srcVoice = SRC(!!L.voice);
     out.srcRibbon = SRC(!!L.workspace); out.srcFlow = SRC(!!(L.flow && L.flow.length));
     out.srcBrain = SRC(!!L.graph);
-    out.srcTokens = SRC(!!(L.usage && L.usage.series && L.usage.series.length));
+    out.srcTokens = SRC(!!L.usage);
     out.srcEvents = SRC(!!(L.events && L.events.length));
     out.srcScreen = SRC(!!L.screens[s.tab]);
+    out.vizOn = false;
     const vz = L.viz[s.tab];
     if (vz){
       this.vizMode = vz.kind === 'graph' ? 'brain' : vz.kind === 'topology' ? 'topology' : 'chart';

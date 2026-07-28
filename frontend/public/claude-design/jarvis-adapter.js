@@ -127,6 +127,7 @@
       usage: raw.usage ? {
         requests: num(raw.usage.requests), tokens: num(raw.usage.tokens),
         spendUsd: num(raw.usage.spendUsd), capUsd: num(raw.usage.capUsd),
+        metered: raw.usage.metered === true,
         series: (raw.usage.series || []).map(function (p) { return { t: str(p.t), v: num(p.v) }; })
       } : null,
       workspace: raw.workspace ? {

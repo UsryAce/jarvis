@@ -240,6 +240,20 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
     vault = knowledge["vault"]
     provider_health = "healthy" if jarvis.get_status().get("nvidia_connected") else "down"
     project_rows = jarvis.workspace_registry.list()
+    tool_rows = jarvis.agent_runtime.list_tools()
+    schedule_rows = jarvis.agent_runtime.list_schedules()
+    skill_rows = jarvis.get_available_skills()
+    workspace_entries: list[dict[str, Any]] = []
+    try:
+        for entry in sorted(PROJECT_ROOT.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold()))[:24]:
+            workspace_entries.append({
+                "name": entry.name,
+                "path": str(entry.relative_to(PROJECT_ROOT)),
+                "kind": "DIRECTORY" if entry.is_dir() else "FILE",
+                "size": entry.stat().st_size if entry.is_file() else 0,
+            })
+    except OSError:
+        workspace_entries = []
     screens = {
         "AGENTS": {
             "title": "AGENT RUNTIME", "subtitle": "Durable local execution runs",
@@ -271,6 +285,164 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             "items": [{"name": "Global Control", "sub": control.reason_code, "tag": control.state.value.upper(), "tone": "danger" if held else "ok", "pct": 0, "meta": [["CONFIRMED", f"{control.confirmed_count}/{control.total_count}"], ["UPDATED", control.updated_at]]}],
         },
     }
+    screens.update({
+        "CHAT": {
+            "title": "CONVERSATION STREAM", "subtitle": "Live Jarvis conversation memory",
+            "kpis": [
+                {"k": "MESSAGES", "v": str(len(history)), "tone": "info"},
+                {"k": "ROUTE", "v": primary, "tone": "ok"},
+                {"k": "AUTO", "v": "ON" if preferences.get("auto_mode", True) else "OFF", "tone": "ok"},
+            ],
+            "items": [{
+                "name": "AHMED" if str(item.get("role")) == "user" else "JARVIS",
+                "sub": str(item.get("content", ""))[:240], "tag": str(item.get("role", "system")).upper(),
+                "tone": "info" if str(item.get("role")) == "user" else "ok", "pct": 0,
+                "meta": [["AT", str(item.get("timestamp", ""))[11:19]], ["SOURCE", "RUNTIME MEMORY"]],
+            } for item in history[-16:]],
+        },
+        "FILES": {
+            "title": "WORKSPACE FILES", "subtitle": str(PROJECT_ROOT),
+            "kpis": [
+                {"k": "VISIBLE", "v": str(len(workspace_entries)), "tone": "info"},
+                {"k": "DIRTY", "v": str(dirty_files), "tone": "warn" if dirty_files else "ok"},
+                {"k": "BOUNDARY", "v": "PROJECT", "tone": "ok"},
+            ],
+            "items": [{
+                "name": entry["name"], "sub": entry["path"], "tag": entry["kind"],
+                "tone": "info" if entry["kind"] == "DIRECTORY" else "muted", "pct": 0,
+                "meta": [["SIZE", str(entry["size"]) if entry["size"] else "—"], ["SCOPE", "WORKSPACE"]],
+            } for entry in workspace_entries],
+        },
+        "NOTES": {
+            "title": "OBSIDIAN KNOWLEDGE VAULT", "subtitle": "Durable reviewed decisions and handoffs",
+            "kpis": [
+                {"k": "NOTES", "v": str(vault["markdown_count"]), "tone": "ok"},
+                {"k": "CONFIG", "v": "READY" if vault["obsidian_configured"] else "MISSING", "tone": "ok" if vault["obsidian_configured"] else "warn"},
+                {"k": "HEALTH", "v": knowledge["health"].upper(), "tone": "ok" if knowledge["health"] == "good" else "warn"},
+            ],
+            "items": [{
+                "name": "JARVIS VAULT", "sub": str(vault["path"]),
+                "tag": "ONLINE" if vault["exists"] else "MISSING", "tone": "ok" if vault["exists"] else "danger",
+                "pct": 0, "meta": [["MARKDOWN", str(vault["markdown_count"])], ["CONFIG", "YES" if vault["obsidian_configured"] else "NO"]],
+            }],
+        },
+        "BROWSER": {
+            "title": "BROWSER CAPABILITIES", "subtitle": "Guarded web research and URL operations",
+            "kpis": [
+                {"k": "SEARCH", "v": "READY" if any(row["name"] == "web_search" for row in tool_rows) else "OFFLINE", "tone": "ok"},
+                {"k": "OPEN URL", "v": "GATED" if any(row["name"] == "open_url" for row in tool_rows) else "OFFLINE", "tone": "warn"},
+                {"k": "SESSIONS", "v": "ON DEMAND", "tone": "muted"},
+            ],
+            "items": [{
+                "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
+                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
+                "meta": [["BOUNDARY", "GUARDED"], ["STATUS", "AVAILABLE"]],
+            } for row in tool_rows if row["name"] in {"web_search", "open_url", "github_repo_view"}],
+        },
+        "CODE": {
+            "title": "CODE EXECUTION", "subtitle": "Workspace-bounded creation, patching, commands, and Git",
+            "kpis": [
+                {"k": "TOOLS", "v": str(sum(row["name"] in {"workspace_read", "workspace_search", "workspace_write", "workspace_patch", "command_run", "project_create"} for row in tool_rows)), "tone": "ok"},
+                {"k": "RUNS", "v": str(len(agent_runs)), "tone": "info"},
+                {"k": "WORKER", "v": "ONLINE" if agent_status["worker_online"] else "OFFLINE", "tone": "ok" if agent_status["worker_online"] else "danger"},
+            ],
+            "items": [{
+                "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
+                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
+                "meta": [["SCOPE", "WORKSPACE"], ["STATUS", "READY"]],
+            } for row in tool_rows if row["name"] in {"workspace_read", "workspace_search", "workspace_write", "workspace_patch", "command_run", "project_create", "directory_create"}],
+        },
+        "TASKS": {
+            "title": "DURABLE TASK QUEUE", "subtitle": "Persisted work survives restarts",
+            "kpis": [
+                {"k": "QUEUED", "v": str(sum(run.get("status") == "queued" for run in agent_runs)), "tone": "info"},
+                {"k": "ACTIVE", "v": str(active_agent_runs + active_swarm_tasks), "tone": "warn" if active_agent_runs + active_swarm_tasks else "ok"},
+                {"k": "COMPLETE", "v": str(sum(run.get("status") == "completed" for run in agent_runs)), "tone": "ok"},
+            ],
+            "items": [{
+                "name": str(run.get("goal", ""))[:100], "sub": str(run.get("id", "")),
+                "tag": str(run.get("status", "unknown")).upper(), "tone": "danger" if run.get("status") == "failed" else "info",
+                "pct": 0, "meta": [["MODEL", str(run.get("model", "auto"))], ["UPDATED", str(run.get("updated_at", ""))[11:19]]],
+            } for run in agent_runs[:20]],
+        },
+        "TOOLS": {
+            "title": "GUARDED TOOL REGISTRY", "subtitle": "Real capabilities exposed to planner and agents",
+            "kpis": [
+                {"k": "TOTAL", "v": str(len(tool_rows)), "tone": "info"},
+                {"k": "READ", "v": str(sum(row["risk"] == "read" for row in tool_rows)), "tone": "ok"},
+                {"k": "WRITE", "v": str(sum(row["risk"] == "write" for row in tool_rows)), "tone": "warn"},
+                {"k": "SKILLS", "v": str(len(skill_rows)), "tone": "info"},
+            ],
+            "items": [{
+                "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
+                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
+                "meta": [["POLICY", "CONFIRM" if row["risk"] == "write" else "ALLOW"], ["STATUS", "REGISTERED"]],
+            } for row in tool_rows],
+        },
+        "AUTOMATIONS": {
+            "title": "AUTOMATION SCHEDULES", "subtitle": "Durable scheduled agent goals",
+            "kpis": [
+                {"k": "TOTAL", "v": str(len(schedule_rows)), "tone": "info"},
+                {"k": "ENABLED", "v": str(sum(bool(row.get("enabled", True)) for row in schedule_rows)), "tone": "ok"},
+                {"k": "MIN INTERVAL", "v": "60 S", "tone": "muted"},
+            ],
+            "items": [{
+                "name": str(row.get("goal", ""))[:100], "sub": str(row.get("id", "")),
+                "tag": "ENABLED" if row.get("enabled", True) else "PAUSED", "tone": "ok" if row.get("enabled", True) else "warn",
+                "pct": 0, "meta": [["NEXT", str(row.get("next_run_at", ""))], ["INTERVAL", str(row.get("interval_seconds") or "ONCE")]],
+            } for row in schedule_rows],
+        },
+        "GIT": {
+            "title": "GIT WORKSPACE", "subtitle": "Live repository state",
+            "kpis": [
+                {"k": "BRANCH", "v": branch.upper(), "tone": "info"},
+                {"k": "CHANGED", "v": str(dirty_files), "tone": "warn" if dirty_files else "ok"},
+                {"k": "ROOT", "v": PROJECT_ROOT.name.upper(), "tone": "ok"},
+            ],
+            "items": [{
+                "name": branch, "sub": str(PROJECT_ROOT), "tag": "DIRTY" if dirty_files else "CLEAN",
+                "tone": "warn" if dirty_files else "ok", "pct": 0,
+                "meta": [["CHANGED", str(dirty_files)], ["BOUNDARY", "REGISTERED"]],
+            }],
+        },
+        "USAGE": {
+            "title": "PROVIDER ACCOUNTING", "subtitle": "Only measured values are reported",
+            "kpis": [
+                {"k": "REQUESTS", "v": str(sum(item.get("role") == "assistant" for item in history)), "tone": "info"},
+                {"k": "TOKENS", "v": "NOT METERED", "tone": "muted"},
+                {"k": "SPEND", "v": "NOT METERED", "tone": "muted"},
+            ],
+            "items": [{
+                "name": "NVIDIA NIM", "sub": f"{len(selectable_models)} selectable / {len(model_rows)} known models",
+                "tag": provider_health.upper(), "tone": "ok" if provider_health == "healthy" else "danger", "pct": 0,
+                "meta": [["TOKENS", "UNAVAILABLE"], ["SPEND", "UNAVAILABLE"]],
+            }],
+        },
+        "DEVICES": {
+            "title": "DEVICE CHANNELS", "subtitle": "Browser-selected microphone and system output",
+            "kpis": [
+                {"k": "VOICE", "v": "ARMED" if preferences.get("auto_mic", True) else "DISARMED", "tone": "ok" if preferences.get("auto_mic", True) else "warn"},
+                {"k": "HOST", "v": platform.node().upper(), "tone": "info"},
+                {"k": "REMOTE", "v": "HTTPS", "tone": "ok"},
+            ],
+            "items": [
+                {"name": "MICROPHONE", "sub": "Selected by the active browser after permission", "tag": "ARMED" if preferences.get("auto_mic", True) else "DISARMED", "tone": "ok", "pct": 0, "meta": [["PROFILE", str(preferences.get("voice_profile", "en-GB"))], ["SENSITIVITY", str(preferences.get("sensitivity", 6))]]},
+                {"name": "SPEAKER", "sub": "System default audio output", "tag": "READY", "tone": "ok", "pct": 0, "meta": [["VOICE", str(preferences.get("voice_profile", "en-GB"))], ["OUTPUT", "BROWSER"]]},
+            ],
+        },
+        "SETTINGS": {
+            "title": "RUNTIME SETTINGS", "subtitle": "Live non-secret operator preferences",
+            "kpis": [
+                {"k": "AUTO", "v": "ON" if preferences.get("auto_mode", True) else "OFF", "tone": "ok"},
+                {"k": "PRIMARY", "v": primary, "tone": "info"},
+                {"k": "VOICE", "v": str(preferences.get("voice_profile", "en-GB")), "tone": "info"},
+            ],
+            "items": [
+                {"name": "AUTO ROUTING", "sub": "Health-aware model selection", "tag": "ON" if preferences.get("auto_mode", True) else "OFF", "tone": "ok", "pct": 0, "meta": [["PRIMARY", primary], ["CATALOG", str(len(selectable_models))]]},
+                {"name": "VOICE AUTHORITY", "sub": "Microphone capture is browser-permission gated", "tag": "ARMED" if preferences.get("auto_mic", True) else "DISARMED", "tone": "ok", "pct": 0, "meta": [["PROFILE", str(preferences.get("voice_profile", "en-GB"))], ["SENSITIVITY", str(preferences.get("sensitivity", 6))]]},
+            ],
+        },
+    })
     return {
         "at": datetime.now().astimezone().isoformat(), "source": "live",
         "agent": {"state": state, "detail": detail, "since": since, "autonomy": 2, "held": held},
@@ -293,6 +465,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
         "router": {"auto": bool(preferences.get("auto_mode", True)), "primary": primary, "models": model_rows},
         "providers": [{"id": "nvidia", "name": "NVIDIA NIM", "status": provider_health, "latencyMs": 0, "circuit": "closed" if provider_health != "down" else "open"}],
         "voice": {"armed": bool(preferences.get("auto_mic", True)), "inputDevice": "Browser selected input", "outputDevice": "System default", "profile": str(preferences.get("voice_profile", "en-GB")), "sensitivity": int(preferences.get("sensitivity", 6)), "level": 0},
+        "usage": {"requests": sum(item.get("role") == "assistant" for item in history), "tokens": 0, "spendUsd": 0, "capUsd": 0, "metered": False, "series": []},
         "events": _events(history, agent_runs), "screens": screens, "viz": {},
         "runtime": {"platform": platform.platform(), "controlRevision": control.revision},
     }
@@ -332,6 +505,21 @@ async def command(
         goal = str(payload.get("goal", "")).strip()
         if not goal:
             raise HTTPException(status_code=422, detail="A goal is required")
+        dispatch = str(payload.get("dispatch") or "agent").strip().lower()
+        if dispatch in {"swarm", "council"}:
+            run = await jarvis.swarm_runtime.submit(
+                goal[:20_000], mode=dispatch, project_id="jarvis",
+                autonomy="guarded", model=str(payload.get("model") or "auto"),
+                max_agents=min(8, max(1, int(payload.get("maxAgents", 8)))),
+                max_runtime_seconds=min(86_400, max(60, int(payload.get("maxRuntimeSeconds", 3_600)))),
+            )
+            return {
+                "ok": True,
+                "message": f"{dispatch.title()} queued as {run.id}",
+                "runId": run.id,
+            }
+        if dispatch != "agent":
+            raise HTTPException(status_code=422, detail="Dispatch mode must be agent, swarm, or council")
         run = await jarvis.agent_runtime.submit(
             goal[:20_000], model=str(payload.get("model") or "auto"),
             autonomy="guarded", max_steps=min(12, max(1, int(payload.get("maxSteps", 8)))),

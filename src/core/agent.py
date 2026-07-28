@@ -17,7 +17,7 @@ from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from src.clients.nvidia_client import NVIDIAClient
+from src.clients.provider_factory import ProviderSafeError
 from src.config import config
 from src.core.agent_store import AgentStore
 from src.core.control import ControlBlockedError, ControlService, ControlState, StopGuard
@@ -399,11 +399,11 @@ Return JSON only with this schema:
 
 User goal: {goal}"""
         try:
-            async with NVIDIAClient() as client:
-                response = await client.chat_completion(
-                    [{"role": "system", "content": "Produce strict JSON plans. Do not include markdown fences."}, {"role": "user", "content": prompt}],
-                    model=model, temperature=0.1, max_tokens=1400,
-                )
+            client = await self.jarvis._require_provider_client()
+            response = await client.chat_completion(
+                [{"role": "system", "content": "Produce strict JSON plans. Do not include markdown fences."}, {"role": "user", "content": prompt}],
+                model=model, temperature=0.1, max_tokens=1400,
+            )
             raw = response["choices"][0]["message"]["content"]
             plan = AgentPlan.model_validate(self._parse_json(raw))
             valid_tools = self.READ_TOOLS | self.WRITE_TOOLS
@@ -482,8 +482,10 @@ User goal: {goal}"""
             return AgentPlan(goal=goal, summary="Check the local GitHub connection and report whether JARVIS can use it.", steps=[
                 AgentStep(id="step-1", description="Verify the local GitHub connection", tool="github_status"),
             ])
+        if re.search(r"\b(git status|git branch|current branch|working[- ]tree)\b", lowered):
+            tool, arguments = "git_status", {}
         if re.search(r"\b(search|research|latest|look up|find online)\b", lowered): tool, arguments = "web_search", {"query": goal}
-        elif re.search(r"\b(cpu|ram|memory|disk|system|uptime|process)\b", lowered): tool, arguments = "system_info", {"action": "info"}
+        elif re.search(r"\b(cpu|ram|memory|disk|system|uptime|process)\b|\b(provider|runtime|machine) health\b|\bagent runtime\b", lowered): tool, arguments = "system_info", {"action": "info"}
         elif re.search(r"\b(calculate|compute|math)\b", lowered): tool, arguments = "calculator", {"expression": goal}
         elif "nvidia" in lowered and "skill" in lowered: tool, arguments = "nvidia_skill_search", {"query": goal, "limit": 8}
         return AgentPlan(goal=goal, summary="Analyze the goal, gather relevant evidence, and synthesize a direct answer.", steps=[AgentStep(id="step-1", description="Gather the evidence needed for the goal" if tool else "Reason through the goal", tool=tool, arguments=arguments)])
@@ -543,14 +545,14 @@ Available tools:
 Return JSON only:
 {{"done":true|false,"summary":"brief status","next_steps":[{{"id":"step-N","description":"...","tool":"tool_name","arguments":{{}},"expected_output":"..."}}]}}
 """
-        async with NVIDIAClient() as client:
-            response = await client.chat_completion(
-                [
-                    {"role": "system", "content": "Return strict JSON for an autonomous tool controller."},
-                    {"role": "user", "content": prompt},
-                ],
-                model=run.model, temperature=0.1, max_tokens=900,
-            )
+        client = await self.jarvis._require_provider_client()
+        response = await client.chat_completion(
+            [
+                {"role": "system", "content": "Return strict JSON for an autonomous tool controller."},
+                {"role": "user", "content": prompt},
+            ],
+            model=run.model, temperature=0.1, max_tokens=900,
+        )
         raw = response["choices"][0]["message"]["content"]
         payload = self._parse_json(raw)
         if payload.get("done", False):
@@ -615,7 +617,7 @@ Return JSON only:
         run.status = "synthesizing"
         self._event(run, "synthesis", "start", "Synthesizing the final answer from verified observations")
         observed_tools = {item.get("tool") for item in run.observations if item.get("tool")}
-        direct_receipt_tools = {"github_status", "git_status", "workspace_list", "workspace_read"}
+        direct_receipt_tools = self.READ_TOOLS
         if any(item.get("tool") in self.WRITE_TOOLS for item in run.observations) or (
             observed_tools and observed_tools.issubset(direct_receipt_tools)
         ):
@@ -656,6 +658,15 @@ Return JSON only:
             elif tool == "github_status":
                 state = "authenticated" if data.get("authenticated") else "not authenticated"
                 lines.append(f"GitHub CLI is {state}.")
+            elif tool == "git_status":
+                status = data.get("status") if isinstance(data.get("status"), dict) else {}
+                output = str(status.get("stdout", "")).strip().splitlines()
+                if output:
+                    lines.append(f"Git status: {output[0][:300]}")
+                    lines.append(f"Working tree entries: {max(0, len(output) - 1)} changed or untracked paths.")
+            elif tool == "system_info":
+                compact = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+                lines.append(f"System evidence: {compact[:1200]}")
             elif tool == "github_create_repo":
                 lines.append(f"GitHub repository {data.get('repository', '')} created ({data.get('visibility', 'private')}).")
             elif tool == "github_push" and data.get("exit_code") == 0:
@@ -1026,8 +1037,10 @@ Return JSON only:
             {"role": "system", "content": self.jarvis.system_prompt + "\nYou are completing an agent run. Base claims on tool observations. State limitations clearly. Do not mention hidden reasoning."},
             {"role": "user", "content": f"Goal:\n{run.goal}\n\nPlan summary:\n{run.plan.summary if run.plan else ''}\n\nTool observations:\n{evidence}\n\nGive Ahmed the completed result and concise next actions."},
         ]
-        async with NVIDIAClient() as client:
-            response = await client.chat_completion(messages, model=run.model, temperature=0.25, max_tokens=1800)
+        client = await self.jarvis._require_provider_client()
+        response = await client.chat_completion(
+            messages, model=run.model, temperature=0.25, max_tokens=1800
+        )
         return response["choices"][0]["message"]["content"]
 
     def create_schedule(
@@ -1154,6 +1167,8 @@ Return JSON only:
     def _safe_error_code(exc: BaseException) -> str:
         if isinstance(exc, ControlBlockedError):
             return "control_blocked"
+        if isinstance(exc, ProviderSafeError):
+            return exc.code
         name = type(exc).__name__.removesuffix("Error") or "runtime"
         normalized = re.sub(r"(?<!^)(?=[A-Z])", "_", name).casefold()
         return f"{normalized}_error"[:128]

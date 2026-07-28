@@ -14,7 +14,7 @@ from typing import Any, TYPE_CHECKING
 
 from pydantic import BaseModel, Field, ValidationError
 
-from src.clients.nvidia_client import NVIDIAClient
+from src.clients.provider_factory import ProviderSafeError
 from src.config import config
 from src.core.control import ControlBlockedError, ControlService, ControlState, StopGuard
 from src.core.swarm_store import SwarmStore
@@ -445,7 +445,15 @@ class MultiAgentOrchestrator:
             self._refresh_worktree(run)
             if not self._effect_allowed(run, "provider"):
                 return
-            run.result = await self._final_synthesis(run)
+            try:
+                run.result = await self._final_synthesis(run)
+            except (ProviderSafeError, asyncio.TimeoutError, TimeoutError, OSError) as exc:
+                run.result = self._fallback_synthesis(run)
+                self._event(
+                    run, "synthesis_degraded",
+                    "Provider synthesis unavailable; assembled verified specialist receipts",
+                    {"code": self._safe_error_code(exc)},
+                )
             if not self._effect_allowed(run, "result_persistence"):
                 return
             run.status = "completed"
@@ -711,17 +719,20 @@ Goal: {run.goal}
 Project: {run.project_id}"""
         try:
             routing = await self.jarvis.route_model(run.goal, run.requested_model)
-            async with NVIDIAClient() as client:
-                response = await client.chat_completion(
-                    [
-                        {"role": "system", "content": "You are a multi-agent task planner. Return strict JSON without markdown."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model=routing.model, temperature=0.1, max_tokens=1800,
-                )
+            client = await self.jarvis._require_provider_client()
+            response = await client.chat_completion(
+                [
+                    {"role": "system", "content": "You are a multi-agent task planner. Return strict JSON without markdown."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=routing.model, temperature=0.1, max_tokens=1800,
+            )
             plan = SwarmPlan.model_validate(self._parse_json(response["choices"][0]["message"]["content"]))
             return self._sanitize_plan(plan)
-        except (KeyError, TypeError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        except (
+            KeyError, TypeError, ValueError, ValidationError, json.JSONDecodeError,
+            ProviderSafeError, asyncio.TimeoutError, TimeoutError, OSError,
+        ) as exc:
             logger.warning(
                 "Swarm planner output invalid; using fallback (%s)",
                 self._safe_error_code(exc),
@@ -740,7 +751,19 @@ Project: {run.project_id}"""
         return SwarmPlan(summary=plan.summary, tasks=tasks)
 
     def _fallback_plan(self, run: SwarmRun) -> SwarmPlan:
-        if run.mode == "swarm":
+        write_requested = bool(re.search(
+            r"\b(create|build|implement|fix|change|modify|write|patch|deploy|publish|push|design)\b",
+            run.goal,
+            flags=re.IGNORECASE,
+        ))
+        if run.mode == "swarm" and not write_requested:
+            tasks = [
+                PlannedTask(id="task-1", title="Inspect runtime evidence", objective=run.goal, role="researcher"),
+                PlannedTask(id="task-2", title="Inspect provider and model evidence", objective=run.goal, role="devops"),
+                PlannedTask(id="task-3", title="Independent verification", objective=run.goal, role="tester"),
+                PlannedTask(id="task-4", title="Review all receipts", objective=run.goal, role="reviewer", dependencies=["task-1", "task-2", "task-3"]),
+            ]
+        elif run.mode == "swarm":
             tasks = [
                 PlannedTask(id="task-1", title="Research requirements", objective=run.goal, role="researcher"),
                 PlannedTask(id="task-2", title="Design solution", objective=run.goal, role="designer", writer=True),
@@ -756,6 +779,19 @@ Project: {run.project_id}"""
                 PlannedTask(id="task-4", title="Review the result", objective=run.goal, role="reviewer", dependencies=["task-3"]),
             ]
         return SwarmPlan(summary="Coordinate specialist agents and independently verify the outcome.", tasks=tasks)
+
+    @staticmethod
+    def _fallback_synthesis(run: SwarmRun) -> str:
+        completed = [task for task in run.tasks.values() if task.status == "completed"]
+        lines = [
+            f"Completed {run.mode} mission: {run.goal}",
+            f"Verified specialist receipts: {len(completed)}/{len(run.tasks)}.",
+        ]
+        for task in completed:
+            result = " ".join(str(task.result).split())
+            lines.append(f"- {task.role.upper()} · {task.title}: {result[:600]}")
+        lines.append("Provider-level final synthesis was unavailable; no specialist result was invented.")
+        return "\n".join(lines)
 
     def _council_plan(self, run: SwarmRun) -> SwarmPlan:
         members = ["coder", "researcher", "designer", "reviewer", "devops"]
@@ -778,14 +814,14 @@ Project: {run.project_id}"""
             for candidate in run.tasks.values() if candidate.id in task.dependencies
         ]
         routing = await self.jarvis.route_model(run.goal, run.requested_model)
-        async with NVIDIAClient() as client:
-            response = await client.chat_completion(
-                [
-                    {"role": "system", "content": "You are JARVIS's independent council judge. Decide by evidence, surface disagreements, and never fabricate consensus."},
-                    {"role": "user", "content": f"Goal: {run.goal}\n\nCouncil proposals:\n{json.dumps(proposals, ensure_ascii=False, indent=2)}\n\nReturn the best synthesized decision, rationale, risks, and next actions."},
-                ],
-                model=routing.model, temperature=0.2, max_tokens=2200,
-            )
+        client = await self.jarvis._require_provider_client()
+        response = await client.chat_completion(
+            [
+                {"role": "system", "content": "You are JARVIS's independent council judge. Decide by evidence, surface disagreements, and never fabricate consensus."},
+                {"role": "user", "content": f"Goal: {run.goal}\n\nCouncil proposals:\n{json.dumps(proposals, ensure_ascii=False, indent=2)}\n\nReturn the best synthesized decision, rationale, risks, and next actions."},
+            ],
+            model=routing.model, temperature=0.2, max_tokens=2200,
+        )
         return response["choices"][0]["message"]["content"]
 
     async def _final_synthesis(self, run: SwarmRun) -> str:
@@ -798,14 +834,14 @@ Project: {run.project_id}"""
             for task in run.tasks.values()
         ]
         routing = await self.jarvis.route_model(run.goal, run.requested_model)
-        async with NVIDIAClient() as client:
-            response = await client.chat_completion(
-                [
-                    {"role": "system", "content": "You are JARVIS's manager. Synthesize completed specialist outputs into one evidence-based result. Do not claim work not shown."},
-                    {"role": "user", "content": f"Goal: {run.goal}\nMode: {run.mode}\nSpecialist outputs:\n{json.dumps(evidence, ensure_ascii=False, indent=2)}\n\nGive Ahmed the integrated outcome, verification, artifacts, risks, and concise next actions."},
-                ],
-                model=routing.model, temperature=0.2, max_tokens=2400,
-            )
+        client = await self.jarvis._require_provider_client()
+        response = await client.chat_completion(
+            [
+                {"role": "system", "content": "You are JARVIS's manager. Synthesize completed specialist outputs into one evidence-based result. Do not claim work not shown."},
+                {"role": "user", "content": f"Goal: {run.goal}\nMode: {run.mode}\nSpecialist outputs:\n{json.dumps(evidence, ensure_ascii=False, indent=2)}\n\nGive Ahmed the integrated outcome, verification, artifacts, risks, and concise next actions."},
+            ],
+            model=routing.model, temperature=0.2, max_tokens=2400,
+        )
         return response["choices"][0]["message"]["content"]
 
     def _event(self, run: SwarmRun, event_type: str, message: str, data: dict[str, Any] | None = None) -> None:
@@ -895,6 +931,8 @@ Project: {run.project_id}"""
     def _safe_error_code(exc: BaseException) -> str:
         if isinstance(exc, ControlBlockedError):
             return "control_blocked"
+        if isinstance(exc, ProviderSafeError):
+            return exc.code
         name = type(exc).__name__.removesuffix("Error") or "runtime"
         normalized = re.sub(r"(?<!^)(?=[A-Z])", "_", name).casefold()
         return f"{normalized}_error"[:128]
