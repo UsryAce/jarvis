@@ -68,7 +68,10 @@ const buttonStyle: CSSProperties = {
   textTransform: "uppercase",
 };
 
-function safeUnlockMessage(error: unknown): string {
+function safeUnlockMessage(
+  error: unknown,
+  stage: "credential" | "session" = "credential",
+): string {
   if (!(error instanceof SafeApiException)) {
     return "Jarvis control plane is unreachable. Protected changes are locked until connection is restored.";
   }
@@ -82,8 +85,17 @@ function safeUnlockMessage(error: unknown): string {
   if (error.safe.code === "rate_limited" || error.status === 429) {
     return "Unlock attempts are temporarily limited. Wait before trying again.";
   }
+  if (error.safe.code === "origin_invalid") {
+    return "This mobile link is no longer trusted. Open the latest Jarvis mobile link and try again.";
+  }
   if (error.safe.code === "invalid_request" || error.status === 422) {
     return "The operator code must contain at least 16 characters.";
+  }
+  if (stage === "session" && error.safe.code === "authentication_required") {
+    return "The code was accepted, but this browser did not retain the secure session. Reload this HTTPS link and unlock again.";
+  }
+  if (error.safe.code === "unlock_failed" || error.status === 401) {
+    return "That operator code does not match the current Jarvis access code. Check every character and try again.";
   }
   return "Jarvis could not unlock this session. Check the code and try again.";
 }
@@ -120,6 +132,7 @@ export function UnlockGate({
   onLogout,
 }: UnlockGateProps) {
   const [code, setCode] = useState("");
+  const [showCode, setShowCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fieldRef = useRef<HTMLInputElement>(null);
@@ -139,13 +152,23 @@ export function UnlockGate({
     if (!code || submitting) return;
     setSubmitting(true);
     setMessage(null);
-    const unlockRequest = api.unlock(code);
-    setCode("");
+    let authoritativeSession: SessionSnapshot;
     try {
-      const authoritativeSession = await unlockRequest;
-      await onUnlocked(authoritativeSession);
+      authoritativeSession = await api.unlock(code);
     } catch (error) {
-      setMessage(safeUnlockMessage(error));
+      setMessage(safeUnlockMessage(error, "credential"));
+      requestAnimationFrame(() => {
+        fieldRef.current?.focus();
+        fieldRef.current?.select();
+      });
+      setSubmitting(false);
+      return;
+    }
+    try {
+      await onUnlocked(authoritativeSession);
+      setCode("");
+    } catch (error) {
+      setMessage(safeUnlockMessage(error, "session"));
       requestAnimationFrame(() => fieldRef.current?.focus());
     } finally {
       setSubmitting(false);
@@ -237,8 +260,12 @@ export function UnlockGate({
           ref={fieldRef}
           id="operator-unlock-code"
           name="operator-unlock-code"
-          type="password"
+          type={showCode ? "text" : "password"}
           autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          enterKeyHint="go"
+          spellCheck={false}
           required
           minLength={16}
           value={code}
@@ -247,6 +274,33 @@ export function UnlockGate({
           style={controlStyle}
           aria-describedby="unlock-message"
         />
+        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr", marginTop: 8 }}>
+          <button
+            type="button"
+            disabled={submitting}
+            style={{ ...buttonStyle, minHeight: 42, fontSize: 12 }}
+            onClick={() => setShowCode((visible) => !visible)}
+            aria-pressed={showCode}
+          >
+            {showCode ? "Hide code" : "Show code"}
+          </button>
+          <button
+            type="button"
+            disabled={submitting || !navigator.clipboard}
+            style={{ ...buttonStyle, minHeight: 42, fontSize: 12 }}
+            onClick={() => {
+              void navigator.clipboard.readText().then((value) => {
+                setCode(value.trim());
+                setMessage(null);
+                fieldRef.current?.focus();
+              }).catch(() => {
+                setMessage("Paste permission was blocked. Press and hold the code field, then choose Paste.");
+              });
+            }}
+          >
+            Paste code
+          </button>
+        </div>
         <button
           type="submit"
           disabled={submitting || !unlockInputReady}
@@ -260,7 +314,7 @@ export function UnlockGate({
           aria-live="polite"
           style={{ color: message ? "#FFAE19" : "#7897A1", lineHeight: 1.5, minHeight: 48, paddingTop: 12 }}
         >
-          {message || unlockHint || "Local control plane · Cookie-protected session"}
+          {message || unlockHint || "Use the current 32-character access code exactly · Cookie-protected session"}
         </div>
       </form>
     </main>
