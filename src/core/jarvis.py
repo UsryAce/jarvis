@@ -263,6 +263,31 @@ Guidelines:
         user_msg = {"role": "user", "content": message, "timestamp": datetime.now().isoformat()}
         self.conversation_history.append(user_msg)
 
+        # File, code, project, and repository requests are real work, not legacy
+        # chat-skill shortcuts. Queue them in the durable guarded runtime so every
+        # mutation is workspace-scoped, audited, and approval-gated.
+        if self.agent_runtime.should_delegate_chat_action(message):
+            run = await self.agent_runtime.submit(
+                message,
+                model=resolved_model,
+                autonomy="guarded",
+            )
+            response = (
+                f"Guarded agent run {run.id} is queued for real execution. "
+                "Track it in Agents; any mutating step will wait for explicit approval."
+            )
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": response,
+                "timestamp": datetime.now().isoformat(),
+                "agent_run_id": run.id,
+            })
+            if self.memory:
+                asyncio.create_task(self._save_conversation(message, response))
+            if stream:
+                return self._stream_text(response)
+            return response
+
         async def find_memories() -> list[dict]:
             if not use_memory or not self.memory:
                 return []

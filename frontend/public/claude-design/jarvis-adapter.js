@@ -40,7 +40,7 @@
  * }
  *
  * Screen { title, subtitle, kpis: [{k,v,tone}], items: [Item] }
- * Item   { name, sub, tag, tone, pct, meta: [[k,v],[k,v]] }
+ * Item   { name, sub, tag, tone, pct, meta: [[k,v],[k,v]], action?: {id,command,payload,confirm} }
  * tone   'ok' | 'info' | 'warn' | 'danger' | 'muted'   → the UI owns the colours
  *
  * Viz is one of:
@@ -135,7 +135,10 @@
         dirtyFiles: num(raw.workspace.dirtyFiles), budgetMin: num(raw.workspace.budgetMin),
         agentsActive: num(raw.workspace.agentsActive), agentsTotal: num(raw.workspace.agentsTotal),
         tasksComplete: num(raw.workspace.tasksComplete), tasksTotal: num(raw.workspace.tasksTotal),
-        missionWindow: str(raw.workspace.missionWindow)
+        missionWindow: str(raw.workspace.missionWindow),
+        projects: (raw.workspace.projects || []).map(function (p) {
+          return { id: str(p.id), name: str(p.name, p.id), protected: p.protected === true };
+        })
       } : null,
       flow: (raw.flow || []).map(function (f) {
         return { name: str(f.name), state: str(f.state), tone: tone(f.tone) };
@@ -160,9 +163,15 @@
         title: str(s.title, k), subtitle: str(s.subtitle),
         kpis: (s.kpis || []).slice(0, 4).map(function (x) { return { k: str(x.k), v: str(x.v), tone: tone(x.tone) }; }),
         items: (s.items || []).map(function (i) {
+          var action = i.action && typeof i.action === 'object' ? i.action : null;
           return {
             name: str(i.name), sub: str(i.sub), tag: str(i.tag), tone: tone(i.tone),
-            pct: num(i.pct), meta: (i.meta || []).slice(0, 2).map(function (m) { return [str(m[0]), str(m[1])]; })
+            pct: num(i.pct), meta: (i.meta || []).slice(0, 2).map(function (m) { return [str(m[0]), str(m[1])]; }),
+            action: action ? {
+              id: str(action.id, str(i.id)),
+              command: str(action.command), payload: action.payload && typeof action.payload === 'object' ? action.payload : {},
+              confirm: str(action.confirm)
+            } : null
           };
         })
       };
@@ -205,26 +214,79 @@
     var base = (opts.baseUrl || (window.location && window.location.origin) || '').replace(/\/$/, '');
     var pollMs = Math.max(500, opts.pollMs || 2000);
     var onChange = opts.onChange || function () { };
-    var alive = true, ws = null, timer = null, failures = 0;
+    var alive = true, ws = null, wsReady = false, timer = null, failures = 0, reconnectTimer = null;
+    var lastSnapshot = null, commandSequence = 0, pendingCommands = {};
+
+    function postHost(action, payload, requestId) {
+      if (window.parent === window) return false;
+      window.parent.postMessage({
+        source: 'jarvis-design', action: action,
+        payload: payload || {}, requestId: requestId || ''
+      }, window.location.origin);
+      return true;
+    }
+
+    function hostCommand(action, payload) {
+      if (window.parent === window) return null;
+      var requestId = 'exact-' + Date.now() + '-' + (++commandSequence);
+      return new Promise(function (resolve) {
+        var timeout = setTimeout(function () {
+          delete pendingCommands[requestId];
+          resolve({ ok: false, message: 'Command bridge timed out' });
+        }, 30000);
+        pendingCommands[requestId] = { resolve: resolve, timeout: timeout };
+        postHost('command', { action: action, payload: payload || {} }, requestId);
+      });
+    }
+
+    function hostApproval(id, decision, note) {
+      if (window.parent === window) return null;
+      var requestId = 'exact-approval-' + Date.now() + '-' + (++commandSequence);
+      return new Promise(function (resolve) {
+        var timeout = setTimeout(function () {
+          delete pendingCommands[requestId];
+          resolve({ ok: false, message: 'Approval bridge timed out' });
+        }, 30000);
+        pendingCommands[requestId] = { resolve: resolve, timeout: timeout };
+        postHost('approval', { id: id, decision: decision, note: note || '' }, requestId);
+      });
+    }
+
+    function onHostMessage(event) {
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      var message = event.data || {};
+      if (message.source !== 'jarvis-host' || message.action !== 'command-result') return;
+      var pending = pendingCommands[message.requestId];
+      if (!pending) return;
+      clearTimeout(pending.timeout);
+      delete pendingCommands[message.requestId];
+      pending.resolve(message.result && typeof message.result === 'object'
+        ? message.result : { ok: false, message: 'Invalid command response' });
+    }
+    window.addEventListener('message', onHostMessage);
 
     function meta(extra) {
-      return Object.assign({ baseUrl: base, transport: ws ? 'websocket' : 'poll', failures: failures }, extra || {});
+      return Object.assign({ baseUrl: base, transport: wsReady ? 'websocket' : 'poll', failures: failures }, extra || {});
     }
 
     function accept(raw) {
       var res = normalize(raw);
       if (!res.data) { fail('normalize: ' + res.problems.join('; ')); return; }
       failures = 0;
+      lastSnapshot = res.data;
       onChange(res.data, meta({ problems: res.problems }));
     }
 
     function fail(reason) {
       failures++;
-      onChange(null, meta({ error: String(reason) }));
+      var detail = String(reason);
+      if (/HTTP\s+(401|403)\b/.test(detail)) postHost('session-expired', {});
+      if (lastSnapshot) onChange(lastSnapshot, meta({ error: detail, stale: true }));
+      else onChange(null, meta({ error: detail, connecting: failures < 3 }));
     }
 
     function poll() {
-      if (!alive || !base) return;
+      if (!alive || !base || wsReady) return;
       fetch(base + EXPECTED_ENDPOINTS.snapshot, { credentials: 'same-origin', headers: { accept: 'application/json' } })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(accept)
@@ -235,6 +297,7 @@
       if (!base || typeof WebSocket === 'undefined') return;
       var url = base.replace(/^http/, 'ws') + EXPECTED_ENDPOINTS.stream;
       try { ws = new WebSocket(url); } catch (e) { ws = null; return; }
+      ws.onopen = function () { wsReady = true; };
       ws.onmessage = function (ev) {
         try {
           var msg = JSON.parse(ev.data);
@@ -242,8 +305,16 @@
           else if (msg.type === 'patch' && opts.onPatch) opts.onPatch(msg.path, msg.value);
         } catch (e) { /* ignore malformed frame */ }
       };
-      ws.onclose = function () { ws = null; };
-      ws.onerror = function () { try { ws.close(); } catch (e) { } ws = null; };
+      ws.onclose = function () {
+        ws = null; wsReady = false;
+        poll();
+        if (!alive || reconnectTimer) return;
+        reconnectTimer = setTimeout(function () {
+          reconnectTimer = null;
+          if (alive) openWs();
+        }, Math.min(10000, 750 * Math.pow(2, Math.min(failures, 4))));
+      };
+      ws.onerror = function () { wsReady = false; try { ws.close(); } catch (e) { } ws = null; };
     }
 
     if (base) { poll(); openWs(); timer = setInterval(poll, pollMs); }
@@ -270,12 +341,46 @@
     }
 
     return {
-      dispose: function () { alive = false; clearInterval(timer); if (ws) try { ws.close(); } catch (e) { } },
+      dispose: function () {
+        alive = false; clearInterval(timer); clearTimeout(reconnectTimer);
+        window.removeEventListener('message', onHostMessage);
+        Object.keys(pendingCommands).forEach(function (key) {
+          clearTimeout(pendingCommands[key].timeout);
+          pendingCommands[key].resolve({ ok: false, message: 'Command bridge closed' });
+          delete pendingCommands[key];
+        });
+        if (ws) try { ws.close(); } catch (e) { }
+      },
       command: function (action, payload) {
+        var runId = payload && typeof payload.runId === 'string' ? payload.runId.trim() : '';
+        var bridged = hostCommand(action, payload || {});
+        if (bridged) return bridged;
+        var protectedPath = null;
+        if (runId) {
+          var encoded = encodeURIComponent(runId);
+          if (action === 'approve_agent_run') protectedPath = '/api/ui/agent/runs/' + encoded + '/approve-current';
+          else if (action === 'cancel_agent_run') protectedPath = '/api/ui/agent/runs/' + encoded + '/cancel';
+          else if (action === 'approve_swarm_run') protectedPath = '/api/ui/swarm/runs/' + encoded + '/approve-current';
+          else if (action === 'cancel_swarm_run') protectedPath = '/api/ui/swarm/runs/' + encoded + '/cancel';
+        }
         if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
+        if (protectedPath) return securePost(protectedPath, {});
         return securePost(EXPECTED_ENDPOINTS.command, { action: action, payload: payload || null });
       },
+      approval: function (id, decision, note) {
+        id = typeof id === 'string' ? id.trim() : '';
+        decision = decision === 'reject' ? 'reject' : decision === 'approve' ? 'approve' : '';
+        if (!id || !decision) return Promise.resolve({ ok: false, message: 'A valid approval id and decision are required' });
+        var bridged = hostApproval(id, decision, note);
+        if (bridged) return bridged;
+        if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
+        return securePost(EXPECTED_ENDPOINTS.approve.replace('{id}', encodeURIComponent(id)), {
+          decision: decision, note: typeof note === 'string' ? note : ''
+        });
+      },
       emergencyStop: function () {
+        var bridged = hostCommand('emergency_stop', {});
+        if (bridged) return bridged;
         if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
         return fetch(base + '/api/control', {
           credentials: 'same-origin', headers: { accept: 'application/json' }

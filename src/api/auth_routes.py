@@ -61,10 +61,22 @@ def _safe_error(code: str, status_code: int, *, applied: bool = False) -> JSONRe
     return JSONResponse(status_code=status_code, content=error.to_payload())
 
 
-def _set_cookie(response: Response, request: Request, cookie: str) -> None:
+def _set_cookie(
+    response: Response,
+    request: Request,
+    cookie: str,
+    *,
+    expires_at: datetime,
+) -> None:
+    """Set a persistent cookie whose client lifetime cannot outlive the session."""
+
+    now = _service(request).clock()
+    max_age = max(0, int((expires_at - now).total_seconds()))
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=cookie,
+        max_age=max_age,
+        expires=expires_at,
         httponly=True,
         secure=request.url.scheme.casefold() == "https",
         samesite="strict",
@@ -84,7 +96,7 @@ async def unlock(payload: UnlockRequest, request: Request, response: Response):
         )
     except AuthenticationError:
         return _safe_error("unlock_failed", 401)
-    _set_cookie(response, request, issued.cookie)
+    _set_cookie(response, request, issued.cookie, expires_at=issued.expires_at)
     return SessionResponse(
         authenticated=True,
         actor_id=issued.actor_id,
@@ -106,7 +118,7 @@ async def session(
         )
     except AuthenticationError:
         return _safe_error("authentication_required", 401)
-    _set_cookie(response, request, issued.cookie)
+    _set_cookie(response, request, issued.cookie, expires_at=issued.expires_at)
     return SessionResponse(
         authenticated=True,
         actor_id=issued.actor_id,

@@ -33,6 +33,13 @@ class Skill:
 class SkillRegistry:
     """Registry for managing skills."""
 
+    # These legacy skills combine matching, parameter inference, and mutation in
+    # one unguarded call. Chat may still use read-only conversational skills, but
+    # file/code work must go through AgentRuntime's workspace and approval gates.
+    AUTO_EXECUTION_BLOCKED_SKILLS = frozenset({
+        "files", "file_operations", "code", "code_execution",
+    })
+
     def __init__(self):
         self.skills: Dict[str, Skill] = {}
         self._loaded = False
@@ -101,6 +108,10 @@ class SkillRegistry:
     async def execute_if_applicable(self, text: str, jarvis) -> str:
         """Execute first matching skill."""
         for name, skill in self.skills.items():
+            identities = {str(name).casefold(), str(skill.name or "").casefold()}
+            if identities.intersection(self.AUTO_EXECUTION_BLOCKED_SKILLS):
+                logger.debug("Skipped guarded legacy skill during automatic chat matching: %s", name)
+                continue
             if skill.matches(text):
                 try:
                     skill.jarvis = jarvis

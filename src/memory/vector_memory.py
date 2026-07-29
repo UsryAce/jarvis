@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,8 @@ class VectorMemory:
         self.embedding_model = config.get("memory.embedding_model", "nvidia/nv-embedqa-e5-v5")
         self.nvidia_client = nvidia_client
         self._initialized = False
+        self._embedding_disabled_until = 0.0
+        self._embedding_failures = 0
 
     async def initialize(self):
         """Initialize ChromaDB and create collection."""
@@ -66,12 +69,24 @@ class VectorMemory:
         if not self.nvidia_client:
             return self._fallback_embeddings(texts)
 
+        if time.monotonic() < self._embedding_disabled_until:
+            return self._fallback_embeddings(texts)
+
         try:
-            async with NVIDIAClient() as client:
-                result = await client.embeddings(texts, model=self.embedding_model)
-                return [item["embedding"] for item in result["data"]]
+            result = await self.nvidia_client.embeddings(texts, model=self.embedding_model)
+            self._embedding_failures = 0
+            self._embedding_disabled_until = 0.0
+            return [item["embedding"] for item in result["data"]]
         except Exception as e:
-            logger.warning(f"NVIDIA embeddings failed: {e}. Using fallback.")
+            self._embedding_failures += 1
+            status = int(getattr(e, "status", 0) or 0)
+            cooldown = 600 if status == 400 else min(300, 30 * (2 ** min(self._embedding_failures - 1, 3)))
+            self._embedding_disabled_until = time.monotonic() + cooldown
+            logger.warning(
+                "NVIDIA embeddings unavailable; using local fallback for %ss (status=%s)",
+                cooldown,
+                status,
+            )
             # Fallback: use simple hash-based embeddings
             return self._fallback_embeddings(texts)
 
@@ -281,6 +296,9 @@ class VectorMemory:
 
     async def close(self):
         """Close connections."""
+        if self.nvidia_client:
+            await self.nvidia_client.__aexit__(None, None, None)
+            self.nvidia_client = None
         if self.client:
             # ChromaDB persistent client doesn't need explicit close
             pass

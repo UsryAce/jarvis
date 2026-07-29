@@ -12,6 +12,9 @@ New-Item -ItemType Directory -Path $dataRoot -Force | Out-Null
 $createdNew = $false
 $mutex = New-Object System.Threading.Mutex($true, 'Local\JarvisAutonomousSupervisor', [ref]$createdNew)
 if (-not $createdNew) { exit 0 }
+$script:PendingMobileOrigin = $null
+$script:AppliedMobileOrigin = $null
+$script:BackendUnreadyChecks = 0
 
 function Write-SupervisorLog([string]$Message) {
     $line = "$(Get-Date -Format o) $Message"
@@ -33,7 +36,7 @@ function Get-PublishedMobileOrigin {
     return $null
 }
 
-function Set-JarvisAllowedOriginsEnvironment {
+function Set-JarvisAllowedOriginsEnvironment([string]$MobileOrigin = '') {
     $origins = @(
         'http://localhost:8080',
         'http://127.0.0.1:8080',
@@ -42,19 +45,47 @@ function Set-JarvisAllowedOriginsEnvironment {
         'http://localhost:5173',
         'http://127.0.0.1:5173'
     )
-    $mobileOrigin = Get-PublishedMobileOrigin
+    $mobileOrigin = $MobileOrigin
+    if (-not $mobileOrigin) { $mobileOrigin = $script:PendingMobileOrigin }
+    if (-not $mobileOrigin) { $mobileOrigin = Get-PublishedMobileOrigin }
+    if ($mobileOrigin -and $mobileOrigin -notmatch '^https://[a-z0-9-]+\.trycloudflare\.com$') {
+        throw 'Invalid mobile tunnel origin'
+    }
     if ($mobileOrigin) { $origins += $mobileOrigin }
     $env:JARVIS_ALLOWED_ORIGINS = $origins -join ','
+    $script:AppliedMobileOrigin = $mobileOrigin
 }
 
-function Restart-JarvisBackendForOriginChange {
+function Get-VerifiedJarvisBackendProcess {
     $listeners = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
     foreach ($listener in $listeners) {
         $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" -ErrorAction SilentlyContinue
-        if ($process.CommandLine -and $process.CommandLine.Contains('uvicorn src.api.server:app')) {
-            Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
-            Write-SupervisorLog 'BACKEND_RESTARTED_FOR_MOBILE_ORIGIN_CHANGE'
+        $executableName = [System.IO.Path]::GetFileName([string]$process.ExecutablePath)
+        $isPythonRuntime = $executableName -in @('python.exe', 'pythonw.exe', 'uvicorn.exe')
+        $isJarvisCommand = (
+            $process.CommandLine -and
+            $process.CommandLine -match '(?i)(?:^|\s)(?:-m\s+)?uvicorn(?:\.exe)?\s+src\.api\.server:app(?:\s|$)'
+        )
+        if ($isPythonRuntime -and $isJarvisCommand) {
+            return $process
         }
+    }
+    return $null
+}
+
+function Stop-VerifiedJarvisBackend([string]$Reason) {
+    $process = Get-VerifiedJarvisBackendProcess
+    if (-not $process) {
+        Write-SupervisorLog "BACKEND_RESTART_REFUSED_UNVERIFIED_$Reason"
+        return $false
+    }
+    try {
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+        Write-SupervisorLog "BACKEND_RESTART_REQUESTED_$Reason"
+        return $true
+    } catch {
+        Write-SupervisorLog "BACKEND_RESTART_FAILED_$Reason"
+        return $false
     }
 }
 
@@ -82,9 +113,97 @@ function Get-JarvisTunnelProcess {
         Select-Object -First 1
 }
 
+function Get-BackendHealth {
+    try {
+        return Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -Method Get -TimeoutSec 2
+    } catch {
+        return $null
+    }
+}
+
+function Test-BackendTrustReady($Health = $null) {
+    if (-not $Health) { $Health = Get-BackendHealth }
+    if (-not $Health) { return $false }
+    if ($Health.status -in @(
+        'paused', 'cancel_requested', 'emergency_stopped',
+        'stopping', 'stopped', 'partial', 'unconfirmed'
+    )) {
+        return $true
+    }
+    return (
+        $Health.status -eq 'ready' -and
+        [bool]$Health.initialized -and
+        [bool]$Health.runtime_ready
+    )
+}
+
+function Test-BackendRuntimeReady($Health = $null) {
+    if (-not $Health) { $Health = Get-BackendHealth }
+    if (-not $Health) { return $false }
+    return (
+        $Health.status -eq 'ready' -and
+        [bool]$Health.initialized -and
+        [bool]$Health.runtime_ready
+    )
+}
+
+function Test-BackendInternalDegraded($Health) {
+    if (-not $Health) { return $false }
+    return (
+        $Health.status -eq 'degraded' -or
+        (
+            $Health.status -eq 'ready' -and
+            [bool]$Health.initialized -and
+            -not [bool]$Health.runtime_ready
+        )
+    )
+}
+
+function Test-RemoteOriginApiReady([string]$Origin) {
+    if ($Origin -notmatch '^https://[a-z0-9-]+\.trycloudflare\.com$') { return $false }
+    if (-not (Test-BackendRuntimeReady)) { return $false }
+
+    # Vite terminates browser preflights before proxying them, so checking the
+    # public URL for Access-Control-Allow-Origin produces a false negative.
+    # Verify the backend's exact-origin policy directly, then prove that the
+    # public /api proxy reaches that backend (an unauthenticated 401 JSON is a
+    # valid reachability result for the protected health alias).
+    try {
+        $headers = @{
+            Origin = $Origin
+            'Access-Control-Request-Method' = 'POST'
+            'Access-Control-Request-Headers' = 'content-type,x-jarvis-csrf'
+        }
+        $preflight = Invoke-WebRequest -UseBasicParsing -Method Options `
+            -Uri 'http://127.0.0.1:8000/api/auth/unlock' -Headers $headers -TimeoutSec 5
+        if (
+            $preflight.StatusCode -notin @(200, 204) -or
+            [string]$preflight.Headers['Access-Control-Allow-Origin'] -ne $Origin
+        ) { return $false }
+    } catch {
+        return $false
+    }
+
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "$Origin/api/health" -TimeoutSec 5
+        return (
+            $response.StatusCode -eq 200 -and
+            [string]$response.Headers['Content-Type'] -match '^application/json'
+        )
+    } catch {
+        $errorResponse = $_.Exception.Response
+        return (
+            $errorResponse -and
+            [int]$errorResponse.StatusCode -eq 401 -and
+            [string]$errorResponse.Headers['Content-Type'] -match '^application/json'
+        )
+    }
+}
+
 function Publish-MobileAccess {
     if (-not (Test-Path -LiteralPath $tunnelLogPath)) { return $false }
     $content = Get-Content -LiteralPath $tunnelLogPath -Raw -ErrorAction SilentlyContinue
+    if (-not $content) { return $false }
     $match = [regex]::Match($content, 'https://[a-z0-9-]+\.trycloudflare\.com')
     if (-not $match.Success) { return $false }
     $existingTunnel = $null
@@ -93,22 +212,34 @@ function Publish-MobileAccess {
             $existingTunnel = (Get-Content -LiteralPath $mobileAccessPath -Raw | ConvertFrom-Json).tunnel
         } catch {}
     }
-    $originChanged = $existingTunnel -ne $match.Value
-    if ($originChanged) {
-        try {
-            $probe = Invoke-WebRequest -UseBasicParsing "$($match.Value)/mobile" -TimeoutSec 3
-            if ($probe.StatusCode -ne 200) { return $false }
-        } catch {
-            return $false
+    $candidateOrigin = $match.Value
+    $originChanged = $existingTunnel -ne $candidateOrigin
+    $localHealth = Get-BackendHealth
+    if (-not (Test-BackendRuntimeReady $localHealth)) { return $false }
+    try {
+        $probe = Invoke-WebRequest -UseBasicParsing "$candidateOrigin/mobile" -TimeoutSec 5
+        if ($probe.StatusCode -ne 200) { return $false }
+    } catch {
+        return $false
+    }
+    if (-not (Test-RemoteOriginApiReady $candidateOrigin)) {
+        if ((Test-Port 8000) -and $script:AppliedMobileOrigin -ne $candidateOrigin) {
+            $script:PendingMobileOrigin = $candidateOrigin
+            if ($originChanged) {
+                Remove-Item -LiteralPath $mobileAccessPath -Force -ErrorAction SilentlyContinue
+            }
+            [void](Stop-VerifiedJarvisBackend 'MOBILE_ORIGIN_CHANGE')
         }
+        return $false
     }
     [ordered]@{
-        url = "$($match.Value)/mobile"
-        tunnel = $match.Value
+        url = "$candidateOrigin/mobile"
+        tunnel = $candidateOrigin
         updated_at = (Get-Date).ToUniversalTime().ToString('o')
         security = 'operator-unlock-required'
     } | ConvertTo-Json | Set-Content -LiteralPath $mobileAccessPath -Encoding UTF8
-    if ($originChanged) { Restart-JarvisBackendForOriginChange }
+    $script:AppliedMobileOrigin = $candidateOrigin
+    $script:PendingMobileOrigin = $null
     return $true
 }
 
@@ -132,6 +263,10 @@ function Ensure-RemoteMobileTunnel {
         Start-Sleep -Seconds 1
         if (Publish-MobileAccess) {
             Write-SupervisorLog 'MOBILE_TUNNEL_READY'
+            return
+        }
+        if (-not (Test-Port 8000)) {
+            Write-SupervisorLog 'MOBILE_TUNNEL_BACKEND_RESTART_PENDING'
             return
         }
     }
@@ -174,22 +309,31 @@ function Remove-LegacyNvidiaEnvironment {
     }
 }
 
-function Test-BackendTrustReady {
-    try {
-        $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -Method Get -TimeoutSec 2
-        return $health.status -in @(
-            'ready', 'paused', 'cancel_requested', 'emergency_stopped',
-            'stopping', 'stopped', 'partial', 'unconfirmed'
-        )
-    } catch {
-        return $false
-    }
-}
-
 try {
     Write-SupervisorLog 'SUPERVISOR_STARTED'
     while ($true) {
         $python = (Get-Command python -ErrorAction Stop).Source
+        if (Test-Port 8000) {
+            $observedHealth = Get-BackendHealth
+            if (Test-BackendInternalDegraded $observedHealth) {
+                if (Stop-VerifiedJarvisBackend 'INTERNAL_RUNTIME_DEGRADED') {
+                    $script:BackendUnreadyChecks = 0
+                    Start-Sleep -Seconds 1
+                    continue
+                }
+            } elseif (-not $observedHealth -or $observedHealth.status -eq 'starting') {
+                $script:BackendUnreadyChecks++
+                if ($script:BackendUnreadyChecks -ge 3) {
+                    if (Stop-VerifiedJarvisBackend 'HEALTH_UNRESPONSIVE') {
+                        $script:BackendUnreadyChecks = 0
+                        Start-Sleep -Seconds 1
+                        continue
+                    }
+                }
+            } else {
+                $script:BackendUnreadyChecks = 0
+            }
+        }
         if (-not (Test-Port 8000)) {
             # The CLI owns the trust store only while the backend is stopped.
             # This verifies the scheduled/current user SID through DPAPI without
@@ -224,7 +368,7 @@ try {
             Set-JarvisAllowedOriginsEnvironment
             Start-Process -FilePath $python -ArgumentList '-m','uvicorn','src.api.server:app','--host','127.0.0.1','--port','8000' -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
             Write-SupervisorLog 'BACKEND_START_REQUESTED'
-            for ($attempt = 0; $attempt -lt 20 -and -not (Test-BackendTrustReady); $attempt++) {
+            for ($attempt = 0; $attempt -lt 60 -and -not (Test-BackendTrustReady); $attempt++) {
                 Start-Sleep -Milliseconds 500
             }
             if ($cutoverExit -in @(0, 31) -and (Test-BackendTrustReady)) {
@@ -252,7 +396,7 @@ try {
         Start-Sleep -Seconds ([Math]::Max(5, $CheckIntervalSeconds))
     }
 } catch {
-    Write-SupervisorLog 'SUPERVISOR_FAILURE'
+    Write-SupervisorLog "SUPERVISOR_FAILURE_$($_.Exception.GetType().Name)"
     throw
 } finally {
     $mutex.ReleaseMutex()

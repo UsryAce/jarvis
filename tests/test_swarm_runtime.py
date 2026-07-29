@@ -5,8 +5,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
+from src.core.agent import AgentRuntime
 from src.core.model_router import RouteDecision
 from src.core.swarm import (
     MultiAgentOrchestrator,
@@ -29,9 +30,11 @@ class FakeAgentRuntime:
     def __init__(self):
         self.calls = 0
         self.cancelled = []
+        self.requests = []
 
-    async def run(self, *_args, **_kwargs):
+    async def run(self, *args, **kwargs):
         self.calls += 1
+        self.requests.append({"args": args, "kwargs": kwargs})
         return FakeAgentRun(f"agent-{self.calls}")
 
     def cancel(self, run_id):
@@ -44,6 +47,8 @@ class FakeAgentRuntime:
 class FakeJarvis:
     def __init__(self, agent_runtime=None):
         self.agent_runtime = agent_runtime or FakeAgentRuntime()
+        self.conversation_history = []
+        self.memory = None
 
     async def route_model(self, _goal, _model):
         return RouteDecision(
@@ -177,6 +182,14 @@ class SwarmRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_writers_for_same_project_are_serialized(self):
         runtime = self.runtime()
+        isolated_root = Path(self.tempdir.name) / "isolated-writers"
+        isolated_root.mkdir()
+        runtime.workspaces.create_worktree = MagicMock(return_value={
+            "root": str(isolated_root), "branch": "jarvis/test-writers",
+        })
+        runtime.workspaces.inspect_worktree = MagicMock(return_value={
+            "clean": True, "ahead": 0, "changed_files": [],
+        })
         active_writers = 0
         peak_writers = 0
 
@@ -237,6 +250,105 @@ class SwarmRuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(integrated.integration_status, "integrated")
             self.assertEqual((project / "mission.txt").read_text(encoding="utf-8"), "isolated\n")
             await runtime.shutdown()
+
+    async def test_malicious_researcher_write_plan_is_read_only_by_construction(self):
+        agent_runtime = FakeAgentRuntime()
+        runtime = self.runtime(FakeJarvis(agent_runtime))
+        runtime._create_plan = AsyncMock(return_value=SwarmPlan(
+            summary="Attempt role escalation",
+            tasks=[PlannedTask(
+                id="research", title="Write a payload",
+                objective="Write owned.txt into the project", role="researcher", writer=True,
+            )],
+        ))
+        runtime._final_synthesis = AsyncMock(return_value="Research-only result")
+
+        run = await runtime.run("Research a safe answer", mode="swarm", autonomy="full")
+
+        task = next(iter(run.tasks.values()))
+        request = agent_runtime.requests[0]["kwargs"]
+        self.assertEqual(run.status, "completed")
+        self.assertFalse(task.writer)
+        self.assertEqual(run.workspace_mode, "direct")
+        self.assertEqual(request["capability_profile"], "read_only")
+        self.assertNotIn("workspace_write", request["allowed_tools"])
+        self.assertFalse(request["record_conversation"])
+        await runtime.shutdown()
+
+    async def test_full_auto_council_members_cannot_mutate(self):
+        agent_runtime = FakeAgentRuntime()
+        runtime = self.runtime(FakeJarvis(agent_runtime))
+        runtime._judge_council = AsyncMock(return_value="Evidence-based council decision")
+
+        run = await runtime.run(
+            "Create a website after the council analyzes it",
+            mode="council", autonomy="full",
+        )
+
+        self.assertEqual(run.status, "completed")
+        self.assertEqual(run.workspace_mode, "direct")
+        self.assertEqual(agent_runtime.calls, 5)
+        for request in agent_runtime.requests:
+            kwargs = request["kwargs"]
+            self.assertEqual(kwargs["capability_profile"], "read_only")
+            self.assertTrue(set(kwargs["allowed_tools"]).issubset(AgentRuntime.READ_TOOLS))
+            self.assertFalse(kwargs["record_conversation"])
+        self.assertFalse(any(task.writer for task in run.tasks.values()))
+        await runtime.shutdown()
+
+    async def test_non_git_writer_mission_fails_closed_without_running_agent(self):
+        root = Path(self.tempdir.name)
+        project = root / "plain-project"
+        project.mkdir()
+        registry = WorkspaceRegistry(root / "plain-workspaces.db", project)
+        agent_runtime = FakeAgentRuntime()
+        runtime = MultiAgentOrchestrator(
+            FakeJarvis(agent_runtime), root / "plain-swarm.db",
+            workspace_registry=registry,
+        )
+        runtime._create_plan = AsyncMock(return_value=SwarmPlan(
+            summary="Unsafe direct-root writer",
+            tasks=[PlannedTask(
+                id="writer", title="Create a file", objective="Write result.txt",
+                role="coder", writer=True,
+            )],
+        ))
+
+        run = await runtime.run(
+            "Create a file", mode="swarm", project_id="jarvis", autonomy="full",
+        )
+
+        self.assertEqual(run.status, "failed")
+        self.assertEqual(run.error, "writer_isolation_error")
+        self.assertEqual(run.workspace_mode, "direct")
+        self.assertEqual(run.integration_status, "unavailable")
+        self.assertEqual(agent_runtime.calls, 0)
+        self.assertFalse((project / "result.txt").exists())
+        await runtime.shutdown()
+
+    async def test_swarm_records_only_operator_mission_and_receipt(self):
+        agent_runtime = FakeAgentRuntime()
+        jarvis = FakeJarvis(agent_runtime)
+        runtime = self.runtime(jarvis)
+        runtime._create_plan = AsyncMock(return_value=independent_plan(3))
+        runtime._final_synthesis = AsyncMock(return_value="One integrated receipt")
+
+        run = await runtime.run("Operator mission", mode="swarm")
+
+        self.assertEqual(run.status, "completed")
+        self.assertTrue(run.conversation_recorded)
+        self.assertEqual(len(jarvis.conversation_history), 2)
+        self.assertEqual(jarvis.conversation_history[0]["content"], "Operator mission")
+        self.assertEqual(jarvis.conversation_history[1]["content"], "One integrated receipt")
+        self.assertTrue(all(
+            request["kwargs"]["record_conversation"] is False
+            for request in agent_runtime.requests
+        ))
+        self.assertFalse(any(
+            "JARVIS RESEARCHER" in item["content"]
+            for item in jarvis.conversation_history
+        ))
+        await runtime.shutdown()
 
     async def test_cancel_stops_background_swarm_and_marks_unfinished_tasks(self):
         runtime = self.runtime()

@@ -1,0 +1,6 @@
+---
+description: Canonical JARVIS repository and shared-brain rules
+alwaysApply: true
+---
+
+Read `AGENTS.md` before editing. Consult `.planning/graphs/GRAPH_REPORT.md` for architecture and `C:\Users\Usry\OneDrive\Documents\Codex Agent Brain\Projects\Jarvis\Home.md` for durable decisions. Preserve unrelated changes, keep secrets out of prompts and notes, and update the vault handoff after material work.

@@ -1,0 +1,77 @@
+.agent-swarm {
+  --swarm-cyan: var(--jarvis-cyan, #00d9ff);
+  --swarm-green: var(--jarvis-green, #00e889);
+  --swarm-amber: var(--jarvis-amber, #ffae19);
+  display: grid;
+  grid-template-rows: auto auto auto auto auto minmax(170px, 1fr);
+  gap: 9px;
+  min-height: 620px;
+  padding: 12px;
+  color: var(--jarvis-text, #a9c5cf);
+  border: 1px solid var(--jarvis-line, rgba(0,183,228,.24));
+  border-radius: 9px;
+  background: radial-gradient(circle at 50% 0, rgba(0,148,190,.09), transparent 34%), linear-gradient(145deg, rgba(3,18,25,.98), rgba(1,8,13,.98));
+  font-family: 'JetBrains Mono', 'Space Mono', monospace;
+  font-size: 10px;
+}
+.agent-swarm button,.agent-swarm textarea,.agent-swarm input { font: inherit; }
+.agent-swarm button { color: #8eb2bd; border: 1px solid rgba(0,183,228,.25); background: linear-gradient(180deg, rgba(0,79,104,.24), rgba(0,34,48,.36)); cursor: pointer; }
+.agent-swarm button:hover,.agent-swarm button:focus-visible { color: #e7fbff; border-color: rgba(0,217,255,.62); outline: none; box-shadow: 0 0 12px rgba(0,217,255,.1); }
+.agent-swarm button:disabled { cursor: not-allowed; opacity: .4; }
+.agent-swarm__header,.agent-swarm__toolbar,.agent-swarm__command>div,.agent-swarm__health,.agent-swarm__metrics,.swarm-state,.swarm-task,.swarm-result { display: flex; align-items: center; }
+.agent-swarm__header { justify-content: space-between; padding: 2px 3px 8px; border-bottom: 1px solid rgba(0,217,255,.18); }
+.agent-swarm__header h2 { margin: 4px 0 0; color: #c7f5ff; font-size: 16px; letter-spacing: .12em; text-shadow: 0 0 12px rgba(0,217,255,.38); }
+.agent-swarm__eyebrow { display: flex; align-items: center; gap: 5px; color: var(--swarm-cyan); font-size: 7px; letter-spacing: .18em; }
+.agent-swarm__eyebrow svg,.agent-swarm__health svg { width: 13px; height: 13px; }
+.agent-swarm__health { gap: 7px; padding: 7px 10px; border: 1px solid currentColor; border-radius: 3px; font-size: 7px; letter-spacing: .12em; }
+.agent-swarm__health.is-online { color: var(--swarm-green); background: rgba(0,232,137,.05); }.agent-swarm__health.is-error { color: #ff5264; }
+.agent-swarm__toolbar { min-height: 48px; gap: 10px; padding: 7px; border: 1px solid rgba(0,183,228,.16); background: rgba(0,23,32,.48); }
+.agent-swarm__modes { display: flex; gap: 5px; margin: 0; padding: 0; border: 0; }
+.agent-swarm__modes legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.agent-swarm__modes button { display: flex; align-items: center; gap: 5px; min-width: 82px; height: 30px; justify-content: center; font-size: 7px; }
+.agent-swarm__modes button svg { width: 12px; }.agent-swarm__modes button.is-selected { color: var(--swarm-cyan); border-color: var(--swarm-cyan); background: rgba(0,174,221,.14); box-shadow: inset 0 0 13px rgba(0,217,255,.08); }
+.agent-swarm__concurrency { width: 150px; display: grid; gap: 5px; color: #648893; font-size: 7px; }.agent-swarm__concurrency b { color: var(--swarm-cyan); }.agent-swarm__concurrency input { width: 100%; accent-color: var(--swarm-cyan); }
+.agent-swarm__metrics { flex: 1; justify-content: flex-end; gap: 17px; }.agent-swarm__metrics span { display: grid; gap: 2px; color: #52717c; font-size: 6px; }.agent-swarm__metrics b { color: #b7d8df; font-size: 9px; }
+.agent-swarm__icon-button { width: 31px; height: 31px; padding: 7px; }.agent-swarm__icon-button svg { width: 14px; }
+.agent-swarm__workspace { min-height: 38px; display: grid; grid-template-columns: 24px minmax(0,1fr) auto auto auto auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid rgba(255,174,25,.24); background: rgba(53,35,2,.14); }
+.agent-swarm__workspace>svg { width: 16px; color: var(--swarm-amber); }.agent-swarm__workspace span { min-width: 0; display: grid; gap: 2px; }.agent-swarm__workspace strong { color: #a9c5cf; font-size: 7px; letter-spacing: .08em; }.agent-swarm__workspace small { overflow: hidden; color: #597984; font-size: 6px; white-space: nowrap; text-overflow: ellipsis; }.agent-swarm__workspace>b { color: var(--swarm-amber); font-size: 6px; }.agent-swarm__workspace>em { color: #ff9b58; font-size: 6px; font-style: normal; }.agent-swarm__workspace button { min-width: 68px; height: 25px; font-size: 6px; }.agent-swarm__workspace .is-danger { color: #ff7d88; border-color: rgba(255,82,100,.3); }
+.agent-swarm__workspace--worktree { border-color: rgba(0,232,137,.28); background: rgba(0,76,46,.12); }.agent-swarm__workspace--worktree>svg,.agent-swarm__workspace--worktree>b { color: var(--swarm-green); }
+.agent-swarm__command label { display: block; margin: 0 0 5px; color: #60828c; font-size: 7px; letter-spacing: .1em; }
+.agent-swarm__command>div { gap: 6px; }.agent-swarm__command textarea { min-width: 0; flex: 1; resize: none; padding: 8px 10px; color: #bce4ec; border: 1px solid rgba(0,183,228,.24); outline: none; background: #031018; }.agent-swarm__command textarea:focus { border-color: var(--swarm-cyan); box-shadow: inset 0 0 14px rgba(0,217,255,.05); }
+.agent-swarm__command button { align-self: stretch; min-width: 76px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 7px; }.agent-swarm__command button svg { width: 12px; }.agent-swarm__command .is-danger { color: #ff7d88; border-color: rgba(255,82,100,.3); }
+.agent-swarm__agents { display: grid; grid-template-columns: repeat(4, minmax(145px, 1fr)); gap: 7px; }
+.swarm-agent { min-width: 0; display: grid; grid-template-columns: 31px minmax(0,1fr) auto; gap: 4px 7px; padding: 8px; border: 1px solid rgba(0,183,228,.17); background: rgba(2,14,20,.78); }
+.swarm-agent--active { border-color: rgba(0,217,255,.58); box-shadow: inset 0 0 15px rgba(0,217,255,.06); }.swarm-agent--done { border-color: rgba(0,232,137,.32); }.swarm-agent--error { border-color: rgba(255,82,100,.4); }
+.swarm-agent__icon { grid-row: span 2; width: 31px; height: 31px; display: grid; place-items: center; color: var(--swarm-cyan); border: 1px solid rgba(0,217,255,.35); border-radius: 50%; background: rgba(0,217,255,.06); }.swarm-agent__icon svg { width: 15px; }
+.swarm-agent__identity { min-width: 0; }.swarm-agent h3 { margin: 1px 0 2px; overflow: hidden; color: #9edce9; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }.swarm-agent__identity span { color: #587882; font-size: 6px; }
+.swarm-state { gap: 3px; align-self: start; font-size: 5px; }.swarm-state svg { width: 9px; height: 9px; }.swarm-state--active { color: var(--swarm-cyan); }.swarm-state--done { color: var(--swarm-green); }.swarm-state--queued { color: var(--swarm-amber); }.swarm-state--error { color: #ff5264; }.swarm-state--idle { color: #58727d; }
+.swarm-agent p { grid-column: 1/-1; height: 21px; margin: 4px 0 2px; overflow: hidden; color: #77949c; font-size: 7px; line-height: 11px; }.swarm-agent small { grid-column: 1/-1; display: flex; align-items: center; gap: 4px; color: #4f707b; font-size: 6px; }.swarm-agent small svg { width: 9px; }
+.agent-swarm__lower { min-height: 0; display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 7px; }
+.swarm-data-panel { min-height: 0; overflow: hidden; border: 1px solid rgba(0,183,228,.17); background: rgba(2,14,20,.72); }.swarm-data-panel>h3 { height: 28px; margin: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; color: var(--swarm-cyan); border-bottom: 1px solid rgba(0,183,228,.13); font-size: 7px; letter-spacing: .08em; }.swarm-data-panel>h3 span { color: #607b84; }.swarm-data-panel__scroll { max-height: 190px; overflow: auto; padding: 5px; scrollbar-color: rgba(0,217,255,.28) transparent; scrollbar-width: thin; }
+.swarm-task,.swarm-result { gap: 7px; padding: 6px; border-bottom: 1px solid rgba(0,183,228,.09); }.swarm-task>svg,.swarm-result>svg { flex: 0 0 auto; width: 12px; color: #67848d; }.swarm-task--active>svg { color: var(--swarm-cyan); }.swarm-task--done>svg,.swarm-result>svg { color: var(--swarm-green); }.swarm-task--error>svg { color: #ff5264; }.swarm-task div,.swarm-result div { min-width: 0; }.swarm-task b,.swarm-task span,.swarm-result b,.swarm-result span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.swarm-task b,.swarm-result b { color: #a8c7cf; font-size: 7px; }.swarm-task span,.swarm-result span { margin-top: 3px; color: #536f78; font-size: 6px; }
+.swarm-event { display: grid; grid-template-columns: 58px minmax(0,1fr); gap: 7px; margin: 0; padding: 6px; border-bottom: 1px solid rgba(0,183,228,.08); font-size: 6px; }.swarm-event time { color: #4d6c76; }.swarm-event span { color: #86a4ac; overflow-wrap: anywhere; }
+.swarm-empty { margin: 0; padding: 17px 10px; color: #4c6a74; font-size: 7px; line-height: 13px; text-align: center; }
+.swarm-spin { animation: swarm-rotate .8s linear infinite; }
+@keyframes swarm-rotate { to { transform: rotate(360deg); } }
+@media (max-width: 980px) { .agent-swarm__agents { grid-template-columns: repeat(2,minmax(145px,1fr)); }.agent-swarm__lower { grid-template-columns: 1fr; }.agent-swarm__metrics { display: none; }.agent-swarm__toolbar { flex-wrap: wrap; }.agent-swarm__workspace { grid-template-columns: 24px minmax(0,1fr) auto auto; }.agent-swarm__workspace>em { display: none; } }
+@media (max-width: 700px) {
+  .agent-swarm { min-height: 0; padding: 8px; font-size: 11px; }
+  .agent-swarm__header { align-items: flex-start; gap: 8px; }.agent-swarm__header h2 { font-size: 13px; }
+  .agent-swarm__health { padding: 6px 7px; white-space: nowrap; }
+  .agent-swarm__toolbar { display: grid; grid-template-columns: minmax(0,1fr) 34px; gap: 8px; }
+  .agent-swarm__modes { grid-column: 1/-1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; }
+  .agent-swarm__modes button { min-width: 0; height: 38px; font-size: 9px; }
+  .agent-swarm__concurrency { width: 100%; font-size: 9px; }
+  .agent-swarm__icon-button { width: 34px; height: 34px; }
+  .agent-swarm__workspace { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; padding: 8px; }
+  .agent-swarm__workspace>svg { grid-column: 1; grid-row: 1; align-self: center; }
+  .agent-swarm__workspace>span { grid-column: 1/-1; grid-row: 1; padding-left: 30px; }
+  .agent-swarm__workspace>b { grid-column: 1/-1; font-size: 9px; }
+  .agent-swarm__workspace>button { min-width: 0; width: 100%; height: 44px; padding-inline: 10px; font-size: 9px; }
+  .agent-swarm__command label { font-size: 9px; }.agent-swarm__command>div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .agent-swarm__command textarea { grid-column: 1/-1; min-height: 72px; }.agent-swarm__command button { min-height: 42px; }
+  .agent-swarm__agents { grid-template-columns: minmax(0,1fr); }
+  .swarm-agent h3,.swarm-task b,.swarm-result b { font-size: 10px; }.swarm-agent__identity span,.swarm-agent p,.swarm-agent small,.swarm-task span,.swarm-result span,.swarm-event,.swarm-empty { font-size: 8px; }
+  .swarm-data-panel>h3 { height: 34px; font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .swarm-spin { animation: none; } }

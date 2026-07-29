@@ -266,7 +266,7 @@ def serve(host, port):
     default_host = "0.0.0.0" if os.getenv("DOCKER_CONTAINER") else "localhost"
     default_port = int(config.get("ui.port", 8080))
     uvicorn.run(
-        "src.ui.app:app",
+        "src.api.server:app",
         host=host or config.get("ui.host", default_host),
         port=port or default_port,
         reload=not os.getenv("DOCKER_CONTAINER"),

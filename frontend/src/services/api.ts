@@ -230,14 +230,23 @@ function safeExceptionFromAxios(error: AxiosError): SafeApiException {
   if (isSafeApiError(error.response?.data)) {
     return new SafeApiException(error.response.data, error.response?.status);
   }
-  if (error.response?.status === 422) {
+  const authoritativeCode: Record<number, string> = {
+    400: "invalid_request",
+    401: "authentication_required",
+    403: "wrong_scope",
+    404: "not_found",
+    409: "conflict",
+    422: "invalid_request",
+  };
+  const status = error.response?.status;
+  if (status && authoritativeCode[status]) {
     return new SafeApiException(
       {
-        code: "invalid_request",
+        code: authoritativeCode[status],
         retryable: false,
         applied: false,
       },
-      422,
+      status,
     );
   }
   const timedOut = error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
@@ -254,6 +263,7 @@ function safeExceptionFromAxios(error: AxiosError): SafeApiException {
 class APIClient {
   private client: AxiosInstance;
   private baseURL: string;
+  private operatorSessionRequest: Promise<SessionSnapshot> | null = null;
 
   constructor(baseURL: string = "") {
     this.baseURL = baseURL;
@@ -304,9 +314,17 @@ class APIClient {
     if (isSafeApiError(payload)) {
       return new SafeApiException(payload, response.status);
     }
+    const authoritativeCode: Record<number, string> = {
+      400: "invalid_request",
+      401: "authentication_required",
+      403: "wrong_scope",
+      404: "not_found",
+      409: "conflict",
+      422: "invalid_request",
+    };
     return new SafeApiException(
       {
-        code: response.status === 403 ? "wrong_scope" : "request_rejected",
+        code: authoritativeCode[response.status] || "request_rejected",
         retryable: false,
         applied: UNSAFE_METHODS.has(method.toLowerCase()) ? null : false,
       },
@@ -369,9 +387,20 @@ class APIClient {
   }
 
   async getOperatorSession(): Promise<SessionSnapshot> {
-    const response = await this.client.get<SessionSnapshot>("/api/auth/session");
-    setCsrfToken(response.data.csrf_token);
-    return response.data;
+    const request = this.operatorSessionRequest || this.client
+      .get<SessionSnapshot>("/api/auth/session")
+      .then((response) => {
+        setCsrfToken(response.data.csrf_token);
+        return response.data;
+      });
+    this.operatorSessionRequest = request;
+    try {
+      return await request;
+    } finally {
+      if (this.operatorSessionRequest === request) {
+        this.operatorSessionRequest = null;
+      }
+    }
   }
 
   async logout(): Promise<void> {
@@ -1042,11 +1071,65 @@ class APIClient {
   }
 
   async sendUiCommand(action: string, payload: Record<string, unknown> = {}) {
+    const runId = typeof payload.runId === "string" ? payload.runId.trim() : "";
+    const encodedRunId = runId ? encodeURIComponent(runId) : "";
+    if (action === "approve_agent_run" && encodedRunId) {
+      return (await this.client.post(
+        `/api/ui/agent/runs/${encodedRunId}/approve-current`,
+        {},
+      )).data as { ok: boolean; message: string; runId?: string };
+    }
+    if (action === "cancel_agent_run" && encodedRunId) {
+      return (await this.client.post(
+        `/api/ui/agent/runs/${encodedRunId}/cancel`,
+        {},
+      )).data as { ok: boolean; message: string; runId?: string };
+    }
+    if (action === "approve_swarm_run" && encodedRunId) {
+      return (await this.client.post(
+        `/api/ui/swarm/runs/${encodedRunId}/approve-current`,
+        {},
+      )).data as { ok: boolean; message: string; runId?: string };
+    }
+    if (action === "cancel_swarm_run" && encodedRunId) {
+      return (await this.client.post(
+        `/api/ui/swarm/runs/${encodedRunId}/cancel`,
+        {},
+      )).data as { ok: boolean; message: string; runId?: string };
+    }
+    if (action === "emergency_stop") {
+      const current = await this.getControl();
+      const outcome = await this.mutateControl({
+        action: "emergency_stop",
+        scope_type: "global",
+        scope_id: "global",
+        expected_revision: current.revision,
+        client_request_id: `exact-core-${Date.now()}`,
+        reason_code: "exact_core_emergency_stop",
+      });
+      if (outcome.status === "authoritative") {
+        return { ok: true, message: "Emergency stop applied" };
+      }
+      return { ok: false, message: `Emergency stop requires reconciliation (${outcome.reason})` };
+    }
     return (await this.client.post("/api/ui/command", { action, payload })).data as {
       ok: boolean;
       message: string;
       runId?: string;
     };
+  }
+
+  async sendUiApproval(
+    id: string,
+    decision: "approve" | "reject",
+    note = "",
+  ) {
+    return (
+      await this.client.post(
+        `/api/ui/approval/${encodeURIComponent(id)}`,
+        { decision, note },
+      )
+    ).data as { ok: boolean; message: string; runId?: string; status?: string };
   }
 
   async getSkills() {

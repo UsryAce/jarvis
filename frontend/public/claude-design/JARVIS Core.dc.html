@@ -3,21 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script>
-  if (new URLSearchParams(location.search).get('layout') === 'mobile') {
-    document.documentElement.classList.add('jarvis-mobile-layout');
-  }
-</script>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin:0; padding:0; background:#03060A; }
+  html, body, x-dc { width:100%; height:100%; margin:0; padding:0; overflow:hidden; background:#03060A; }
+  x-dc { display:block; position:relative; }
+  #dc-root, .sc-host { width:100%; height:100%; min-height:0; overflow:hidden; }
   a { color:#35D6FF; text-decoration:none; }
   a:hover { color:#9BE9FF; }
   ::selection { background:#35D6FF; color:#03060A; }
@@ -33,72 +31,6 @@
   @keyframes jBlink { 0%,100% { opacity:1; } 50% { opacity:.2; } }
   @keyframes jSweep { from { transform:translateX(-100%); } to { transform:translateX(340%); } }
   @keyframes jRise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  @media (max-width:700px) {
-    html, body { width:100%; min-height:100%; overflow-x:hidden; }
-    .jarvis-shell { width:100vw !important; min-height:100dvh !important; height:auto !important; overflow:visible !important; }
-    .jarvis-control { position:sticky !important; top:0; z-index:40; min-height:48px; height:auto !important; padding:7px 10px !important; overflow-x:auto; scrollbar-width:none; }
-    .jarvis-control::-webkit-scrollbar, .jarvis-command-header::-webkit-scrollbar, .jarvis-ribbon::-webkit-scrollbar, .jarvis-tabs::-webkit-scrollbar { display:none; }
-    .jarvis-control > * { flex:none !important; }
-    .jarvis-event { position:sticky !important; top:48px; z-index:39; min-height:34px; height:auto !important; padding:5px 10px !important; }
-    .jarvis-dashboard { overflow:visible !important; min-height:calc(100dvh - 82px); }
-    .jarvis-command-header { min-height:74px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
-    .jarvis-command-header > * { flex:none !important; }
-    .jarvis-ribbon { min-height:54px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
-    .jarvis-ribbon > * { min-width:190px !important; flex:none !important; }
-    .jarvis-stage-viewport { flex:none !important; min-height:0 !important; perspective:none !important; overflow:visible !important; }
-    .jarvis-stage { height:auto !important; display:flex !important; flex-direction:column !important; gap:10px !important; padding:10px !important; transform:none !important; }
-    .jarvis-center { order:1; min-height:1160px !important; }
-    .jarvis-left { order:2; min-height:680px !important; }
-    .jarvis-right { order:3; min-height:760px !important; }
-    .jarvis-left, .jarvis-center, .jarvis-right { width:100% !important; box-sizing:border-box; }
-    .jarvis-flow-row { overflow-x:auto; scrollbar-width:none; }
-    .jarvis-flow-row::-webkit-scrollbar { display:none; }
-    .jarvis-flow-row > * { min-width:122px !important; flex:none !important; }
-    .jarvis-core-row { flex:1 !important; min-height:830px !important; flex-direction:column !important; }
-    .jarvis-reactor { order:1; flex:none !important; width:100% !important; min-height:380px !important; }
-    .jarvis-assistant { order:2; width:100% !important; min-height:210px !important; }
-    .jarvis-session { order:3; width:100% !important; min-height:220px !important; }
-    .jarvis-tabs { position:sticky !important; bottom:0; z-index:45; min-height:66px; height:auto !important; padding:0 8px !important; overflow-x:auto; scrollbar-width:none; }
-    .jarvis-tabs > div:nth-child(2) { min-width:1450px; }
-    .jarvis-voice { min-height:100dvh !important; overflow:visible !important; }
-    .jarvis-voice-header { padding:18px 16px 0 !important; flex-wrap:wrap; }
-    .jarvis-voice-body { display:flex !important; flex-direction:column !important; gap:20px !important; padding:20px 16px !important; }
-    .jarvis-voice-body > * { width:100% !important; box-sizing:border-box; }
-    .jarvis-voice-body > :nth-child(2) { height:360px !important; min-height:360px !important; }
-    .jarvis-voice-controls { display:grid !important; grid-template-columns:1fr 1fr !important; padding:12px 16px 84px !important; }
-  }
-  html.jarvis-mobile-layout, html.jarvis-mobile-layout body { width:100%; min-height:100%; overflow-x:hidden; }
-  html.jarvis-mobile-layout .jarvis-shell { width:100vw !important; min-height:100dvh !important; height:auto !important; overflow:visible !important; }
-  html.jarvis-mobile-layout .jarvis-control { position:sticky !important; top:0; z-index:40; min-height:48px; height:auto !important; padding:7px 10px !important; overflow-x:auto; scrollbar-width:none; }
-  html.jarvis-mobile-layout .jarvis-control::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-command-header::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-ribbon::-webkit-scrollbar, html.jarvis-mobile-layout .jarvis-tabs::-webkit-scrollbar { display:none; }
-  html.jarvis-mobile-layout .jarvis-control > * { flex:none !important; }
-  html.jarvis-mobile-layout .jarvis-event { position:sticky !important; top:48px; z-index:39; min-height:34px; height:auto !important; padding:5px 10px !important; }
-  html.jarvis-mobile-layout .jarvis-dashboard { overflow:visible !important; min-height:calc(100dvh - 82px); }
-  html.jarvis-mobile-layout .jarvis-command-header { min-height:74px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
-  html.jarvis-mobile-layout .jarvis-command-header > * { flex:none !important; }
-  html.jarvis-mobile-layout .jarvis-ribbon { min-height:54px; height:auto !important; overflow-x:auto; scrollbar-width:none; }
-  html.jarvis-mobile-layout .jarvis-ribbon > * { min-width:190px !important; flex:none !important; }
-  html.jarvis-mobile-layout .jarvis-stage-viewport { flex:none !important; min-height:0 !important; perspective:none !important; overflow:visible !important; }
-  html.jarvis-mobile-layout .jarvis-stage { height:auto !important; display:flex !important; flex-direction:column !important; gap:10px !important; padding:10px !important; transform:none !important; }
-  html.jarvis-mobile-layout .jarvis-center { order:1; min-height:1160px !important; }
-  html.jarvis-mobile-layout .jarvis-left { order:2; min-height:680px !important; }
-  html.jarvis-mobile-layout .jarvis-right { order:3; min-height:760px !important; }
-  html.jarvis-mobile-layout .jarvis-left, html.jarvis-mobile-layout .jarvis-center, html.jarvis-mobile-layout .jarvis-right { width:100% !important; box-sizing:border-box; }
-  html.jarvis-mobile-layout .jarvis-flow-row { overflow-x:auto; scrollbar-width:none; }
-  html.jarvis-mobile-layout .jarvis-flow-row::-webkit-scrollbar { display:none; }
-  html.jarvis-mobile-layout .jarvis-flow-row > * { min-width:122px !important; flex:none !important; }
-  html.jarvis-mobile-layout .jarvis-core-row { flex:1 !important; min-height:830px !important; flex-direction:column !important; }
-  html.jarvis-mobile-layout .jarvis-reactor { order:1; flex:none !important; width:100% !important; min-height:380px !important; }
-  html.jarvis-mobile-layout .jarvis-assistant { order:2; width:100% !important; min-height:210px !important; }
-  html.jarvis-mobile-layout .jarvis-session { order:3; width:100% !important; min-height:220px !important; }
-  html.jarvis-mobile-layout .jarvis-tabs { position:sticky !important; bottom:0; z-index:45; min-height:66px; height:auto !important; padding:0 8px !important; overflow-x:auto; scrollbar-width:none; }
-  html.jarvis-mobile-layout .jarvis-tabs > div:nth-child(2) { min-width:1450px; }
-  html.jarvis-mobile-layout .jarvis-voice { min-height:100dvh !important; overflow:visible !important; }
-  html.jarvis-mobile-layout .jarvis-voice-header { padding:18px 16px 0 !important; flex-wrap:wrap; }
-  html.jarvis-mobile-layout .jarvis-voice-body { display:flex !important; flex-direction:column !important; gap:20px !important; padding:20px 16px !important; }
-  html.jarvis-mobile-layout .jarvis-voice-body > * { width:100% !important; box-sizing:border-box; }
-  html.jarvis-mobile-layout .jarvis-voice-body > :nth-child(2) { height:360px !important; min-height:360px !important; }
-  html.jarvis-mobile-layout .jarvis-voice-controls { display:grid !important; grid-template-columns:1fr 1fr !important; padding:12px 16px 84px !important; }
 </style>
 <script src="./jarvis-adapter.js"></script>
 <script>
@@ -113,7 +45,7 @@
 </script>
 </helmet>
 
-<div class="jarvis-shell" style="width:1920px;min-height:1080px;display:flex;flex-direction:column;background:#03060A;font-family:'JetBrains Mono',ui-monospace,monospace;color:#DCE8F2;position:relative;overflow:hidden">
+<div ref="{{ shellRef }}" style="width:1920px;height:1080px;display:flex;flex-direction:column;background:#03060A;font-family:'JetBrains Mono',ui-monospace,monospace;color:#DCE8F2;position:absolute;left:0;top:0;overflow:hidden;transform-origin:top left">
 
   <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(1500px 900px at 50% -10%, rgba(53,214,255,.10), transparent 62%), radial-gradient(1100px 800px at 92% 62%, rgba(76,140,255,.06), transparent 60%), radial-gradient(900px 700px at 5% 84%, rgba(0,229,196,.05), transparent 60%)"></div>
   <div style="position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(53,214,255,.024) 1px,transparent 1px),linear-gradient(90deg,rgba(53,214,255,.024) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(1250px 780px at 50% 34%,#000,transparent 92%)"></div>
@@ -121,10 +53,10 @@
   <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:{{ motionOpacity }}"><div style="position:absolute;left:0;right:0;height:180px;background:linear-gradient(180deg,transparent,rgba(53,214,255,.035),transparent);animation:jScan 15s linear infinite"></div></div>
   <div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 320px 90px rgba(0,0,0,.8)"></div>
 
-  <div class="jarvis-control" style="position:relative;display:flex;align-items:center;height:30px;padding:0 16px;gap:14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(6,11,18,.9)">
+  <div style="position:relative;display:flex;align-items:center;height:30px;padding:0 16px;gap:14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(6,11,18,.9)">
     <div style="display:flex;align-items:center;gap:8px;font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#7CFFE6">
       <div style="width:6px;height:6px;border-radius:50%;background:#00E5C4;box-shadow:0 0 10px #00E5C4;animation:jBlink 2.4s ease-in-out infinite"></div>
-      CONTROL PLANE {{ planeState }} — NO STOP IS ACTIVE
+      CONTROL PLANE {{ planeState }} — {{ stopNotice }}
     </div>
     <div style="flex:1"></div>
     <div onClick="{{ reconnect }}" title="Data source" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid {{ sourceCol }}">
@@ -134,18 +66,19 @@
     </div>
     <div style="font:400 10px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#5C7C8C">REV 1 · LAST CONFIRMED {{ clock }}</div>
     <div onClick="{{ notifyKeys }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(53,214,255,.3);background:rgba(53,214,255,.07);font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.16)">PROTECTED API KEYS</div>
+    <div onClick="{{ remoteApp }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(53,214,255,.3);background:rgba(53,214,255,.05);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.14)">REMOTE APP</div>
     <div onClick="{{ estop }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(255,77,109,.38);background:rgba(255,77,109,.09);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#FF8FA3" style-hover="background:rgba(255,77,109,.2)">EMERGENCY STOP</div>
   </div>
 
-  <div class="jarvis-event" style="position:relative;display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;border-bottom:1px solid rgba(53,214,255,.10);background:rgba(4,9,15,.85)">
+  <div style="position:relative;display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;border-bottom:1px solid rgba(53,214,255,.10);background:rgba(4,9,15,.85)">
     <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#3F5B69;flex:none">EVENT</div>
     <div style="width:5px;height:5px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 8px {{ stateColor }};flex:none;opacity:{{ toastOpacity }}"></div>
     <div style="font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#9BE9FF;opacity:{{ toastOpacity }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toast }}</div>
   </div>
 
   <sc-if value="{{ dashOn }}" hint-placeholder-val="{{ true }}">
-  <div class="jarvis-dashboard" style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
-  <div class="jarvis-command-header" style="position:relative;display:flex;align-items:stretch;height:74px;border-bottom:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#070C14,#03060A)">
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+  <div style="position:relative;display:flex;align-items:stretch;height:74px;border-bottom:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#070C14,#03060A)">
     <div style="display:flex;align-items:center;gap:12px;padding:0 18px;width:250px;flex:none;border-right:1px solid rgba(255,255,255,.05)">
       <div style="position:relative;width:38px;height:38px;flex:none">
         <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.5);border-top-color:transparent;animation:jSpin 6s linear infinite"></div>
@@ -194,7 +127,7 @@
     </div>
   </div>
 
-  <div class="jarvis-ribbon" style="position:relative;display:flex;align-items:stretch;height:44px;border-bottom:1px solid rgba(53,214,255,.12);background:rgba(6,11,18,.6)">
+  <div style="position:relative;display:flex;align-items:stretch;height:44px;border-bottom:1px solid rgba(53,214,255,.12);background:rgba(6,11,18,.6)">
     <sc-for list="{{ ribbon }}" as="r" hint-placeholder-count="5">
       <div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid rgba(255,255,255,.05)">
         <div style="width:6px;height:6px;border-radius:50%;background:{{ r.col }};box-shadow:0 0 9px {{ r.col }};flex:none"></div>
@@ -211,10 +144,10 @@
     </div>
   </div>
 
-  <div class="jarvis-stage-viewport" style="position:relative;flex:1;min-height:0;perspective:2200px;perspective-origin:50% 45%">
-  <div class="jarvis-stage" ref="{{ stageRef }}" style="height:100%;display:grid;grid-template-columns:312px 1fr 348px;gap:14px;padding:14px 16px 8px;box-sizing:border-box;transform-style:preserve-3d;transition:transform .25s cubic-bezier(.2,.7,.3,1);will-change:transform">
+  <div style="position:relative;flex:1;min-height:0;perspective:2200px;perspective-origin:50% 45%">
+  <div ref="{{ stageRef }}" style="height:100%;display:grid;grid-template-columns:312px 1fr 348px;gap:14px;padding:14px 16px 8px;box-sizing:border-box;transform-style:preserve-3d;transition:transform .25s cubic-bezier(.2,.7,.3,1);will-change:transform">
 
-    <div class="jarvis-left" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));position:relative">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">MODEL ROUTER</div>
@@ -277,7 +210,7 @@
           <sc-for list="{{ providers }}" as="p" hint-placeholder-count="6">
             <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
               <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8FA8B6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ p.col }}">{{ p.status }}</div>
+              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#7CFFE6">ONLINE</div>
               <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#3F5B69">{{ p.ms }}</div>
             </div>
           </sc-for>
@@ -285,13 +218,13 @@
       </div>
     </div>
 
-    <div class="jarvis-center" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.9),rgba(5,9,15,.9))">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">OPERATIONS FLOW</div>
           <div style="padding:3px 7px;border:1px solid {{ srcFlow.bd }};background:{{ srcFlow.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcFlow.col }}">{{ srcFlow.label }}</div>
         </div>
-        <div class="jarvis-flow-row" style="padding:11px;display:flex;align-items:center;gap:8px">
+        <div style="padding:11px;display:flex;align-items:center;gap:8px">
           <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
             <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid {{ f.bd }};background:{{ f.bg }};position:relative;overflow:hidden">
               <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(53,214,255,.10),transparent);width:40%;animation:jSweep 3.6s linear infinite;opacity:{{ motionOpacity }}"></div>
@@ -370,8 +303,8 @@
       </sc-if>
 
       <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
-      <div class="jarvis-core-row" style="flex:1;display:flex;gap:12px;min-height:0">
-        <div class="jarvis-assistant" style="width:204px;flex:none;display:flex;flex-direction:column;gap:12px">
+      <div style="flex:1;display:flex;gap:12px;min-height:0">
+        <div style="width:204px;flex:none;display:flex;flex-direction:column;gap:12px">
           <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1;display:flex;flex-direction:column">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
               <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ASSISTANT STATUS</div>
@@ -401,7 +334,7 @@
           </div>
         </div>
 
-        <div class="jarvis-reactor" onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="flex:1;min-width:0;position:relative;border:1px solid rgba(53,214,255,.14);background:radial-gradient(circle at 50% 50%, rgba(9,22,34,.95), rgba(3,6,10,.98) 72%);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:crosshair">
+        <div onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="flex:1;min-width:0;position:relative;border:1px solid rgba(53,214,255,.14);background:radial-gradient(circle at 50% 50%, rgba(9,22,34,.95), rgba(3,6,10,.98) 72%);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:crosshair">
           <canvas ref="{{ cref }}" width="880" height="720" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
           <div style="position:absolute;left:0;top:0;width:22px;height:22px;border-left:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
           <div style="position:absolute;right:0;top:0;width:22px;height:22px;border-right:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
@@ -423,7 +356,7 @@
           <div onClick="{{ hold }}" style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:7px 18px;border:1px solid rgba(53,214,255,.36);background:rgba(4,10,16,.8);font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.17em;color:#9BE9FF;cursor:pointer" style-hover="background:rgba(53,214,255,.18)">{{ holdLabel }}</div>
         </div>
 
-        <div class="jarvis-session" style="width:212px;flex:none;display:flex;flex-direction:column;gap:12px">
+        <div style="width:212px;flex:none;display:flex;flex-direction:column;gap:12px">
           <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
               <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ACTIVE SESSION</div>
@@ -476,18 +409,13 @@
           </sc-for>
         </div>
         <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid rgba(53,214,255,.14)">
-          <select value="{{ dispatch }}" onChange="{{ setDispatch }}" title="Dispatch mode" style="width:112px;flex:none;padding:10px 8px;background:rgba(4,8,13,.9);border:1px solid rgba(255,180,60,.3);color:#FFD38A;font-size:9px;outline:none">
-            <option value="agent">AGENT</option>
-            <option value="swarm">SWARM · 8</option>
-            <option value="council">COUNCIL</option>
-          </select>
           <input value="{{ draft }}" onChange="{{ setDraft }}" onKeyDown="{{ onKey }}" placeholder="Give Jarvis a goal to plan and execute..." style="flex:1;padding:10px 12px;background:rgba(4,8,13,.9);border:1px solid rgba(53,214,255,.2);color:#EAF6FF;font-size:11px;outline:none">
           <div onClick="{{ send }}" style="cursor:pointer;padding:10px 20px;border:1px solid rgba(0,229,196,.42);background:rgba(0,229,196,.1);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#7CFFE6" style-hover="background:rgba(0,229,196,.22)">SEND</div>
         </div>
       </div>
     </div>
 
-    <div class="jarvis-right" style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
       <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
           <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">VOICE AUTHORITY</div>
@@ -598,7 +526,7 @@
 
   </div>
 
-  <div class="jarvis-tabs" style="position:relative;display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
+  <div style="position:relative;display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
     <div style="position:relative;width:40px;height:40px;flex:none">
       <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.35);animation:jSpin 8s linear infinite"></div>
       <div style="position:absolute;inset:11px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 16px {{ stateColor }};animation:jBreathe 2.4s ease-in-out infinite"></div>
@@ -620,8 +548,8 @@
   </sc-if>
 
   <sc-if value="{{ voiceOn }}" hint-placeholder-val="{{ false }}">
-  <div class="jarvis-voice" style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
-    <div class="jarvis-voice-header" style="display:flex;align-items:center;gap:18px;padding:22px 44px 0">
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+    <div style="display:flex;align-items:center;gap:18px;padding:22px 44px 0">
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="font:700 30px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF;text-shadow:0 0 30px rgba(53,214,255,.5)">J.A.R.V.I.S.</div>
         <div style="font:400 9px/1 'JetBrains Mono',monospace;letter-spacing:.22em;color:#5C7C8C">VOICE COMMAND INTERFACE</div>
@@ -634,7 +562,7 @@
       <div onClick="{{ goDash }}" style="cursor:pointer;padding:13px 24px;border:1px solid rgba(53,214,255,.32);background:rgba(53,214,255,.06);font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.18)">DASHBOARD</div>
     </div>
 
-    <div class="jarvis-voice-body" style="flex:1;display:grid;grid-template-columns:1fr 640px 1fr;gap:34px;align-items:center;padding:10px 44px 0;min-height:0">
+    <div style="flex:1;display:grid;grid-template-columns:1fr 640px 1fr;gap:34px;align-items:center;padding:10px 44px 0;min-height:0">
       <div style="display:flex;flex-direction:column;gap:22px">
         <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:#9BE9FF">VOICE AUTHORITY</div>
         <div style="font:700 84px/.9 'Space Grotesk',sans-serif;letter-spacing:.03em;color:{{ stateColor }};text-shadow:0 0 60px {{ stateColor }}">{{ stateLabel }}</div>
@@ -669,7 +597,7 @@
       </div>
     </div>
 
-    <div class="jarvis-voice-controls" style="display:flex;align-items:stretch;gap:10px;padding:20px 44px 24px">
+    <div style="display:flex;align-items:stretch;gap:10px;padding:20px 44px 24px">
       <sc-for list="{{ voiceControls }}" as="v" hint-placeholder-count="7">
         <div onClick="{{ v.go }}" style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:9px;padding:19px 8px;border:1px solid {{ v.bd }};background:{{ v.bg }}" style-hover="border-color:rgba(53,214,255,.55)">
           <div style="width:6px;height:6px;border-radius:50%;background:{{ v.dot }};box-shadow:0 0 9px {{ v.dot }};flex:none"></div>
@@ -706,10 +634,17 @@ const STATES = {
 const TONE = {ok:TE, info:CY, warn:AM, danger:RD, muted:DIM};
 /* Per-panel provenance chip. A panel is LIVE only when the snapshot actually
    carried its data; anything the backend omits stays visibly DEMO. */
-const SRC = (live)=> live ? {label:'LIVE', col:TE, bd:'rgba(0,229,196,.4)', bg:'rgba(0,229,196,.08)'}
-                          : {label:'DEMO', col:AM, bd:'rgba(255,180,60,.38)', bg:'rgba(255,180,60,.07)'};
+const SRC = (mode)=> mode === 'stale'
+  ? {label:'STALE', col:AM, bd:'rgba(255,180,60,.52)', bg:'rgba(255,180,60,.10)'}
+  : mode === 'partial'
+    ? {label:'PARTIAL', col:AM, bd:'rgba(255,180,60,.42)', bg:'rgba(255,180,60,.08)'}
+    : mode
+      ? {label:'LIVE', col:TE, bd:'rgba(0,229,196,.4)', bg:'rgba(0,229,196,.08)'}
+      : {label:'DEMO', col:AM, bd:'rgba(255,180,60,.38)', bg:'rgba(255,180,60,.07)'};
 const fmtDur = (sec)=>{ sec = Math.max(0, Math.round(sec||0)); const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
   return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); };
+const fmtAge = (at)=>{ const ms = Date.now() - Date.parse(at||''); if (!Number.isFinite(ms) || ms < 0) return 'unknown age';
+  const sec=Math.floor(ms/1000); return sec<60 ? sec+'s ago' : sec<3600 ? Math.floor(sec/60)+'m ago' : Math.floor(sec/3600)+'h ago'; };
 const TABS = ['DASHBOARD','CHAT','VOICE','MISSIONS','AGENTS','PROJECTS','FILES','NOTES','BROWSER','CODE','BRAIN','TASKS','TOOLS','AUTOMATIONS','GIT','SECURITY','USAGE','DEVICES','SETTINGS'];
 
 const K = (k,v,c)=>({k,v,col:c||'#DCE8F2'});
@@ -893,8 +828,9 @@ const VIZ = {
 
 class Component extends DCLogic {
   state = {
-    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:true, dispatch:'agent',
-    model:'z-ai/glm-5.2', draft:'', extra:[], toast:'Deploy gate is blocking mission MERIDIAN — approval required', toastOn:true
+    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:true,
+    model:'z-ai/glm-5.2', draft:'', extra:[], submitting:false, toast:'Deploy gate is blocking mission MERIDIAN — approval required', toastOn:true,
+    voice:{ready:false,armed:false,capturing:false,transcribing:false,processing:false,speaking:false,handsFree:false,clapWake:false,level:0,inputDevice:'Browser microphone',inputDeviceId:'',inputDevices:[],profile:'JARVIS · BRITISH',lastUser:'',lastJarvis:'',error:''}
   };
 
   advance(){
@@ -931,7 +867,7 @@ class Component extends DCLogic {
     if (!A) return;
     if (this.store) this.store.dispose();
     this.store = A.connect({
-      baseUrl: this.props.forceDemo === true ? '' : (this.props.apiBase ?? ''),
+      baseUrl: this.props.forceDemo === true ? '' : ((this.props.apiBase ?? '') || window.location.origin),
       pollMs: this.props.pollMs ?? 2000,
       onChange: (snap, meta)=> this.setState(s=>({
         live:snap, meta:meta,
@@ -945,6 +881,9 @@ class Component extends DCLogic {
 
   componentDidMount(){
     this.installClock();
+    this.fitShell();
+    this.fitListener = ()=> this.fitShell();
+    window.addEventListener('resize', this.fitListener);
     this.connectBackend();
     /* Integration test hook: window.jarvisPush(rawSnapshot) renders a payload
        without a running backend. Returns the adapter's validation problems. */
@@ -970,11 +909,34 @@ class Component extends DCLogic {
     this.untilt = ()=>{ if (this.stage) this.stage.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(0)'; };
     window.addEventListener('mousemove', this.tilt);
     window.addEventListener('mouseleave', this.untilt);
+    this.voiceMessage = (event)=>{
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || data.type !== 'jarvis-voice-state' || !data.value || typeof data.value !== 'object') return;
+      this.setState(s=>({voice:{...s.voice,...data.value,ready:true}, mic:typeof data.value.armed==='boolean'?data.value.armed:s.mic}));
+    };
+    window.addEventListener('message', this.voiceMessage);
+    this.voiceControl('state');
   }
-  componentWillUnmount(){ if (this.store) this.store.dispose(); clearInterval(this.bootT); window.removeEventListener('mousemove', this.tilt); window.removeEventListener('mouseleave', this.untilt); clearInterval(this.timer); clearInterval(this.raf); clearTimeout(this.streamT); clearTimeout(this.toastT); }
+  componentWillUnmount(){ if (this.store) this.store.dispose(); clearInterval(this.bootT); window.removeEventListener('mousemove', this.tilt); window.removeEventListener('mouseleave', this.untilt); if(this.fitListener) window.removeEventListener('resize', this.fitListener); if(this.voiceMessage) window.removeEventListener('message', this.voiceMessage); clearInterval(this.timer); clearInterval(this.raf); clearTimeout(this.streamT); clearTimeout(this.toastT); }
+
+  shellRef = (el)=>{ this.shell = el; if (el) requestAnimationFrame(()=>this.fitShell()); };
+  fitShell(){
+    if (!this.shell) return;
+    const w = Math.max(1, document.documentElement.clientWidth || window.innerWidth || 1920);
+    const h = Math.max(1, document.documentElement.clientHeight || window.innerHeight || 1080);
+    const scale = Math.min(w/1920, h/1080);
+    this.shell.style.transform = 'scale('+scale+')';
+    this.shell.style.left = Math.max(0,(w-1920*scale)/2)+'px';
+    this.shell.style.top = Math.max(0,(h-1080*scale)/2)+'px';
+  }
 
   accent(){ return this.props.accent ?? CY; }
   cur(){
+    const V = this.state.voice || {};
+    if (V.capturing) return STATES.listening;
+    if (V.transcribing || V.processing) return STATES.thinking;
+    if (V.speaking) return STATES.speaking;
     const L = this.state.live;
     if (L) return STATES[L.agent.held ? 'paused' : L.agent.state] || STATES.idle;
     return STATES[this.state.held ? 'paused' : this.state.st] || STATES.ready;
@@ -1414,34 +1376,141 @@ class Component extends DCLogic {
     try { window.parent.postMessage({source:'jarvis-design',action:action,payload:payload||{}}, window.location.origin); }
     catch(err){ this.toast('Interface bridge unavailable'); }
   }
-  go(tab){
-    if (TABS.includes(tab)) return ()=> this.setState({tab});
-    return ()=> this.bridge('workspace',{name:tab});
+  voiceControl(action, payload){
+    try { window.parent.postMessage({type:'jarvis-voice-control',action:action,payload:payload||{}}, window.location.origin); }
+    catch(err){ this.toast('Voice controller unavailable'); }
   }
   runCommand(action, payload, localUpdate){
-    if (!this.store){ this.toast('Backend connection is not ready'); return Promise.resolve(false); }
+    if (!this.store || typeof this.store.command !== 'function'){
+      this.toast('Backend connection is not ready');
+      return Promise.resolve({ok:false,message:'Backend connection is not ready'});
+    }
     return this.store.command(action, payload || {}).then((result)=>{
-      this.toast((result && result.message) || (result && result.ok ? 'Command completed' : 'Command failed'));
-      if (result && result.ok){
-        if (localUpdate) localUpdate(result);
-        setTimeout(()=>this.connectBackend(), 150);
-        return true;
-      }
-      return false;
+      const resolved = result || {ok:false,message:'Command failed'};
+      this.toast(resolved.message || (resolved.ok ? 'Command completed' : 'Command failed'));
+      if (resolved.ok && localUpdate) localUpdate(resolved);
+      return resolved;
+    }).catch((error)=>{
+      const message = error && error.message ? error.message : String(error || 'Command failed');
+      this.toast(message);
+      return {ok:false,message};
     });
   }
+  emergencyStop = ()=>{
+    if (!this.store){ this.toast('Backend connection is not ready'); return; }
+    const request = typeof this.store.emergencyStop === 'function'
+      ? this.store.emergencyStop()
+      : this.store.command('emergency_stop',{});
+    Promise.resolve(request).then((result)=>{
+      this.toast((result && result.message) || (result && result.ok ? 'Emergency stop applied' : 'Emergency stop failed'));
+      if (result && result.ok) this.setState({held:true,st:'paused'});
+    }).catch((error)=>this.toast(error && error.message ? error.message : 'Emergency stop failed'));
+  };
+  setVoiceArmed = (armed)=>{
+    this.voiceControl(armed?'arm':'disarm');
+    this.runCommand(armed?'voice_arm':'voice_disarm',{},()=>this.setState({mic:armed}));
+  };
+  togglePushToTalk = ()=>{
+    const active = !!this.pttStartedAt || !!(this.state.voice && this.state.voice.capturing);
+    if (!active){
+      this.pttStartedAt = performance.now();
+      this.voiceControl('ptt-start');
+      this.toast('Listening — press again to send');
+      return;
+    }
+    const ms = Math.max(1, Math.round(performance.now() - (this.pttStartedAt || performance.now())));
+    this.pttStartedAt = 0;
+    this.voiceControl('ptt-stop');
+    this.runCommand('push_to_talk',{ms});
+  };
+  voiceQuick(action){
+    this.voiceControl(action);
+  }
+  go(tab){
+    return ()=>{
+      this.setState({tab});
+      this.runCommand('open_screen',{key:tab});
+    };
+  }
+  panelAction(label, panelTitle, tab){
+    return ()=>{
+      const action = String(label||'').toUpperCase();
+      if (action === 'COPY'){
+        const liveRows = this.state.live && Array.isArray(this.state.live.events) ? this.state.live.events : [];
+        const demoRows = (PANELS[tab]||PANELS.DASHBOARD)[1] || [];
+        const text = liveRows.length
+          ? liveRows.map(e=>[(e.at||'').slice(11,19),e.who,e.text].filter(Boolean).join(' · ')).join('\n')
+          : demoRows.map(r=>[r[0],r[1],r[4]].filter(Boolean).join(' · ')).join('\n');
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(()=>this.toast('Visible activity copied')).catch(()=>this.toast('Clipboard permission was not granted'));
+        } else this.toast('Clipboard is unavailable in this browser');
+        return;
+      }
+      if (action === 'SPEAK'){ this.voiceControl('test-voice'); return; }
+      if (action === 'TRACE' || action === 'AUDIT'){ this.go('SECURITY')(); return; }
+      if (action === 'EXPAND'){ this.go('CHAT')(); return; }
+      if (action === 'PUSH TO TALK'){ this.togglePushToTalk(); return; }
+      if (action === 'FREE TALKING'){ this.voiceQuick('toggle-handsfree'); return; }
+      if (action === 'CLAP WAKE'){ this.voiceQuick('toggle-clap'); return; }
+      if (action === 'PAUSE ALL' || action === 'HOLD ALL AGENTS'){ this.agentHold(); return; }
+      if (action === 'GRAPH'){ this.go('BRAIN')(); return; }
+      if (action === 'KEYS'){ this.bridge('credentials',{}); return; }
+      if (action === 'AUTONOMY' || action.indexOf('AUTONOMY ') === 0){ this.go('SETTINGS')(); return; }
+      if (action === 'NEW THREAD'){
+        this.setState({draft:''});
+        this.toast('Composer cleared · enter the new thread goal below');
+        return;
+      }
+      const needsSelection = ['PIN','OPEN','DIFF','INDEX','NEW NOTE','SEARCH','OPEN TAB','SNAPSHOT','CLOSE ALL','RUN','REVERT','REBUILD','PRUNE','EXPORT','APPROVE','REORDER','CANCEL','GRANT','REVOKE','RESET','ADD AGENT','COUNCIL MODE','FILTER'];
+      if (needsSelection.includes(action)){
+        this.toast(action+' needs a selected live item or parameters · choose a card or enter a goal');
+        return;
+      }
+      this.toast(action+' · '+panelTitle+' · display-only control in the approved layout');
+    };
+  }
+  agentHold = ()=>{
+    const release = !!this.state.held;
+    this.runCommand(release?'release':'hold',{},()=>this.setState({held:!release,st:release?'ready':'paused'}));
+  };
+  runScreenAction(item){
+    const action = item && item.action;
+    const command = action && typeof action.command === 'string' ? action.command.trim() : '';
+    if (!command){
+      this.toast((item && item.name ? item.name : 'Item')+' · status only · no backend action supplied');
+      return;
+    }
+    const payload = action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload)
+      ? {...action.payload} : {};
+    if (!payload.id && action.id) payload.id = action.id;
+    const guarded = command === 'approve' || command === 'reject' || command.indexOf('cancel_') === 0 || command.indexOf('approve_') === 0;
+    const confirmation = typeof action.confirm === 'string' && action.confirm.trim()
+      ? action.confirm.trim()
+      : (guarded ? 'Confirm '+command.replace(/_/g,' ')+' for '+(item.name||payload.id||'this item')+'?' : '');
+    if (confirmation && (typeof window.confirm !== 'function' || !window.confirm(confirmation))){
+      this.toast('Action cancelled · no changes made');
+      return;
+    }
+    if ((command === 'approve' || command === 'reject') && this.store && typeof this.store.approval === 'function'){
+      this.store.approval(payload.id, command, payload.note || '').then((result)=>this.toast(result.message || (result.ok?'Decision recorded':'Decision failed')));
+      return;
+    }
+    this.runCommand(command,payload);
+  }
   send = ()=>{
-    const d = this.state.draft.trim(); if (!d) return;
+    const d = this.state.draft.trim(); if (!d || this.state.submitting) return;
     const time = new Date().toTimeString().slice(0,8);
-    this.setState(s=>({draft:'', extra:s.extra.concat([[time,'AHMED','typed',CY,d]])}));
-    this.runCommand('submit_goal', {goal:d, model:this.state.auto?'auto':this.state.model, dispatch:this.state.dispatch, maxAgents:8}, (result)=>{
+    this.setState(s=>({draft:'', submitting:true, extra:s.extra.concat([[time,'AHMED','typed',CY,d]])}));
+    this.runCommand('send_message',{text:d},(result)=>{
       const t2 = new Date().toTimeString().slice(0,8);
-      this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS',result.runId||'queued',TE,result.message||'Goal accepted by the durable agent runtime.']])}));
-    });
+      this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS',result.runId||'accepted',TE,result.message||'Message accepted by the live runtime.']])}));
+    }).finally(()=>this.setState({submitting:false}));
   };
 
   renderVals(){
-    const s = this.state, st = this.cur(), col = this.accent();
+    const s = this.state, V = s.voice || {}, st = this.cur(), col = this.accent();
+    const stale = !!(s.meta && s.meta.stale);
+    const voiceArmed = V.ready ? !!V.armed : !!s.mic;
     const now = new Date();
     const pct = (seed, base, span)=> Math.min(99, Math.round(base + (s.t*3 + seed*13) % span));
     const cpu = pct(1,14,22), ram = pct(2,58,18), disk = 46, gpu = pct(4,9,26);
@@ -1452,10 +1521,17 @@ class Component extends DCLogic {
       const amp = live ? (0.3 + 0.7*this.rnd(i+scale)) : 0.14 + 0.07*this.rnd(i+scale);
       return {h: Math.round(5 + max*amp*(0.4+0.6*center))+'px', col: i%7===0 ? st.color : this.hex(col,0.55)};
     });
+    const voiceLevel = Math.max(0,Math.min(1,Number(V.level)||0));
+    const voiceBars = Array.from({length:34},(_,i)=>{
+      const center = 1-Math.abs(i-16.5)/16.5;
+      const active = V.capturing || V.speaking;
+      const amp = active ? Math.max(0.08,voiceLevel)*(0.48+0.52*this.rnd(i+301)) : 0.05;
+      return {h:Math.round(4+22*amp*(0.45+0.55*center))+'px',col:i%7===0?st.color:this.hex(col,active?0.72:0.22)};
+    });
 
     const scr = SCREENS[s.tab];
     this.vizMode = (s.tab === 'DASHBOARD' || s.tab === 'VOICE') ? 'reactor' : (VIZ[s.tab] ? VIZ[s.tab][0] : 'reactor');
-    let panel = PANELS[s.tab];
+    let panel = s.tab === 'AGENTS' ? PANELS.SWARM : PANELS[s.tab];
     if (!panel && scr) panel = [scr[0]+' · ACTIVITY',
       scr[3].slice(0,4).map((c,i)=>['00:'+(38-i*3)+':0'+(i+1), c.tag, c.name.toLowerCase(), c.tagCol, c.sub.charAt(0).toUpperCase()+c.sub.slice(1)+'.']),
       ['REFRESH','FILTER','AUDIT']];
@@ -1472,9 +1548,10 @@ class Component extends DCLogic {
       motionOpacity: this.props.reduceMotion === true ? 0 : 1,
       stateColor: st.color, stateLabel: st.label, stateSub: st.sub,
       planeState: s.held ? 'HELD' : 'READY',
+      stopNotice: s.held ? 'STOP ACTIVE' : 'NO STOP IS ACTIVE',
       clock: now.toTimeString().slice(0,8),
       dateStr: now.toDateString().slice(0,3).toUpperCase()+', '+now.toDateString().slice(4,10).toUpperCase(),
-      headBars: bars(14,24,1), sideBars: bars(18,56,7), micBars: bars(34,22,3),
+      headBars: bars(14,24,1), sideBars: bars(18,56,7), micBars: voiceBars,
       telemetry: [
         {k:'SYSTEM UPTIME', v:'72:37:00', col:'#DCE8F2', w:'72%'},
         {k:'CPU', v:cpu+'%', col:col, w:cpu+'%'},
@@ -1494,22 +1571,23 @@ class Component extends DCLogic {
       route: s.auto ? 'AUTO → '+s.model : s.model,
       routeSub: 'NVIDIA NIM API · GLM 5.2 PRIMARY',
       autoLabel: s.auto ? 'AUTO ON' : 'AUTO OFF',
-      toggleAuto: ()=> this.runCommand('set_auto_mode',{enabled:!s.auto},()=>this.setState({auto:!s.auto})),
+      toggleAuto: ()=> this.runCommand('set_auto_route',{auto:!s.auto},()=>this.setState({auto:!s.auto})),
       model: s.model,
       modelOptions: council.map(c=>c[1]),
-      setModel: (e)=> { const model=e.target.value; this.runCommand('set_primary_model',{model},()=>this.setState({model})); },
+      setModel: (e)=> { const modelId=e.target.value; this.runCommand('set_route',{modelId},()=>this.setState({model:modelId})); },
       refresh: ()=> this.runCommand('refresh_catalog',{}),
       notifyKeys: ()=> this.bridge('credentials',{}),
-      estop: ()=> { if (!this.store || !this.store.emergencyStop) return this.toast('Control plane is not connected'); this.store.emergencyStop().then(result=>{ this.toast(result.message||result.code||(result.ok?'Emergency stop applied':'Emergency stop failed')); if(result.ok) this.setState({held:true,st:'paused'}); }); },
+      remoteApp: ()=> this.bridge('navigate',{to:'/mobile'}),
+      estop: this.emergencyStop,
       council: council.map(c=>({
         name:c[0], id:c[1], n:c[2], col:c[3],
         bd: s.model===c[1] ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: s.model===c[1] ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
-        pick: ()=> this.runCommand('set_primary_model',{model:c[1]},()=>this.setState({model:c[1]}))
+        pick: ()=> this.runCommand('set_route',{modelId:c[1]},()=>this.setState({model:c[1]}))
       })),
       providers: [
-        {name:'GLM', status:'ONLINE', col:TE, ms:'118 ms'},{name:'DEEPSEEK', status:'ONLINE', col:TE, ms:'134 ms'},{name:'META', status:'ONLINE', col:TE, ms:'96 ms'},
-        {name:'OPENAI', status:'ONLINE', col:TE, ms:'128 ms'},{name:'MISTRAL', status:'ONLINE', col:TE, ms:'115 ms'},{name:'KIMI', status:'ONLINE', col:TE, ms:'165 ms'}
+        {name:'GLM', ms:'118 ms'},{name:'DEEPSEEK', ms:'134 ms'},{name:'META', ms:'96 ms'},
+        {name:'OPENAI', ms:'128 ms'},{name:'MISTRAL', ms:'115 ms'},{name:'KIMI', ms:'165 ms'}
       ],
       flow: [
         {name:'UI INTERFACE', state:'ONLINE', col:TE},{name:'AGENT CORE', state:'ARMED', col:col},
@@ -1527,31 +1605,38 @@ class Component extends DCLogic {
         {k:'COHERENCE', v:(0.91 + (s.t%5)*0.01).toFixed(2), col:col},
         {k:'FIELD', v: s.held ? 'DAMPED' : 'STABLE', col: s.held?AM:TE}
       ],
-      holdLabel: s.held ? 'RELEASE HOLD' : 'HOLD TO SPEAK',
-      hold: ()=> this.bridge('navigate',{to:'/voice'}),
+      holdLabel: V.capturing ? 'RELEASE TO SEND' : 'HOLD TO SPEAK',
+      hold: this.togglePushToTalk,
       cref: this.cref, onMove: this.onMove, onLeave: this.onLeave, pulse: this.pulse,
       session: [
         {k:'SESSION ID', v:'sess_20260726_0041'},{k:'STARTED', v:'00:41:02'},
         {k:'DURATION', v:'00:0'+(1+s.t%5)+':16'},{k:'ROUTE', v: s.auto?'AUTO':'PINNED'},
         {k:'MESSAGES', v:String(4 + s.extra.length)}
       ],
-      viewSession: ()=> this.bridge('workspace',{name:'CHAT'}),
-      quick: ['SYSTEM SCAN','BROWSER','NOTES','FILES','CODE','VOICE']
-        .map(q=>({label:q, go:q==='SYSTEM SCAN'?()=>this.runCommand('system_scan',{}):this.go(q)})),
+      viewSession: this.go('CHAT'),
+      quick: [
+        {label:'SYSTEM SCAN',go:()=>this.runCommand('system_scan',{})},
+        {label:'BROWSER OPEN',go:this.go('BROWSER')},
+        {label:'NOTE CAPTURE',go:this.go('NOTES')},
+        {label:'FILE SEARCH',go:this.go('FILES')},
+        {label:'CODE EXECUTOR',go:this.go('CODE')},
+        {label:'VOICE TEST',go:()=>this.voiceControl('test-voice')}
+      ],
       panelTitle: panel[0],
-      panelChips: panel[2].map(c=>({label:c, go:()=> this.toast(c+' · '+panel[0])})),
+      panelChips: panel[2].map(c=>({
+        label:c==='PAUSE ALL'?(s.held?'RESUME MISSIONS':'HOLD ALL AGENTS'):c,
+        go:this.panelAction(c,panel[0],s.tab)
+      })),
       rows: rowsRaw.map(r=>({time:r[0], who:r[1], meta:r[2], col:r[3], text:r[4]})),
       draft: s.draft,
-      dispatch: s.dispatch,
-      setDispatch: (e)=> this.setState({dispatch:e.target.value}),
       setDraft: (e)=> this.setState({draft:e.target.value}),
       onKey: (e)=> { if (e.key === 'Enter') this.send(); },
       send: this.send,
-      voiceState: s.mic ? 'ARMED' : 'DISARMED',
+      voiceState: !V.ready ? (s.mic?'PREFERENCE ON':'DISARMED') : V.error ? 'ERROR' : V.capturing ? 'LISTENING' : V.transcribing ? 'TRANSCRIBING' : V.processing ? 'THINKING' : V.speaking ? 'SPEAKING' : V.handsFree ? 'HANDS-FREE' : V.armed ? 'ARMED' : 'DISARMED',
       voiceBtns: [
-        {label: s.mic?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
-        {label:'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:()=> this.bridge('navigate',{to:'/voice'})},
-        {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})}
+        {label: voiceArmed?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceArmed)},
+        {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:this.togglePushToTalk},
+        {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=>this.voiceQuick('test-mic')}
       ],
       sens: '6 / 10', sensW: '60%',
       tokenStats: [
@@ -1565,7 +1650,7 @@ class Component extends DCLogic {
         s: (4 + Math.round(this.rnd(i+53)*5))+'px', col: i%5===0 ? TE : col, o: (0.4 + this.rnd(i+61)*0.6).toFixed(2)
       })),
       graphStats: [{v:'3,475', k:'NODES'},{v:'8,504', k:'EDGES'},{v:'62', k:'VAULT NOTES'}],
-      openGraph: ()=> this.setState({tab:'BRAIN'}),
+      openGraph: this.go('BRAIN'),
       envRows: [
         {k:'CPU LOAD', v:cpu+'%', col:col, w:cpu+'%'},
         {k:'MEMORY', v:ram+'%', col:AM, w:ram+'%'},
@@ -1580,6 +1665,7 @@ class Component extends DCLogic {
         dot: s.tab===t ? st.color : 'rgba(120,150,165,.5)'
       })),
       dashOn: s.tab !== 'VOICE', voiceOn: s.tab === 'VOICE',
+      shellRef: this.shellRef,
       stageRef: (el)=>{ this.stage = el; },
       isDash: s.tab === 'DASHBOARD', isScreen: !!scr && s.tab !== 'VOICE',
       vizOn: !!VIZ[s.tab], vizRef: this.vizRef, onViz: this.onViz,
@@ -1592,41 +1678,44 @@ class Component extends DCLogic {
       screenCards: (scr ? scr[3] : []).map(c=>({
         name:c.name, sub:c.sub, tag:c.tag, tagCol:c.tagCol, w:(c.pct||0)+'%',
         k1:c.m1[0], v1:c.m1[1], k2:c.m2[0], v2:c.m2[1],
-        go:()=> this.toast(c.name+' · '+c.tag)
+        go:()=> this.toast(c.name+' · '+c.tag+' · demo item has no backend action')
       })),
       voiceMeta: [
         {k:'MODEL', v: (s.auto?'AUTO · ':'')+s.model, col:'#DCE8F2'},
-        {k:'INPUT DEVICE', v:'STEELSERIES SONAR MIC', col:'#DCE8F2'},
-        {k:'SPEAKER', v:'SYSTEM DEFAULT · EN-GB', col:'#DCE8F2'},
-        {k:'VOICE CHANNEL', v: s.mic ? 'ARMED' : 'DISARMED', col: s.mic?TE:RD},
-        {k:'AGENT TEAM', v:'SWARM · 2/6 ACTIVE · 6 TASKS', col:col}
+        {k:'INPUT DEVICE', v:V.inputDevice||'SYSTEM DEFAULT', col:'#DCE8F2'},
+        {k:'SPEAKER', v:V.profile||'JARVIS · BRITISH', col:'#DCE8F2'},
+        {k:'VOICE CHANNEL', v:V.capturing?'CAPTURING':voiceArmed?'ARMED':'DISARMED', col:voiceArmed?TE:RD},
+        {k:'AGENT TEAM', v:s.live ? (s.live.workspace ? ('SWARM · '+s.live.workspace.agentsActive+'/'+s.live.workspace.agentsTotal+' ACTIVE · '+s.live.workspace.tasksTotal+' TASKS') : 'NO LIVE TEAM DATA') : 'SWARM · 2/6 ACTIVE · 6 TASKS', col:col}
       ],
       voiceLines: [
-        {who:'YOU SAID', col:col, text:'Jarvis, run a system scan and give me a summary.'},
-        {who:'JARVIS', col:TE, text:'Systems nominal. GLM 5.2 is primary and auto-routing is on. Deploy gate is still blocking mission MERIDIAN — say "approve deploy" to release it.'}
+        {who:'YOU SAID', col:col, text:V.lastUser||'No voice command captured yet.'},
+        {who:'JARVIS', col:TE, text:V.error?('Voice error: '+V.error):(V.lastJarvis||'Voice controller ready. Arm the microphone or use push to talk.')}
       ],
       voiceControls: [
-        {label: s.mic?'DISARM VOICE':'ARM VOICE', dot: s.mic?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.runCommand('set_voice_armed',{armed:!s.mic},()=>this.setState({mic:!s.mic}))},
-        {label:'PUSH TO TALK', dot:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:()=> this.bridge('navigate',{to:'/voice'})},
-        {label:'FREE TALKING', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})},
-        {label:'CLAP WAKE', dot:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=> this.bridge('navigate',{to:'/voice'})},
-        {label:'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=> this.bridge('navigate',{to:'/voice'})},
-        {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=>this.runCommand('set_auto_mode',{enabled:!s.auto},()=>this.setState({auto:!s.auto}))},
-        {label:'SWARM · 6 AGENTS', dot:col, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:this.go('AGENTS')}
+        {label: voiceArmed?'DISARM VOICE':'ARM VOICE', dot:voiceArmed?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceArmed)},
+        {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', dot:V.capturing?TE:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:this.togglePushToTalk},
+        {label:V.handsFree?'FREE TALKING ON':'FREE TALKING', dot:V.handsFree?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-handsfree')},
+        {label:V.clapWake?'CLAP WAKE ON':'CLAP WAKE', dot:V.clapWake?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-clap')},
+        {label:V.profile||'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=>{this.voiceControl('cycle-profile');setTimeout(()=>this.voiceControl('test-voice'),150);}},
+        {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=>this.runCommand('set_auto_route',{auto:!s.auto},()=>this.setState({auto:!s.auto}))},
+        {label:s.live ? (s.live.workspace ? ('SWARM · '+s.live.workspace.agentsActive+'/'+s.live.workspace.agentsTotal+' ACTIVE') : 'AGENTS · NO LIVE TEAM DATA') : 'SWARM · 6 AGENTS', dot:col, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:this.go('AGENTS')}
       ],
       toast: s.toast, toastOpacity: s.toastOn ? 1 : 0,
       goDash: this.go('DASHBOARD'), goVoice: this.go('VOICE'),
       srcTel: SRC(false), srcRouter: SRC(false), srcProviders: SRC(false), srcSession: SRC(false),
       srcFlow: SRC(false), srcRibbon: SRC(false), srcBrain: SRC(false), srcTokens: SRC(false),
       srcEvents: SRC(false), srcScreen: SRC(false), srcVoice: SRC(false), srcState: SRC(false),
-      sourceLabel: s.live ? 'LIVE BACKEND' : 'DEMO DATA',
-      sourceCol: s.live ? TE : AM,
-      sourceDetail: s.live
-        ? ((s.meta && s.meta.transport ? s.meta.transport.toUpperCase() : 'POLL') + ' · ' + (this.props.apiBase ?? ''))
+      sourceLabel: stale ? 'STALE · LAST SNAPSHOT' : s.live ? 'LIVE BACKEND' : 'DEMO DATA',
+      sourceCol: stale ? AM : s.live ? TE : AM,
+      sourceDetail: stale
+        ? ('last update '+fmtAge(s.live && s.live.at)+' · '+((s.meta && s.meta.error) ? String(s.meta.error).slice(0,48) : 'backend unavailable'))
+        : s.live
+        ? ((s.meta && s.meta.transport ? s.meta.transport.toUpperCase() : 'POLL') + ' · ' + ((this.props.apiBase ?? '') || window.location.origin))
         : ((s.meta && s.meta.error) ? String(s.meta.error).slice(0,64) : 'no backend attached'),
       reconnect: ()=> { this.connectBackend(); this.toast('Reconnecting to ' + ((this.props.apiBase ?? '') || window.location.origin)); }
     };
     if (s.live) this.applyLive(out, s.live);
+    if (stale) Object.keys(out).filter(k=>/^src[A-Z]/.test(k)).forEach(k=>{ out[k]=SRC('stale'); });
     return out;
   }
 
@@ -1638,7 +1727,19 @@ class Component extends DCLogic {
     const tl = L.telemetry;
     out.stateColor = st.color; out.stateLabel = st.label;
     out.stateSub = L.agent.detail || st.sub;
+    out.statusMeta = [
+      {k:'LAST UPDATE', v:(L.at||'').slice(11,19)||'—', col:'#DCE8F2'},
+      {k:'AUTONOMY', v:'LEVEL '+L.agent.autonomy, col:TE},
+      {k:'VOICE', v:L.voice ? (L.voice.armed ? (L.voice.profile||'ARMED') : 'DISARMED') : 'NO LIVE DATA', col:L.voice&&L.voice.armed?col:AM}
+    ];
+    out.coreReadouts = [
+      {k:'CPU', v:Math.round(tl.cpuPct)+'%', col:TE},
+      {k:'MEMORY', v:Math.round(tl.ramPct)+'%', col:col},
+      {k:'UPTIME', v:fmtDur(tl.uptimeSec), col:col},
+      {k:'CONTROL', v:L.agent.held?'HELD':'ACTIVE', col:L.agent.held?AM:TE}
+    ];
     out.planeState = L.agent.held ? 'HELD' : 'READY';
+    out.stopNotice = L.agent.held ? 'STOP ACTIVE' : 'NO STOP IS ACTIVE';
     out.telemetry = [
       {k:'SYSTEM UPTIME', v:fmtDur(tl.uptimeSec), col:'#DCE8F2', w:'100%'},
       {k:'CPU', v:Math.round(tl.cpuPct)+'%', col:col, w:Math.round(tl.cpuPct)+'%'},
@@ -1658,10 +1759,13 @@ class Component extends DCLogic {
       {k:'MESSAGES', v:String(L.session.messages)}
     ];
     if (L.router){
+      const selectableModels = L.router.models.filter(m=>m.selectable);
       out.route = (L.router.auto ? 'AUTO → ' : '') + L.router.primary;
       out.autoLabel = L.router.auto ? 'AUTO ON' : 'AUTO OFF';
-      out.modelOptions = L.router.models.filter(m=>m.selectable).map(m=>m.id);
-      out.model = s.model && L.router.models.some(m=>m.id===s.model) ? s.model : L.router.primary;
+      out.modelOptions = selectableModels.map(m=>m.id);
+      out.model = s.model && selectableModels.some(m=>m.id===s.model)
+        ? s.model
+        : (selectableModels.some(m=>m.id===L.router.primary) ? L.router.primary : (selectableModels[0]||{}).id||'');
       out.routeSub = L.router.models.length + ' MODELS · ' + (L.providers.length) + ' PROVIDERS';
       out.councilStatus = L.router.models.filter(m=>m.health==='healthy').length + '/' + L.router.models.length + ' ONLINE';
       out.council = L.router.models.map(m=>({
@@ -1670,28 +1774,20 @@ class Component extends DCLogic {
         bd: out.model===m.id ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: out.model===m.id ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
         pick: ()=> m.selectable
-          ? this.runCommand('set_primary_model',{model:m.id},()=>this.setState({model:m.id}))
-          : this.toast(m.name+' is configured but not available in the live NVIDIA catalog')
+          ? this.runCommand('set_route',{modelId:m.id},()=>this.setState({model:m.id}))
+          : this.toast(m.name+' is visible in inventory but unavailable as a live chat route')
       }));
     }
-    if (L.providers.length) out.providers = L.providers.map(p=>({
-      name:p.name.toUpperCase(), status:p.status.toUpperCase(),
-      col:p.status==='healthy'?TE:p.status==='degraded'?AM:p.status==='down'?RD:DIM,
-      ms:p.latencyMs ? p.latencyMs+' ms' : 'latency not probed'
-    }));
-    if (L.voice){
+    if (L.providers.length) out.providers = L.providers.map(p=>({name:p.name.toUpperCase(), ms:p.latencyMs+' ms'}));
+    if (L.voice && !(s.voice&&s.voice.ready)){
       out.voiceState = L.voice.armed ? 'ARMED' : 'DISARMED';
       out.sens = L.voice.sensitivity + ' / 10';
       out.sensW = Math.round(L.voice.sensitivity*10) + '%';
     }
-    if (L.usage) out.tokenStats = L.usage.metered ? [
+    if (L.usage) out.tokenStats = [
       {k:'REQUESTS', v:String(L.usage.requests), col:col},
       {k:'TOKENS', v:(L.usage.tokens>=1000 ? (L.usage.tokens/1000).toFixed(1)+'k' : String(L.usage.tokens)), col:TE},
-      {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.capUsd && L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
-    ] : [
-      {k:'REQUESTS', v:String(L.usage.requests), col:col},
-      {k:'TOKENS', v:'NOT METERED', col:DIM},
-      {k:'SPEND', v:'NOT METERED', col:DIM}
+      {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
     ];
     if (L.events.length) out.rows = L.events.map(e=>({
       time:(e.at||'').slice(11,19), who:e.who, meta:e.meta, text:e.text,
@@ -1705,7 +1801,7 @@ class Component extends DCLogic {
         name:i.name, sub:i.sub, tag:i.tag, tagCol:T(i.tone), w:Math.round(i.pct)+'%',
         k1:(i.meta[0]||['',''])[0], v1:(i.meta[0]||['',''])[1],
         k2:(i.meta[1]||['',''])[0], v2:(i.meta[1]||['',''])[1],
-        go:()=> this.toast(i.name+' · '+i.tag)
+        go:i.action&&i.action.command?()=>this.runScreenAction(i):()=>this.toast(i.name+' · '+i.tag+' · status only')
       }));
     }
     if (L.workspace){
@@ -1730,6 +1826,15 @@ class Component extends DCLogic {
       ];
       out.graphHealth = 'HEALTH ' + L.graph.health.toUpperCase();
     }
+    const brainViz = L.viz && L.viz.BRAIN;
+    if (brainViz && brainViz.kind === 'graph' && brainViz.nodes && brainViz.nodes.length){
+      out.graphNodes = brainViz.nodes.slice(0,48).map((n,i)=>({
+        x:Math.round(4+(Math.max(-1,Math.min(1,n.x))+1)*46)+'%',
+        y:Math.round(4+(Math.max(-1,Math.min(1,n.y))+1)*46)+'%',
+        s:(4+Math.round(Math.max(0.5,Math.min(2,n.size||1))*3))+'px',
+        col:i%5===0?TE:col, o:(0.55+Math.min(0.4,Math.abs(Number(n.z)||0)*0.4)).toFixed(2)
+      }));
+    }
     if (L.usage && L.usage.series && L.usage.series.length){
       const mx = Math.max(1, ...L.usage.series.map(p=>p.v));
       out.spark = L.usage.series.map(p=>({h: Math.round(6 + 52*(p.v/mx))+'px'}));
@@ -1738,15 +1843,30 @@ class Component extends DCLogic {
     out.srcRouter = SRC(!!L.router); out.srcProviders = SRC(!!(L.providers && L.providers.length));
     out.srcSession = SRC(!!L.session); out.srcVoice = SRC(!!L.voice);
     out.srcRibbon = SRC(!!L.workspace); out.srcFlow = SRC(!!(L.flow && L.flow.length));
-    out.srcBrain = SRC(!!L.graph);
-    out.srcTokens = SRC(!!L.usage);
+    out.srcBrain = SRC(L.graph ? (brainViz && brainViz.kind === 'graph' && brainViz.nodes && brainViz.nodes.length ? true : 'partial') : false);
+    out.srcTokens = SRC(!!(L.usage && L.usage.series && L.usage.series.length));
     out.srcEvents = SRC(!!(L.events && L.events.length));
-    out.srcScreen = SRC(!!L.screens[s.tab]);
-    out.vizOn = false;
+    const hasScreen = !!L.screens[s.tab], needsViz = !!VIZ[s.tab], hasViz = !!L.viz[s.tab];
+    out.srcScreen = SRC(hasScreen ? (needsViz && !hasViz ? 'partial' : true) : false);
     const vz = L.viz[s.tab];
     if (vz){
       this.vizMode = vz.kind === 'graph' ? 'brain' : vz.kind === 'topology' ? 'topology' : 'chart';
       out.vizOn = true;
+      if (vz.kind === 'graph'){
+        out.vizTitle = s.tab === 'BRAIN' ? 'GRAPHIFY KNOWLEDGE FIELD' : s.tab+' · LIVE GRAPH';
+        out.vizHint = (L.graph ? (L.graph.nodes.toLocaleString()+' nodes · '+L.graph.edges.toLocaleString()+' edges') : (vz.nodes.length+' projected nodes'))+' · orbit with the pointer';
+        out.vizLegend = [{label:'LIVE KNOWLEDGE',col:CY},{label:'RELATIONSHIPS',col:TE}];
+      } else if (vz.kind === 'topology'){
+        out.vizTitle = s.tab+' · LIVE TOPOLOGY';
+        out.vizHint = 'Current control-store states and routed relationships';
+        out.vizLegend = [{label:'ACTIVE',col:TE},{label:'OBSERVED',col:CY},{label:'GATED',col:AM}];
+      } else {
+        const unit = String(vz.unit||'events').toUpperCase();
+        out.vizTitle = (s.tab === 'USAGE' ? 'REQUEST ACTIVITY' : s.tab+' ACTIVITY')+' · 24H';
+        out.vizHint = 'Observed '+unit.toLowerCase()+' by hour';
+        out.vizLegend = [{label:'OBSERVED '+unit,col:CY}];
+        if (vz.compare) out.vizLegend.push({label:'COMPARISON',col:BL});
+      }
     }
   }
 

@@ -29,6 +29,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class ToolProcessError(RuntimeError):
+    """A bounded tool process returned an exit code that was not allowed."""
+
+    def __init__(self, exit_code: int):
+        self.exit_code = int(exit_code)
+        super().__init__(f"tool process exited with code {self.exit_code}")
+
+
+class ToolCapabilityError(PermissionError):
+    """A run attempted to plan or execute a tool outside its capability boundary."""
+
+    def __init__(self, tool: str):
+        self.tool = str(tool)
+        super().__init__("tool is outside this run's capability profile")
+
+
 class AgentStep(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     description: str = Field(min_length=1, max_length=500)
@@ -55,6 +71,9 @@ class AgentRun:
     attempts: int = 0
     schedule_id: str | None = None
     workspace_root: str | None = None
+    capability_profile: str = "unrestricted"
+    allowed_tools: set[str] | None = None
+    record_conversation: bool = True
     status: str = "planning"
     plan: AgentPlan | None = None
     current_step: int = 0
@@ -73,6 +92,9 @@ class AgentRun:
             "max_steps": self.max_steps, "max_retries": self.max_retries,
             "attempts": self.attempts, "schedule_id": self.schedule_id,
             "workspace_root": self.workspace_root,
+            "capability_profile": self.capability_profile,
+            "allowed_tools": sorted(self.allowed_tools) if self.allowed_tools is not None else None,
+            "record_conversation": self.record_conversation,
             "plan": self.plan.model_dump() if self.plan else None, "current_step": self.current_step,
             "events": self.events, "observations": self.observations, "result": self.result,
             "error": self.error, "created_at": self.created_at, "updated_at": self.updated_at,
@@ -90,6 +112,13 @@ class AgentRun:
             max_retries=int(payload.get("max_retries", 2)), attempts=int(payload.get("attempts", 0)),
             schedule_id=payload.get("schedule_id"), status=payload.get("status", "queued"), plan=plan,
             workspace_root=payload.get("workspace_root"),
+            capability_profile=payload.get("capability_profile", "unrestricted"),
+            allowed_tools=(
+                set(payload.get("allowed_tools") or [])
+                if payload.get("allowed_tools") is not None
+                else None
+            ),
+            record_conversation=bool(payload.get("record_conversation", True)),
             current_step=int(payload.get("current_step", 0)),
             approved_steps=set(payload.get("approved_steps", [])), events=list(payload.get("events", [])),
             observations=list(payload.get("observations", [])), result=payload.get("result", ""),
@@ -106,6 +135,8 @@ class AgentRuntime:
         "notes_search", "calendar_list", "reminders_list", "workspace_list", "workspace_read",
         "workspace_search", "git_status", "github_status", "github_repo_view",
     }
+    STATUS_RECEIPT_TOOLS = {"system_info", "git_status", "github_status"}
+    CONTENT_READ_TOOLS = READ_TOOLS - STATUS_RECEIPT_TOOLS
     WRITE_TOOLS = {
         "note_create", "reminder_set", "calendar_create", "workspace_write",
         "workspace_patch", "command_run", "project_create", "git_init", "git_commit",
@@ -115,6 +146,23 @@ class AgentRuntime:
     REMOTE_WRITE_TOOLS = {
         "github_create_repo", "github_push", "github_issue_create", "github_pr_create",
     }
+    LOCAL_EXECUTION_TOOLS = {"command_run", "app_launch"}
+    WORKSPACE_AUTHOR_TOOLS = {
+        "workspace_write", "workspace_patch", "directory_create", "project_create",
+        "git_clone", "git_init", "git_commit",
+    }
+    DEVOPS_TOOLS = WORKSPACE_AUTHOR_TOOLS | LOCAL_EXECUTION_TOOLS | REMOTE_WRITE_TOOLS | {
+        "open_path", "open_url",
+    }
+    CAPABILITY_PROFILES = {
+        "read_only": frozenset(READ_TOOLS),
+        "workspace_writer": frozenset(READ_TOOLS | WORKSPACE_AUTHOR_TOOLS),
+        "devops": frozenset(READ_TOOLS | DEVOPS_TOOLS),
+    }
+    BLOCKED_APP_LAUNCHERS = frozenset({
+        "powershell", "pwsh", "cmd", "wscript", "cscript", "mshta",
+        "rundll32", "regsvr32",
+    })
     TOOL_DESCRIPTIONS = {
         "system_info": "Read system status. arguments: action=info|cpu|memory|disk|processes|uptime|network",
         "web_search": "Search the public web. arguments: query",
@@ -133,7 +181,7 @@ class AgentRuntime:
         "git_status": "Read git working-tree status and recent diff summary. arguments: path (optional)",
         "workspace_write": "Create or replace a workspace text file. arguments: path, content. Protected outside Full Auto.",
         "workspace_patch": "Apply an exact text replacement in a workspace file. arguments: path, old_text, new_text. Protected outside Full Auto.",
-        "command_run": "Run a bounded PowerShell command in the workspace. arguments: command, timeout_seconds, path (optional working directory). Protected outside Full Auto.",
+        "command_run": "Run a bounded PowerShell command in the workspace. arguments: command, timeout_seconds, path (optional working directory). Always requires confirmation.",
         "directory_create": "Create a directory inside the active workspace. arguments: path. Protected outside Full Auto.",
         "project_create": "Create a real local starter project. arguments: name, kind=website|python, description (optional), directory (optional). Protected outside Full Auto.",
         "git_clone": "Clone a Git repository into the active workspace. arguments: repository, directory (optional). Protected outside Full Auto.",
@@ -145,15 +193,27 @@ class AgentRuntime:
         "github_push": "Push the current Git branch to its configured GitHub remote. arguments: path (optional). Full Auto executes only when the goal explicitly requests a push or publication.",
         "github_issue_create": "Create a GitHub issue. arguments: title, body, repository (optional). Full Auto requires an explicit issue-creation goal.",
         "github_pr_create": "Create a GitHub pull request. arguments: title, body, base (optional), path (optional). Full Auto requires an explicit pull-request goal.",
-        "app_launch": "Launch an installed Windows application by executable name. arguments: app, arguments (optional list). Protected outside Full Auto.",
+        "app_launch": "Launch an installed Windows application by executable name. arguments: app, arguments (optional list). Always requires confirmation; shell and script-host executables are blocked.",
         "open_path": "Open a file or folder from the active workspace with Windows. arguments: path. Protected outside Full Auto.",
         "open_url": "Open an http/https URL in the default browser. arguments: url. Protected outside Full Auto.",
     }
 
     ACTION_PATTERN = re.compile(
         r"\b(create|build|make|scaffold|implement|fix|edit|change|update|write|save|"
-        r"run|execute|install|test|debug|check|inspect|list|clone|commit|push|publish|deploy|open|launch|"
-        r"rename|copy|move|generate|download|set up|setup)\b",
+        r"read|search|find|show|run|execute|install|test|debug|check|inspect|list|clone|commit|push|"
+        r"publish|deploy|open|launch|delete|remove|rename|copy|move|generate|download|set up|setup)\b",
+        flags=re.IGNORECASE,
+    )
+    FILE_CODE_CONTEXT_PATTERN = re.compile(
+        r"```|\b(file|files|folder|folders|directory|directories|filesystem|workspace|code|codebase|"
+        r"script|python|javascript|typescript|powershell|bash|shell|command|repo|repository|github|git|"
+        r"website|web app|application|app|project|dashboard|test|tests|pytest|npm|node|build)\b|"
+        r"\b[A-Za-z0-9_.-]+\.(?:py|js|jsx|ts|tsx|html|css|json|ya?ml|toml|md|txt|ps1|sh|sql)\b",
+        flags=re.IGNORECASE,
+    )
+    SENSITIVE_FIELD_PATTERN = re.compile(
+        r"^(?:(?:[a-z0-9]+)[_-])*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|passwd|secret|"
+        r"credential|cookie|session[_-]?token)$",
         flags=re.IGNORECASE,
     )
     ADAPTIVE_PATTERN = re.compile(
@@ -190,6 +250,42 @@ class AgentRuntime:
             {"name": name, "description": description, "risk": "write" if name in self.WRITE_TOOLS else "read"}
             for name, description in self.TOOL_DESCRIPTIONS.items()
         ]
+
+    @classmethod
+    def _resolve_capabilities(
+        cls,
+        allowed_tools: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None,
+        capability_profile: str | None,
+    ) -> tuple[set[str] | None, str]:
+        """Resolve a durable, least-privilege tool boundary for one agent run."""
+        known_tools = set(cls.TOOL_DESCRIPTIONS)
+        profile_name = (capability_profile or "unrestricted").strip().casefold()
+        if profile_name == "unrestricted":
+            profile_tools: set[str] | None = None
+        else:
+            profile = cls.CAPABILITY_PROFILES.get(profile_name)
+            if profile is None:
+                raise ValueError("unknown capability profile")
+            profile_tools = set(profile)
+
+        if allowed_tools is None:
+            effective = profile_tools
+        else:
+            requested = {str(tool).strip() for tool in allowed_tools if str(tool).strip()}
+            unknown = requested - known_tools
+            if unknown:
+                raise ValueError("allowed_tools contains an unknown tool")
+            effective = requested if profile_tools is None else requested & profile_tools
+        return (None if effective is None else set(effective)), profile_name
+
+    @classmethod
+    def _tool_is_allowed(cls, allowed_tools: set[str] | None, tool: str | None) -> bool:
+        return tool is None or allowed_tools is None or tool in allowed_tools
+
+    @classmethod
+    def _require_tool_allowed(cls, run: AgentRun, tool: str | None) -> None:
+        if not cls._tool_is_allowed(run.allowed_tools, tool):
+            raise ToolCapabilityError(str(tool))
 
     def get_run(self, run_id: str) -> AgentRun | None:
         return self.runs.get(run_id)
@@ -244,10 +340,16 @@ class AgentRuntime:
         self, goal: str, model: str = "auto", max_steps: int = 8,
         autonomy: str = "guarded", max_retries: int = 2,
         workspace_root: str | Path | None = None,
+        allowed_tools: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None = None,
+        capability_profile: str | None = None,
+        record_conversation: bool = True,
     ) -> AgentRun:
         """Execute inline for compatibility with CLI/tests."""
         self._require_global_effect("run_launch")
-        run = self._new_run(goal, model, max_steps, autonomy, max_retries, workspace_root)
+        run = self._new_run(
+            goal, model, max_steps, autonomy, max_retries, workspace_root,
+            allowed_tools, capability_profile, record_conversation,
+        )
         self.runs[run.id] = run
         self._prune_runs()
         await self._run_existing(run)
@@ -257,11 +359,17 @@ class AgentRuntime:
         self, goal: str, model: str = "auto", max_steps: int = 8,
         autonomy: str = "guarded", max_retries: int = 2,
         workspace_root: str | Path | None = None,
+        allowed_tools: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None = None,
+        capability_profile: str | None = None,
+        record_conversation: bool = True,
     ) -> AgentRun:
         """Persist and enqueue work, returning immediately."""
         await self.start()
         self._require_global_effect("run_launch")
-        run = self._new_run(goal, model, max_steps, autonomy, max_retries, workspace_root)
+        run = self._new_run(
+            goal, model, max_steps, autonomy, max_retries, workspace_root,
+            allowed_tools, capability_profile, record_conversation,
+        )
         self.runs[run.id] = run
         self._event(run, "queue", "queued", "Goal accepted by the durable agent queue")
         await self._queue.put(run.id)
@@ -271,14 +379,22 @@ class AgentRuntime:
     def _new_run(
         self, goal: str, model: str, max_steps: int, autonomy: str,
         max_retries: int, workspace_root: str | Path | None = None,
+        allowed_tools: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None = None,
+        capability_profile: str | None = None,
+        record_conversation: bool = True,
     ) -> AgentRun:
         mode = "full" if autonomy == "full" else "guarded"
         resolved_workspace = self._resolve_workspace_root(workspace_root)
+        effective_tools, profile_name = self._resolve_capabilities(
+            allowed_tools, capability_profile,
+        )
         return AgentRun(
             id=f"agent-{uuid.uuid4().hex[:12]}", goal=goal, model=model,
             requested_model=model, autonomy=mode, max_steps=max(1, min(max_steps, 12)),
             max_retries=max(0, min(max_retries, 5)), status="queued",
             workspace_root=str(resolved_workspace),
+            capability_profile=profile_name, allowed_tools=effective_tools,
+            record_conversation=bool(record_conversation),
         )
 
     async def _run_existing(self, run: AgentRun) -> None:
@@ -294,7 +410,9 @@ class AgentRuntime:
             if not run.plan:
                 run.status = "planning"
                 run.plan = await self._with_retry(
-                    run, "planning", lambda: self._create_plan(run.goal, run.model, run.max_steps)
+                    run, "planning", lambda: self._create_plan(
+                        run.goal, run.model, run.max_steps, run.allowed_tools,
+                    )
                 )
             self._event(run, "planning", "end", run.plan.summary, {"steps": len(run.plan.steps)})
             await self._execute(run)
@@ -345,6 +463,8 @@ class AgentRuntime:
                 )
                 if attempt < run.max_retries:
                     await asyncio.sleep(min(2 ** attempt, 8))
+        if isinstance(last_error, ToolProcessError):
+            raise last_error
         raise RuntimeError(f"{stage.replace(':', '_')}_failed") from last_error
 
     async def approve(self, run_id: str, step_ids: list[str]) -> AgentRun:
@@ -377,12 +497,25 @@ class AgentRuntime:
                 task.cancel()
         return run
 
-    async def _create_plan(self, goal: str, model: str, max_steps: int) -> AgentPlan:
+    async def _create_plan(
+        self, goal: str, model: str, max_steps: int,
+        allowed_tools: set[str] | None = None,
+    ) -> AgentPlan:
+        valid_tools = set(self.TOOL_DESCRIPTIONS) if allowed_tools is None else set(allowed_tools)
         deterministic = self._fallback_plan(goal)
-        if any(step.tool for step in deterministic.steps):
+        deterministic_has_tools = any(step.tool for step in deterministic.steps)
+        deterministic_is_allowed = all(
+            self._tool_is_allowed(allowed_tools, step.tool)
+            for step in deterministic.steps
+        )
+        if deterministic_has_tools and deterministic_is_allowed:
             deterministic.steps = deterministic.steps[: max(1, min(max_steps, 12))]
             return deterministic
-        tools = "\n".join(f"- {name}: {description}" for name, description in self.TOOL_DESCRIPTIONS.items())
+        tools = "\n".join(
+            f"- {name}: {description}"
+            for name, description in self.TOOL_DESCRIPTIONS.items()
+            if name in valid_tools
+        ) or "- No tools are authorized; provide analysis only and do not claim state changes."
         prompt = f"""You are the planning core for JARVIS, Ahmed's personal agentic AI.
 Create an execution-first plan for the user's goal. If Ahmed asks to create, change, run, test,
 publish, open, or operate something, you MUST use tools and produce verifiable effects rather
@@ -406,20 +539,40 @@ User goal: {goal}"""
             )
             raw = response["choices"][0]["message"]["content"]
             plan = AgentPlan.model_validate(self._parse_json(raw))
-            valid_tools = self.READ_TOOLS | self.WRITE_TOOLS
             for step in plan.steps:
                 if step.tool and step.tool not in valid_tools:
-                    step.tool = None; step.arguments = {}
+                    raise ToolCapabilityError(step.tool)
             plan.steps = plan.steps[: max(1, min(max_steps, 12))]
             if self._needs_execution_plan(goal, plan):
-                return self._fallback_plan(goal)
+                return self._capability_safe_fallback(goal, allowed_tools, max_steps)
             return plan
         except Exception as exc:
             logger.warning(
                 "Planner output was invalid; using deterministic fallback (%s)",
                 self._safe_error_code(exc),
             )
-            return self._fallback_plan(goal)
+            return self._capability_safe_fallback(goal, allowed_tools, max_steps)
+
+    def _capability_safe_fallback(
+        self, goal: str, allowed_tools: set[str] | None, max_steps: int,
+    ) -> AgentPlan:
+        """Discard forbidden fallback actions while retaining any authorized evidence steps."""
+        fallback = self._fallback_plan(goal)
+        fallback.steps = [
+            step for step in fallback.steps
+            if self._tool_is_allowed(allowed_tools, step.tool)
+        ][: max(1, min(max_steps, 12))]
+        if not fallback.steps:
+            fallback = AgentPlan(
+                goal=goal,
+                summary="Analyze the assignment within the run's capability boundary.",
+                steps=[AgentStep(
+                    id="step-1",
+                    description="Analyze the assignment without changing external or workspace state",
+                    tool=None,
+                )],
+            )
+        return fallback
 
     def _fallback_plan(self, goal: str) -> AgentPlan:
         lowered = goal.lower()
@@ -521,13 +674,28 @@ User goal: {goal}"""
         return bool(cls.ACTION_PATTERN.search(normalized)) and not bool(consultative)
 
     @classmethod
+    def should_delegate_chat_action(cls, goal: str) -> bool:
+        """Route file, code, project, and repository work through the guarded runtime."""
+        normalized = goal.strip()
+        return bool(cls.FILE_CODE_CONTEXT_PATTERN.search(normalized)) and cls.is_action_goal(normalized)
+
+    @classmethod
     def needs_adaptive_review(cls, goal: str) -> bool:
         return bool(cls.ADAPTIVE_PATTERN.search(goal)) and cls.is_action_goal(goal)
 
     async def _continue_plan(self, run: AgentRun) -> list[AgentStep]:
         """Review observations and choose the next concrete action, if any."""
         evidence = json.dumps(run.observations[-6:], ensure_ascii=False, indent=2)
-        tools = "\n".join(f"- {name}: {description}" for name, description in self.TOOL_DESCRIPTIONS.items())
+        valid_tools = (
+            set(self.TOOL_DESCRIPTIONS)
+            if run.allowed_tools is None
+            else set(run.allowed_tools)
+        )
+        tools = "\n".join(
+            f"- {name}: {description}"
+            for name, description in self.TOOL_DESCRIPTIONS.items()
+            if name in valid_tools
+        ) or "- No tools are authorized."
         prompt = f"""You are the observe-act-repair controller for JARVIS.
 Goal: {run.goal}
 Workspace: {run.workspace_root}
@@ -557,7 +725,6 @@ Return JSON only:
         payload = self._parse_json(raw)
         if payload.get("done", False):
             return []
-        valid_tools = self.READ_TOOLS | self.WRITE_TOOLS
         steps: list[AgentStep] = []
         for index, item in enumerate(payload.get("next_steps") or []):
             if len(steps) >= 2:
@@ -578,6 +745,7 @@ Return JSON only:
         run.status = "running"
         while run.current_step < len(run.plan.steps):
             step = run.plan.steps[run.current_step]
+            self._require_tool_allowed(run, step.tool)
             self._resolve_step_context(run, step)
             if self._requires_confirmation(run, step) and step.id not in run.approved_steps:
                 run.status = "awaiting_confirmation"; run.updated_at = datetime.now().isoformat()
@@ -592,9 +760,16 @@ Return JSON only:
                     run, f"tool:{step.tool or 'reasoning'}",
                     lambda: self._execute_tool(step.tool, step.arguments, run.workspace_root),
                 ) if step.tool else "No tool required; use model reasoning during synthesis."
-                observation = {"step_id": step.id, "tool": step.tool, "result": str(result)[:12000], "duration_ms": round((time.monotonic() - started) * 1000), "ok": True}
-                if isinstance(result, (dict, list, str, int, float, bool)) or result is None:
-                    observation["data"] = result
+                safe_result = self._sanitize_evidence(result)
+                observation = {
+                    "step_id": step.id,
+                    "tool": step.tool,
+                    "result": self._evidence_text(safe_result, limit=12000),
+                    "duration_ms": round((time.monotonic() - started) * 1000),
+                    "ok": True,
+                }
+                if isinstance(safe_result, (dict, list, str, int, float, bool)) or safe_result is None:
+                    observation["data"] = safe_result
             except Exception as exc:
                 observation = {"step_id": step.id, "tool": step.tool, "code": self._safe_error_code(exc), "duration_ms": round((time.monotonic() - started) * 1000), "ok": False}
             if not self._effect_allowed(run, "result_persistence"):
@@ -616,12 +791,33 @@ Return JSON only:
                 raise RuntimeError("tool_step_failed")
         run.status = "synthesizing"
         self._event(run, "synthesis", "start", "Synthesizing the final answer from verified observations")
-        observed_tools = {item.get("tool") for item in run.observations if item.get("tool")}
-        direct_receipt_tools = self.READ_TOOLS
-        if any(item.get("tool") in self.WRITE_TOOLS for item in run.observations) or (
-            observed_tools and observed_tools.issubset(direct_receipt_tools)
+        successful_tools = {
+            item.get("tool") for item in run.observations
+            if item.get("ok") and item.get("tool")
+        }
+        has_successful_write = any(
+            item.get("ok") and item.get("tool") in self.WRITE_TOOLS
+            for item in run.observations
+        )
+        content_reads = successful_tools.intersection(self.CONTENT_READ_TOOLS)
+        if has_successful_write or (
+            successful_tools and successful_tools.issubset(self.STATUS_RECEIPT_TOOLS)
         ):
             run.result = self._execution_receipt(run)
+        elif content_reads:
+            if not self._effect_allowed(run, "provider"):
+                return
+            try:
+                run.result = await self._with_retry(run, "synthesis", lambda: self._synthesize(run))
+            except Exception as exc:
+                self._event(
+                    run,
+                    "synthesis",
+                    "warning",
+                    "Provider synthesis was unavailable; returning verified tool evidence",
+                    {"code": self._safe_error_code(exc)},
+                )
+                run.result = self._execution_receipt(run)
         else:
             if not self._effect_allowed(run, "provider"):
                 return
@@ -630,47 +826,115 @@ Return JSON only:
             return
         run.status = "completed"; run.updated_at = datetime.now().isoformat()
         self._event(run, "run", "completed", "Agent run completed", {"model": run.model})
-        self.jarvis.conversation_history.extend([
-            {"role": "user", "content": run.goal, "timestamp": run.created_at},
-            {"role": "assistant", "content": run.result, "timestamp": run.updated_at, "agent_run_id": run.id},
-        ])
-        if self.jarvis.memory:
-            asyncio.create_task(self.jarvis._save_conversation(run.goal, run.result))
+        if run.record_conversation:
+            self.jarvis.conversation_history.extend([
+                {"role": "user", "content": run.goal, "timestamp": run.created_at},
+                {"role": "assistant", "content": run.result, "timestamp": run.updated_at, "agent_run_id": run.id},
+            ])
+            if self.jarvis.memory:
+                asyncio.create_task(self.jarvis._save_conversation(run.goal, run.result))
+
+    @classmethod
+    def _redact_text(cls, value: str) -> str:
+        """Remove common credential forms before evidence is persisted or synthesized."""
+        redacted = re.sub(r"\bnvapi-[A-Za-z0-9_-]{12,}\b", "nvapi-[REDACTED]", value, flags=re.IGNORECASE)
+        redacted = re.sub(
+            r"\b(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b",
+            "[REDACTED_CREDENTIAL]",
+            redacted,
+            flags=re.IGNORECASE,
+        )
+        redacted = re.sub(
+            r"(?i)\b(Bearer\s+)[A-Za-z0-9._~+/-]{12,}=*",
+            r"\1[REDACTED]",
+            redacted,
+        )
+        assignment = re.compile(
+            r"(?im)\b([A-Z0-9_.-]*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|PASSWORD|PASSWD|SECRET|CREDENTIAL)"
+            r"[A-Z0-9_.-]*\s*[:=]\s*)([^\s,;]+)"
+        )
+        return assignment.sub(lambda match: f"{match.group(1)}[REDACTED]", redacted)
+
+    @classmethod
+    def _sanitize_evidence(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                str(key): (
+                    "[REDACTED]"
+                    if cls.SENSITIVE_FIELD_PATTERN.fullmatch(str(key))
+                    else cls._sanitize_evidence(item)
+                )
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._sanitize_evidence(item) for item in value]
+        if isinstance(value, tuple):
+            return [cls._sanitize_evidence(item) for item in value]
+        if isinstance(value, str):
+            return cls._redact_text(value)
+        return value
+
+    @classmethod
+    def _evidence_text(cls, value: Any, *, limit: int, compact: bool = False) -> str:
+        sanitized = cls._sanitize_evidence(value)
+        if isinstance(sanitized, str):
+            rendered = sanitized
+        else:
+            rendered = json.dumps(sanitized, ensure_ascii=False, default=str)
+        rendered = cls._redact_text(rendered)
+        if compact:
+            rendered = re.sub(r"\s+", " ", rendered).strip()
+        return rendered[:limit]
 
     def _execution_receipt(self, run: AgentRun) -> str:
         completed = [item for item in run.observations if item.get("ok")]
         failed = [item for item in run.observations if not item.get("ok")]
         tools = [str(item.get("tool")) for item in completed if item.get("tool")]
-        lines = [f"Completed: {run.goal}", f"Executed {len(completed)} verified tool step{'s' if len(completed) != 1 else ''}: {', '.join(tools) or 'reasoning'}." ]
+        lines = [
+            f"Completed: {run.goal}",
+            f"Executed {len(completed)} verified tool step{'s' if len(completed) != 1 else ''}: "
+            f"{', '.join(tools) or 'reasoning'}.",
+        ]
         for item in completed:
-            data = item.get("data")
-            if not isinstance(data, dict):
-                continue
             tool = item.get("tool")
-            if tool == "project_create" and data.get("path"):
-                lines.append(f"Project created at {data['path']}.")
-            elif tool in {"workspace_write", "workspace_patch", "directory_create"} and data.get("path"):
-                lines.append(f"Updated {data['path']}.")
-            elif tool == "git_commit":
-                stdout = str(data.get("stdout") or data.get("result", {}).get("stdout", "")).strip()
-                if stdout:
-                    lines.append(f"Git commit: {stdout.splitlines()[-1][:240]}")
-            elif tool == "github_status":
-                state = "authenticated" if data.get("authenticated") else "not authenticated"
-                lines.append(f"GitHub CLI is {state}.")
-            elif tool == "git_status":
-                status = data.get("status") if isinstance(data.get("status"), dict) else {}
-                output = str(status.get("stdout", "")).strip().splitlines()
-                if output:
-                    lines.append(f"Git status: {output[0][:300]}")
-                    lines.append(f"Working tree entries: {max(0, len(output) - 1)} changed or untracked paths.")
-            elif tool == "system_info":
-                compact = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-                lines.append(f"System evidence: {compact[:1200]}")
-            elif tool == "github_create_repo":
-                lines.append(f"GitHub repository {data.get('repository', '')} created ({data.get('visibility', 'private')}).")
-            elif tool == "github_push" and data.get("exit_code") == 0:
-                lines.append("GitHub push completed successfully.")
+            data = item.get("data", item.get("result", ""))
+            handled = False
+            if isinstance(data, dict):
+                if tool == "project_create" and data.get("path"):
+                    lines.append(f"Project created at {data['path']}.")
+                    handled = True
+                elif tool in {"workspace_write", "workspace_patch", "directory_create"} and data.get("path"):
+                    lines.append(f"Updated {data['path']}.")
+                    handled = True
+                elif tool == "git_commit":
+                    nested = data.get("result") if isinstance(data.get("result"), dict) else {}
+                    stdout = str(data.get("stdout") or nested.get("stdout", "")).strip()
+                    if stdout:
+                        lines.append(f"Git commit: {stdout.splitlines()[-1][:240]}")
+                    handled = True
+                elif tool == "github_status":
+                    state = "authenticated" if data.get("authenticated") else "not authenticated"
+                    lines.append(f"GitHub CLI is {state}.")
+                    handled = True
+                elif tool == "git_status":
+                    status = data.get("status") if isinstance(data.get("status"), dict) else {}
+                    output = str(status.get("stdout", "")).strip().splitlines()
+                    if output:
+                        lines.append(f"Git status: {output[0][:300]}")
+                        lines.append(f"Working tree entries: {max(0, len(output) - 1)} changed or untracked paths.")
+                    handled = True
+                elif tool == "system_info":
+                    lines.append(f"System evidence: {self._evidence_text(data, limit=1200, compact=True)}")
+                    handled = True
+                elif tool == "github_create_repo":
+                    lines.append(f"GitHub repository {data.get('repository', '')} created ({data.get('visibility', 'private')}).")
+                    handled = True
+                elif tool == "github_push" and data.get("exit_code") == 0:
+                    lines.append("GitHub push completed successfully.")
+                    handled = True
+            if not handled and tool in self.CONTENT_READ_TOOLS:
+                evidence = self._evidence_text(data, limit=2400, compact=True)
+                lines.append(f"{tool} evidence: {evidence or '[no content returned]'}")
         if failed:
             lines.append(f"Recovered from {len(failed)} failed attempt{'s' if len(failed) != 1 else ''}; see Agent Trace for details.")
         lines.append(f"Workspace: {run.workspace_root}")
@@ -703,6 +967,8 @@ Return JSON only:
     def _requires_confirmation(self, run: AgentRun, step: AgentStep) -> bool:
         if step.tool not in self.WRITE_TOOLS:
             return False
+        if step.tool in self.LOCAL_EXECUTION_TOOLS:
+            return True
         if step.tool in self.REMOTE_WRITE_TOOLS:
             if run.autonomy != "full":
                 return True
@@ -716,7 +982,7 @@ Return JSON only:
         if run.autonomy != "full":
             return True
         # Full Auto can mutate only its configured local workspace and local Jarvis data.
-        # Commands still pass through a deny-list and a scrubbed environment.
+        # Local process execution was handled above and never bypasses confirmation.
         return False
 
     async def _execute_tool(
@@ -764,7 +1030,9 @@ Return JSON only:
                 if glob:
                     command.extend(["--glob", glob])
                 command.extend(["--", query, str(search_path)])
-                return await self._run_process(command, timeout=30, cwd=active_root)
+                return await self._run_process(
+                    command, timeout=30, cwd=active_root, allowed_exit_codes={0, 1}
+                )
             return self._search_workspace_python(search_path, query, glob, active_root)
         if tool == "git_status":
             root = self._workspace_path(str(arguments.get("path", ".")).strip() or ".", must_exist=True, root=active_root)
@@ -830,7 +1098,12 @@ Return JSON only:
         if tool == "github_status":
             if not shutil.which("gh"):
                 return {"available": False, "authenticated": False, "detail": "GitHub CLI (gh) is not installed"}
-            result = await self._run_process(["gh", "auth", "status"], timeout=30, cwd=active_root)
+            result = await self._run_process(
+                ["gh", "auth", "status"],
+                timeout=30,
+                cwd=active_root,
+                allowed_exit_codes={0, 1},
+            )
             return {"available": True, "authenticated": result["exit_code"] == 0, **result}
         if tool == "github_repo_view":
             if not shutil.which("gh"):
@@ -904,6 +1177,11 @@ Return JSON only:
             app = str(arguments.get("app", "")).strip()
             if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}(?:\.exe)?", app):
                 raise ValueError("app_launch requires a simple executable name")
+            normalized_app = app.casefold()
+            if normalized_app.endswith(".exe"):
+                normalized_app = normalized_app[:-4]
+            if normalized_app in self.BLOCKED_APP_LAUNCHERS:
+                raise PermissionError("app_launch blocks shell, script-host, and proxy executables")
             raw_args = arguments.get("arguments", [])
             app_args = [str(value) for value in raw_args[:20]] if isinstance(raw_args, list) else []
             process = await asyncio.create_subprocess_exec(app, *app_args, cwd=str(active_root))
@@ -1009,6 +1287,7 @@ Return JSON only:
     async def _run_process(
         self, command: list[str], timeout: int, scrub_secrets: bool = False,
         cwd: str | Path | None = None,
+        allowed_exit_codes: set[int] | frozenset[int] | None = None,
     ) -> dict[str, Any]:
         environment = os.environ.copy()
         if scrub_secrets:
@@ -1025,11 +1304,15 @@ Return JSON only:
             process.kill()
             await process.communicate()
             raise TimeoutError(f"Command exceeded {timeout} seconds")
-        return {
+        result = {
             "exit_code": process.returncode,
             "stdout": stdout.decode(errors="replace")[-30000:],
             "stderr": stderr.decode(errors="replace")[-15000:],
         }
+        allowed = frozenset({0} if allowed_exit_codes is None else allowed_exit_codes)
+        if process.returncode not in allowed:
+            raise ToolProcessError(process.returncode)
+        return result
 
     async def _synthesize(self, run: AgentRun) -> str:
         evidence = json.dumps(run.observations, ensure_ascii=False, indent=2)
@@ -1169,6 +1452,8 @@ Return JSON only:
             return "control_blocked"
         if isinstance(exc, ProviderSafeError):
             return exc.code
+        if isinstance(exc, ToolProcessError):
+            return f"tool_exit_{exc.exit_code}"
         name = type(exc).__name__.removesuffix("Error") or "runtime"
         normalized = re.sub(r"(?<!^)(?=[A-Z])", "_", name).casefold()
         return f"{normalized}_error"[:128]

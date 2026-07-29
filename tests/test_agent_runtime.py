@@ -1,9 +1,10 @@
+import sys
 import unittest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from src.core.agent import AgentPlan, AgentRuntime, AgentStep
+from src.core.agent import AgentPlan, AgentRuntime, AgentStep, ToolProcessError
 from src.core.model_router import RouteDecision
 
 
@@ -75,6 +76,49 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tools["project_create"], "write")
         self.assertEqual(tools["github_status"], "read")
 
+    async def test_read_only_capability_rejects_injected_write_plan(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="malicious researcher plan",
+            summary="Attempt a forbidden write",
+            steps=[AgentStep(
+                id="step-1", description="Write outside the role boundary",
+                tool="workspace_write", arguments={"path": "owned.txt", "content": "bad"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(return_value={"path": "owned.txt"})
+
+        run = await runtime.run(
+            "malicious researcher plan",
+            autonomy="full",
+            max_retries=0,
+            capability_profile="read_only",
+        )
+
+        self.assertEqual(run.status, "failed")
+        self.assertEqual(run.error, "tool_capability_error")
+        self.assertEqual(run.capability_profile, "read_only")
+        self.assertEqual(run.allowed_tools, AgentRuntime.READ_TOOLS)
+        runtime._execute_tool.assert_not_awaited()
+        self.assertFalse((Path(self.tempdir.name) / "owned.txt").exists())
+
+    async def test_internal_agent_run_does_not_record_specialist_prompt(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="internal specialist prompt", summary="Read evidence",
+            steps=[AgentStep(id="step-1", description="Read system", tool="system_info")],
+        ))
+
+        run = await runtime.run(
+            "internal specialist prompt",
+            capability_profile="read_only",
+            record_conversation=False,
+        )
+
+        self.assertEqual(run.status, "completed")
+        self.assertFalse(run.record_conversation)
+        self.assertEqual(runtime.jarvis.conversation_history, [])
+
     async def test_full_auto_can_write_only_inside_workspace(self):
         runtime = self.runtime()
         runtime.workspace_root = Path(self.tempdir.name).resolve()
@@ -83,6 +127,49 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((runtime.workspace_root / "demo.txt").read_text(), "ready")
         with self.assertRaises(PermissionError):
             await runtime._execute_tool("workspace_write", {"path": "../escape.txt", "content": "blocked"})
+
+    async def test_full_auto_still_pauses_for_local_process_execution(self):
+        cases = (
+            ("command_run", {"command": "Write-Output safe"}),
+            ("app_launch", {"app": "notepad"}),
+        )
+        for tool, arguments in cases:
+            with self.subTest(tool=tool):
+                runtime = self.runtime()
+                runtime._create_plan = AsyncMock(return_value=AgentPlan(
+                    goal=f"execute {tool}", summary="Execute local process",
+                    steps=[AgentStep(
+                        id="step-1",
+                        description=f"Execute {tool}",
+                        tool=tool,
+                        arguments=arguments,
+                    )],
+                ))
+                runtime._execute_tool = AsyncMock(return_value={"launched": True})
+
+                run = await runtime.run(
+                    f"execute {tool}",
+                    autonomy="full",
+                    max_retries=0,
+                )
+
+                self.assertEqual(run.status, "awaiting_confirmation")
+                self.assertEqual(run.to_dict()["pending_step"]["tool"], tool)
+                runtime._execute_tool.assert_not_awaited()
+
+    async def test_app_launch_rejects_shell_script_host_and_proxy_executables(self):
+        runtime = self.runtime()
+        runtime.workspace_root = Path(self.tempdir.name).resolve()
+        blocked = (
+            "powershell", "PowerShell.EXE", "pwsh", "PWSH.exe", "cmd", "cmd.exe",
+            "wscript", "wscript.exe", "cscript", "cscript.exe", "mshta", "mshta.exe",
+            "rundll32", "rundll32.exe", "regsvr32", "regsvr32.exe",
+        )
+
+        for executable in blocked:
+            with self.subTest(executable=executable):
+                with self.assertRaises(PermissionError):
+                    await runtime._execute_tool("app_launch", {"app": executable})
 
     async def test_project_creator_builds_runnable_website_inside_workspace(self):
         runtime = self.runtime()
@@ -150,6 +237,96 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(AgentRuntime.is_action_goal("Fix the dashboard and run its tests"))
         self.assertTrue(AgentRuntime.is_action_goal("Create a GitHub repository"))
         self.assertFalse(AgentRuntime.is_action_goal("What is a GitHub repository?"))
+
+    def test_file_and_code_actions_are_delegated_but_advice_is_not(self):
+        self.assertTrue(AgentRuntime.should_delegate_chat_action("Delete the temporary file demo.txt"))
+        self.assertTrue(AgentRuntime.should_delegate_chat_action("Run the Python test suite"))
+        self.assertFalse(AgentRuntime.should_delegate_chat_action("How can I structure a Python project?"))
+        self.assertFalse(AgentRuntime.should_delegate_chat_action("What is the weather today?"))
+
+    async def test_process_nonzero_exit_fails_unless_explicitly_allowed(self):
+        runtime = self.runtime()
+        runtime.workspace_root = Path(self.tempdir.name).resolve()
+        command = [sys.executable, "-c", "raise SystemExit(7)"]
+
+        with self.assertRaises(ToolProcessError) as raised:
+            await runtime._run_process(command, timeout=10, cwd=runtime.workspace_root)
+        self.assertEqual(raised.exception.exit_code, 7)
+
+        result = await runtime._run_process(
+            command,
+            timeout=10,
+            cwd=runtime.workspace_root,
+            allowed_exit_codes={0, 7},
+        )
+        self.assertEqual(result["exit_code"], 7)
+
+    async def test_nonzero_mutation_cannot_produce_a_success_receipt(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="commit failing mutation", summary="Commit mutation",
+            steps=[AgentStep(
+                id="step-1", description="Commit mutation", tool="git_commit",
+                arguments={"message": "Expected failure"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(side_effect=ToolProcessError(9))
+
+        run = await runtime.run(
+            "commit failing mutation",
+            autonomy="full",
+            max_retries=0,
+        )
+
+        self.assertEqual(run.status, "failed")
+        self.assertFalse(run.observations[0]["ok"])
+        self.assertEqual(run.observations[0]["code"], "tool_exit_9")
+        self.assertEqual(run.result, "")
+
+    async def test_content_read_uses_provider_synthesis_when_available(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="research evidence", summary="Research evidence",
+            steps=[AgentStep(
+                id="step-1", description="Search sources", tool="web_search",
+                arguments={"query": "evidence"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(return_value={
+            "items": [{"title": "Primary source", "url": "https://example.test/source"}],
+        })
+        runtime._synthesize = AsyncMock(return_value="Synthesized primary-source evidence.")
+
+        run = await runtime.run("research evidence", max_retries=0)
+
+        self.assertEqual(run.status, "completed")
+        self.assertEqual(run.result, "Synthesized primary-source evidence.")
+        runtime._synthesize.assert_awaited_once()
+        self.assertIn("Primary source", run.observations[0]["result"])
+
+    async def test_content_read_returns_evidence_receipt_when_provider_is_unavailable(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="research evidence", summary="Research evidence",
+            steps=[AgentStep(
+                id="step-1", description="Search sources", tool="web_search",
+                arguments={"query": "evidence"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(return_value={
+            "items": [{"title": "Fallback source", "url": "https://example.test/fallback"}],
+        })
+        runtime._synthesize = AsyncMock(side_effect=RuntimeError("provider unavailable"))
+
+        run = await runtime.run("research evidence", max_retries=0)
+
+        self.assertEqual(run.status, "completed")
+        self.assertIn("web_search evidence", run.result)
+        self.assertIn("Fallback source", run.result)
+        self.assertTrue(any(
+            event["stage"] == "synthesis" and event["event_type"] == "warning"
+            for event in run.events
+        ))
 
     async def test_adaptive_loop_can_add_and_execute_verification_step(self):
         runtime = self.runtime()

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyaudio
+import shutil
 
 from src.config import config
 from src.clients.nvidia_client import NVIDIAClient

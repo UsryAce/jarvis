@@ -59,6 +59,58 @@ jarvis: Jarvis = None
 _unconfigured_speech = NvidiaSpeechAdapter()
 
 
+def _session_service(store: ControlStore, *, clock=None) -> SessionService:
+    """Build a session service from the durable trust timeout policy."""
+    return SessionService(
+        store,
+        clock=clock,
+        idle_timeout_seconds=int(
+            config.get("trust.session_idle_timeout_seconds", 12 * 60 * 60)
+        ),
+        absolute_timeout_seconds=int(
+            config.get("trust.session_absolute_timeout_seconds", 7 * 24 * 60 * 60)
+        ),
+    )
+
+
+def _runtime_health(runtime: Jarvis | None) -> dict:
+    """Return a secret-free liveness view of every persistent execution loop."""
+    initialized = bool(runtime is not None and runtime._initialized)
+    if runtime is None:
+        agent_status = {}
+        swarm_status = {}
+    else:
+        try:
+            agent_status = runtime.agent_runtime.status()
+        except Exception:
+            agent_status = {}
+        try:
+            swarm_status = runtime.swarm_runtime.status()
+        except Exception:
+            swarm_status = {}
+
+    agent_worker = bool(agent_status.get("started") and agent_status.get("worker_online"))
+    scheduler = bool(agent_status.get("started") and agent_status.get("scheduler_online"))
+    active_swarms = max(0, int(swarm_status.get("active_swarms", 0) or 0))
+    active_swarm_workers = max(0, int(swarm_status.get("active_workers", 0) or 0))
+    swarm_worker = bool(
+        swarm_status.get("started")
+        and swarm_status.get("healthy")
+        and (active_swarms == 0 or active_swarm_workers > 0)
+    )
+    components = {
+        "agent_worker": agent_worker,
+        "scheduler": scheduler,
+        "swarm_worker": swarm_worker,
+    }
+    reasons = [name for name, online in components.items() if initialized and not online]
+    return {
+        "ready": initialized and all(components.values()),
+        "components": components,
+        "degradation_reasons": reasons,
+    }
+
+
 def _nvidia_speech_adapter() -> NvidiaSpeechAdapter:
     """Resolve the current generation-fenced adapter without plaintext config."""
     if jarvis is not None and jarvis.speech_adapter is not None:
@@ -83,7 +135,9 @@ async def lifespan(app: FastAPI):
             store, protector=store.protector, clock=app.state.session_clock
         )
         app.state.audit_service = audit_service
-        app.state.session_service = SessionService(store, clock=app.state.session_clock)
+        app.state.session_service = _session_service(
+            store, clock=app.state.session_clock
+        )
         app.state.credential_service = CredentialService(
             store,
             protector=store.protector,
@@ -571,9 +625,19 @@ async def project_workspace_delete(project_id: str):
 @app.get("/api/health")
 async def health():
     """Health check endpoint."""
+    trust_status = getattr(app.state, "trust_status", "starting")
+    runtime = _runtime_health(jarvis)
+    status = trust_status
+    if trust_status == "ready" and not runtime["ready"]:
+        status = "degraded"
     return {
-        "status": getattr(app.state, "trust_status", "starting"),
+        "status": status,
         "initialized": jarvis._initialized if jarvis else False,
+        "runtime_ready": runtime["ready"],
+        "runtime": runtime["components"],
+        "degradation_reasons": runtime["degradation_reasons"],
+        "trust_status": trust_status,
+        "trust_failure_code": getattr(app.state, "trust_failure_code", None),
     }
 
 
@@ -956,7 +1020,7 @@ def _route_policy(path: str, methods: set[str]) -> RoutePolicy:
         scope = SECRETS_ADMIN
     elif "emergency" in path:
         scope = EMERGENCY_STOP
-    elif "approve" in path:
+    elif "approve" in path or "/approval/" in path:
         scope = APPROVALS_WRITE
     elif any(marker in path for marker in ("/cancel", "/resume", "/integrate", "/reject")):
         scope = RUNS_CONTROL
@@ -1005,7 +1069,7 @@ def _install_security(
         application.state.control_store = store
         audit_service = AuditService(store, protector=store.protector, clock=clock)
         application.state.audit_service = audit_service
-        application.state.session_service = SessionService(store, clock=clock)
+        application.state.session_service = _session_service(store, clock=clock)
         application.state.credential_service = CredentialService(
             store,
             protector=store.protector,

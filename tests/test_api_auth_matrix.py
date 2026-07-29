@@ -116,6 +116,27 @@ def test_stacked_voice_and_nvidia_aliases_have_identical_policy(
         )
 
 
+def test_ui_run_actions_use_dedicated_authorization_scopes(
+    isolated_control_path, fake_clock
+):
+    app = _test_app(isolated_control_path, fake_clock)
+    policies = {route.path: _policy(route) for route in app.routes}
+    expected = {
+        "/api/ui/command": auth.OPERATOR_EXECUTE,
+        "/api/ui/approval/{approval_id}": auth.APPROVALS_WRITE,
+        "/api/ui/agent/runs/{run_id}/approve-current": auth.APPROVALS_WRITE,
+        "/api/ui/swarm/runs/{run_id}/approve-current": auth.APPROVALS_WRITE,
+        "/api/ui/agent/runs/{run_id}/cancel": auth.RUNS_CONTROL,
+        "/api/ui/swarm/runs/{run_id}/cancel": auth.RUNS_CONTROL,
+    }
+    for path, scope in expected.items():
+        _safe(path in policies, f"protected UI route missing: {path}")
+        _safe(
+            policies[path].required_scope == scope,
+            f"wrong scope for {path}: {policies[path].required_scope}",
+        )
+
+
 @pytest.mark.parametrize("credential_state", ("missing", "invalid", "expired"))
 def test_every_privileged_http_stream_and_audio_route_returns_401(
     isolated_control_path,

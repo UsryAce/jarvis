@@ -15,6 +15,7 @@ def test_configured_models_remain_visible_when_runtime_is_held() -> None:
 
     assert PRIMARY_MODEL in rows
     assert "moonshotai/kimi-k2.6" in rows
+    assert "nvidia/nemotron-3-ultra-550b-a55b" in rows
     assert rows[PRIMARY_MODEL]["health"] == "unknown"
     assert rows[PRIMARY_MODEL]["selectable"] is False
     assert rows["moonshotai/kimi-k2.6"]["catalogSource"] == "configured"

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from src.clients.provider_factory import ProviderSafeError
 from src.config import config
+from src.core.agent import AgentRuntime
 from src.core.control import ControlBlockedError, ControlService, ControlState, StopGuard
 from src.core.swarm_store import SwarmStore
 from src.core.workspaces import WorkspaceRegistry
@@ -37,7 +38,17 @@ SPECIALIST_PROFILES: dict[str, str] = {
     "judge": "Compare independent work, resolve disagreements by evidence, and synthesize the final decision.",
 }
 WRITER_ROLES = {"coder", "designer", "devops"}
+READ_ONLY_ROLES = {"manager", "researcher", "tester", "reviewer", "judge"}
+WRITE_INTENT_PATTERN = re.compile(
+    r"\b(create|build|implement|fix|edit|change|modify|write|patch|deploy|publish|push|"
+    r"commit|scaffold|generate|add|remove|delete|rename|move|copy|install)\b",
+    flags=re.IGNORECASE,
+)
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+
+
+class WriterIsolationError(RuntimeError):
+    """A writer mission could not acquire an isolated Git worktree."""
 
 
 class PlannedTask(BaseModel):
@@ -105,6 +116,7 @@ class SwarmRun:
     plan_summary: str = ""
     result: str = ""
     error: str = ""
+    conversation_recorded: bool = False
     tasks: dict[str, SwarmTask] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -124,6 +136,7 @@ class SwarmRun:
             "status": self.status,
             "plan_summary": self.plan_summary, "result": self.result,
             "error": self.error, "events": self.events,
+            "conversation_recorded": self.conversation_recorded,
             "created_at": self.created_at, "updated_at": self.updated_at,
         }
         if include_tasks:
@@ -169,6 +182,7 @@ class SwarmRun:
             deadline_at=payload.get("deadline_at", ""),
             status=payload.get("status", "queued"), plan_summary=payload.get("plan_summary", ""),
             result=payload.get("result", ""), error=payload.get("error", ""), tasks=tasks,
+            conversation_recorded=bool(payload.get("conversation_recorded", False)),
             events=list(payload.get("events", [])), created_at=payload.get("created_at", datetime.now().isoformat()),
             updated_at=payload.get("updated_at", datetime.now().isoformat()),
         )
@@ -376,23 +390,6 @@ class MultiAgentOrchestrator:
         worktree_id = worktree_branch = ""
         integration_status = "not_applicable"
         integration_error = ""
-        try:
-            worktree = self.workspaces.create_worktree(normalized_project, run_id)
-            execution_root = Path(worktree["root"]).resolve()
-            workspace_mode = "worktree"
-            worktree_id = run_id
-            worktree_branch = str(worktree.get("branch") or "")
-            integration_status = "working"
-        except Exception as exc:
-            # Non-Git and dirty projects remain usable, but their run clearly
-            # reports that isolation could not be established.
-            integration_status = "unavailable"
-            integration_error = self._safe_error_code(exc)
-            logger.info(
-                "Swarm %s is using its direct project root (%s)",
-                run_id,
-                integration_error,
-            )
         return SwarmRun(
             id=run_id, goal=goal.strip(), mode=mode,
             project_id=normalized_project, project_root=str(execution_root),
@@ -413,6 +410,42 @@ class MultiAgentOrchestrator:
         self._run_tasks[run.id] = task
         task.add_done_callback(lambda _: self._run_tasks.pop(run.id, None))
 
+    def _prepare_writer_worktree(self, run: SwarmRun) -> None:
+        """Acquire isolation before any writer child is allowed to start."""
+        if run.workspace_mode == "worktree" and run.worktree_id:
+            return
+        try:
+            worktree = self.workspaces.create_worktree(run.project_id, run.id)
+        except Exception as exc:
+            run.project_root = run.base_root
+            run.workspace_mode = "direct"
+            run.worktree_id = ""
+            run.worktree_branch = ""
+            run.integration_status = "unavailable"
+            run.integration_error = self._safe_error_code(exc)
+            self._save_run(run)
+            raise WriterIsolationError("writer worktree is unavailable") from exc
+        run.project_root = str(Path(worktree["root"]).resolve())
+        run.workspace_mode = "worktree"
+        run.worktree_id = run.id
+        run.worktree_branch = str(worktree.get("branch") or "")
+        run.integration_status = "working"
+        run.integration_error = ""
+        self._save_run(run)
+
+    @staticmethod
+    def _task_capabilities(run: SwarmRun, task: SwarmTask) -> tuple[str, set[str]]:
+        """Return the enforced, non-escalating capability profile for a specialist."""
+        if run.mode == "council" or task.role in READ_ONLY_ROLES or not task.writer:
+            profile = "read_only"
+        elif task.role in {"coder", "designer"}:
+            profile = "workspace_writer"
+        elif task.role == "devops":
+            profile = "devops"
+        else:
+            profile = "read_only"
+        return profile, set(AgentRuntime.CAPABILITY_PROFILES[profile])
+
     async def _execute_run(self, run: SwarmRun) -> None:
         try:
             if not self._effect_allowed(run, "run_launch"):
@@ -421,6 +454,7 @@ class MultiAgentOrchestrator:
                 if not self._effect_allowed(run, "provider"):
                     return
                 plan = self._council_plan(run) if run.mode == "council" else await self._create_plan(run)
+                plan = self._sanitize_plan(plan, mode=run.mode)
                 run.plan_summary = plan.summary
                 run.tasks = {
                     task.id: SwarmTask(
@@ -435,6 +469,16 @@ class MultiAgentOrchestrator:
                 for task in run.tasks.values():
                     self._save_task(task)
                 self._event(run, "planned", run.plan_summary, {"task_count": len(run.tasks)})
+            if any(task.writer for task in run.tasks.values()):
+                self._prepare_writer_worktree(run)
+            else:
+                run.project_root = run.base_root
+                run.workspace_mode = "direct"
+                run.worktree_id = ""
+                run.worktree_branch = ""
+                run.integration_status = "not_applicable"
+                run.integration_error = ""
+                self._save_run(run)
             run.status = "running"
             self._save_run(run)
             await self._dispatch_graph(run)
@@ -458,6 +502,7 @@ class MultiAgentOrchestrator:
                 return
             run.status = "completed"
             self._event(run, "completed", "All specialist work completed")
+            self._record_operator_conversation(run)
         except asyncio.CancelledError:
             if run.status not in {"cancelled", "stopping"}:
                 run.status = "queued"
@@ -534,6 +579,7 @@ class MultiAgentOrchestrator:
                         task.status = "completed"
                     else:
                         prompt = self._role_prompt(run, task)
+                        capability_profile, allowed_tools = self._task_capabilities(run, task)
                         if not self._effect_allowed(run, "child", task_id=task.id):
                             return
                         if task.writer:
@@ -543,6 +589,9 @@ class MultiAgentOrchestrator:
                                     self.jarvis.agent_runtime.run(
                                         prompt, model=task.model, max_steps=8, autonomy=run.autonomy,
                                         workspace_root=run.project_root,
+                                        allowed_tools=allowed_tools,
+                                        capability_profile=capability_profile,
+                                        record_conversation=False,
                                     ), timeout=self._remaining_seconds(run),
                                 )
                         else:
@@ -550,6 +599,9 @@ class MultiAgentOrchestrator:
                                 self.jarvis.agent_runtime.run(
                                     prompt, model=task.model, max_steps=8, autonomy=run.autonomy,
                                     workspace_root=run.project_root,
+                                    allowed_tools=allowed_tools,
+                                    capability_profile=capability_profile,
+                                    record_conversation=False,
                                 ), timeout=self._remaining_seconds(run),
                             )
                         task.agent_run_id = agent_run.id
@@ -691,8 +743,11 @@ class MultiAgentOrchestrator:
             {"title": run.tasks[dep].title, "role": run.tasks[dep].role, "result": run.tasks[dep].result}
             for dep in task.dependencies if dep in run.tasks
         ]
+        capability_profile, allowed_tools = self._task_capabilities(run, task)
         return f"""You are the JARVIS {task.role.upper()} specialist.
 Role charter: {self.profiles[task.role]}
+Enforced capability profile: {capability_profile}
+Authorized tools: {", ".join(sorted(allowed_tools)) or "none"}
 Overall goal: {run.goal}
 Project: {run.project_id}
 Workspace root: {run.project_root}
@@ -700,7 +755,8 @@ Assigned task: {task.title}
 Objective: {task.objective}
 Dependency outputs: {json.dumps(dependency_results, ensure_ascii=False)}
 
-Work only on this assignment. Use tools for evidence and implementation. Do not duplicate another role's scope.
+Work only on this assignment. Use only authorized tools. A read-only profile must never claim
+to have modified files, applications, commands, repositories, or external state. Do not duplicate another role's scope.
 Return a concise result with work performed, verification evidence, files/artifacts, and remaining risks."""
 
     async def _create_plan(self, run: SwarmRun) -> SwarmPlan:
@@ -728,7 +784,7 @@ Project: {run.project_id}"""
                 model=routing.model, temperature=0.1, max_tokens=1800,
             )
             plan = SwarmPlan.model_validate(self._parse_json(response["choices"][0]["message"]["content"]))
-            return self._sanitize_plan(plan)
+            return self._sanitize_plan(plan, mode=run.mode)
         except (
             KeyError, TypeError, ValueError, ValidationError, json.JSONDecodeError,
             ProviderSafeError, asyncio.TimeoutError, TimeoutError, OSError,
@@ -739,7 +795,7 @@ Project: {run.project_id}"""
             )
             return self._fallback_plan(run)
 
-    def _sanitize_plan(self, plan: SwarmPlan) -> SwarmPlan:
+    def _sanitize_plan(self, plan: SwarmPlan, *, mode: str | None = None) -> SwarmPlan:
         tasks = plan.tasks[:self.MAX_CONCURRENT_AGENTS]
         if len({task.id for task in tasks}) != len(tasks):
             raise ValueError("Swarm plan contains duplicate task IDs")
@@ -748,6 +804,14 @@ Project: {run.project_id}"""
             if task.role not in self.profiles:
                 task.role = "researcher"
             task.dependencies = [dep for dep in dict.fromkeys(task.dependencies) if dep in valid_ids and dep != task.id]
+            requested_write = task.writer or bool(
+                WRITE_INTENT_PATTERN.search(f"{task.title}\n{task.objective}")
+            )
+            task.writer = bool(
+                mode != "council"
+                and task.role in WRITER_ROLES
+                and requested_write
+            )
         return SwarmPlan(summary=plan.summary, tasks=tasks)
 
     def _fallback_plan(self, run: SwarmRun) -> SwarmPlan:
@@ -843,6 +907,26 @@ Project: {run.project_id}"""
             model=routing.model, temperature=0.2, max_tokens=2400,
         )
         return response["choices"][0]["message"]["content"]
+
+    def _record_operator_conversation(self, run: SwarmRun) -> None:
+        """Record one operator mission/receipt, never the internal specialist prompts."""
+        if run.conversation_recorded:
+            return
+        history = getattr(self.jarvis, "conversation_history", None)
+        if not isinstance(history, list):
+            return
+        # Persist the at-most-once marker before touching in-memory/global memory state.
+        run.conversation_recorded = True
+        self._save_run(run)
+        history.extend([
+            {"role": "user", "content": run.goal, "timestamp": run.created_at},
+            {
+                "role": "assistant", "content": run.result,
+                "timestamp": run.updated_at, "swarm_run_id": run.id,
+            },
+        ])
+        if getattr(self.jarvis, "memory", None):
+            asyncio.create_task(self.jarvis._save_conversation(run.goal, run.result))
 
     def _event(self, run: SwarmRun, event_type: str, message: str, data: dict[str, Any] | None = None) -> None:
         timestamp = datetime.now().isoformat()
