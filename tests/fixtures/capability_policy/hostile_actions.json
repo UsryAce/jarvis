@@ -1,0 +1,85 @@
+{
+  "schema_version": "hostile-actions.v1",
+  "limits": {
+    "max_depth": 8,
+    "max_width": 32,
+    "max_string_bytes": 4096,
+    "max_total_bytes": 16384
+  },
+  "base_action": {
+    "schema_version": "resolved-action.v1",
+    "tool_id": "fixture.read",
+    "tool_schema_version": "v1",
+    "actor_id": "actor-fixture",
+    "session_digest": "session-digest-fixture",
+    "request_id": "request-fixture",
+    "run_id": "run-fixture",
+    "project_id": "project-fixture",
+    "workspace_id": "workspace-fixture",
+    "worktree_id": "worktree-fixture",
+    "policy_digest": "policy-digest-fixture",
+    "manifest_digest": "manifest-digest-fixture",
+    "declared_effect": "read",
+    "arguments": {
+      "encoding": "utf-8",
+      "path": "docs/readme.txt"
+    },
+    "precondition_digest": "precondition-digest-fixture"
+  },
+  "equivalent_argument_orders": [
+    [
+      ["encoding", "utf-8"],
+      ["path", "docs/readme.txt"]
+    ],
+    [
+      ["path", "docs/readme.txt"],
+      ["encoding", "utf-8"]
+    ]
+  ],
+  "semantic_mutations": [
+    "tool_id",
+    "tool_schema_version",
+    "actor_id",
+    "session_digest",
+    "request_id",
+    "run_id",
+    "project_id",
+    "workspace_id",
+    "worktree_id",
+    "policy_digest",
+    "manifest_digest",
+    "declared_effect",
+    "arguments",
+    "precondition_digest"
+  ],
+  "hostile_vectors": [
+    {"name": "unknown_tool", "kind": "mapping_patch", "field": "tool_id", "value": "fixture.unknown", "expected": "deny", "reason_family": "manifest_"},
+    {"name": "unknown_tool_version", "kind": "mapping_patch", "field": "tool_schema_version", "value": "v999", "expected": "deny", "reason_family": "schema_"},
+    {"name": "unknown_effect", "kind": "mapping_patch", "field": "declared_effect", "value": "ambient_machine_control", "expected": "deny_or_reject", "reason_family": "schema_"},
+    {"name": "alias_field", "kind": "mapping_alias", "field": "tool", "expected": "reject", "reason_family": "schema_"},
+    {"name": "extra_field", "kind": "mapping_extra", "field": "authorization", "expected": "reject", "reason_family": "schema_"},
+    {"name": "bool_as_int", "kind": "runtime_factory", "factory": "bool_as_int", "expected": "reject", "reason_family": "schema_"},
+    {"name": "nan", "kind": "runtime_factory", "factory": "nan", "expected": "reject", "reason_family": "schema_"},
+    {"name": "positive_infinity", "kind": "runtime_factory", "factory": "positive_infinity", "expected": "reject", "reason_family": "schema_"},
+    {"name": "negative_infinity", "kind": "runtime_factory", "factory": "negative_infinity", "expected": "reject", "reason_family": "schema_"},
+    {"name": "invalid_utf8", "kind": "runtime_factory", "factory": "invalid_utf8", "expected": "reject", "reason_family": "schema_"},
+    {"name": "unicode_surrogate", "kind": "runtime_factory", "factory": "unicode_surrogate", "expected": "reject", "reason_family": "schema_"},
+    {"name": "excessive_depth", "kind": "runtime_factory", "factory": "excessive_depth", "expected": "reject", "reason_family": "schema_"},
+    {"name": "excessive_width", "kind": "runtime_factory", "factory": "excessive_width", "expected": "reject", "reason_family": "schema_"},
+    {"name": "excessive_string_bytes", "kind": "runtime_factory", "factory": "excessive_string_bytes", "expected": "reject", "reason_family": "schema_"},
+    {"name": "excessive_total_bytes", "kind": "runtime_factory", "factory": "excessive_total_bytes", "expected": "reject", "reason_family": "schema_"},
+    {"name": "generator", "kind": "runtime_factory", "factory": "generator", "expected": "reject", "reason_family": "schema_"},
+    {"name": "infinite_iterable", "kind": "runtime_factory", "factory": "infinite_iterable", "expected": "reject", "reason_family": "schema_"},
+    {"name": "dict_subclass", "kind": "runtime_factory", "factory": "dict_subclass", "expected": "reject", "reason_family": "schema_"},
+    {"name": "model_subclass", "kind": "runtime_factory", "factory": "model_subclass", "expected": "reject", "reason_family": "schema_"},
+    {"name": "datetime_subclass", "kind": "runtime_factory", "factory": "datetime_subclass", "expected": "reject", "reason_family": "schema_"},
+    {"name": "callable_value", "kind": "runtime_factory", "factory": "callable_value", "expected": "reject", "reason_family": "schema_"},
+    {"name": "input_owned_hook", "kind": "runtime_factory", "factory": "input_owned_hook", "expected": "deny", "reason_family": "schema_"},
+    {"name": "absolute_path", "kind": "argument_patch", "field": "path", "value": "C:/Windows/System32/config", "expected": "deny", "reason_family": "path_"},
+    {"name": "escaping_path", "kind": "argument_patch", "field": "path", "value": "../outside.txt", "expected": "deny", "reason_family": "path_"},
+    {"name": "unresolved_precondition", "kind": "mapping_patch", "field": "precondition_digest", "value": "", "expected": "deny_or_reject", "reason_family": "precondition_"},
+    {"name": "field_order_equivalence", "kind": "equivalence", "expected": "same_digest", "reason_family": "canonical_"},
+    {"name": "one_field_digest_mutation", "kind": "mutation_set", "expected": "different_digest_or_reject", "reason_family": "canonical_"},
+    {"name": "redaction_canary", "kind": "runtime_factory", "factory": "generated_redaction_canary", "expected": "deny", "reason_family": "schema_"}
+  ]
+}
