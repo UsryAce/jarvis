@@ -1,6 +1,8 @@
 """Isolated contracts for the live dashboard command endpoint."""
 
+import json
 from pathlib import Path
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, call, patch
@@ -8,8 +10,15 @@ from unittest.mock import AsyncMock, Mock, call, patch
 from fastapi import HTTPException
 
 from src.api.ui_routes import (
+    APPROVAL_CONFLICT_DETAIL,
+    SWARM_APPROVAL_APPLIED_CODE,
+    SWARM_APPROVAL_PARTIAL_CODE,
+    SWARM_RESUME_CONFLICT_DETAIL,
+    UIAgentApprovalRequest,
     UIApprovalDecision,
     UICommand,
+    UISwarmApprovalReference,
+    UISwarmApprovalRequest,
     approve_agent_current_step,
     approve_swarm_current_steps,
     cancel_agent_run,
@@ -50,6 +59,7 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
             chat=AsyncMock(return_value="Live JARVIS response"),
             _get_live_model_catalog=AsyncMock(return_value={"z-ai/glm-5.2"}),
             _model_catalog={"z-ai/glm-5.2"},
+            _model_catalog_cached_at=time.monotonic(),
         )
         running = SimpleNamespace(state=SimpleNamespace(value="running"), revision=1)
         self.control_service = SimpleNamespace(
@@ -172,16 +182,27 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
             status="awaiting_confirmation",
             current_step=1,
             plan=SimpleNamespace(steps=steps),
+            pending_approval=SimpleNamespace(
+                step_id="step-2", challenge_id="challenge-agent-0001",
+            ),
         )
         resumed = SimpleNamespace(id="agent-1", status="running")
         self.agent_runtime.get_run.return_value = pending
         self.agent_runtime.approve.return_value = resumed
 
         response = await approve_agent_current_step(
-            "agent-1", self.request, _principal=None, _mutation_guard=None,
+            "agent-1",
+            UIAgentApprovalRequest(
+                step_id="step-2", challenge_id="challenge-agent-0001",
+            ),
+            self.request,
+            _principal=None,
+            _mutation_guard=None,
         )
 
-        self.agent_runtime.approve.assert_awaited_once_with("agent-1", ["step-2"])
+        self.agent_runtime.approve.assert_awaited_once_with(
+            "agent-1", ["step-2"], "challenge-agent-0001",
+        )
         self.assertEqual(response["status"], "running")
 
     async def test_cancel_agent_run_requests_runtime_cancellation(self) -> None:
@@ -193,6 +214,34 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.agent_runtime.cancel.assert_called_once_with("agent-1")
         self.assertEqual(response["status"], "stopping")
+
+    async def test_agent_approval_value_errors_are_stable_conflicts(self) -> None:
+        self.agent_runtime.get_run.return_value = SimpleNamespace(
+            id="agent-1",
+            status="awaiting_confirmation",
+            current_step=0,
+            plan=SimpleNamespace(steps=[SimpleNamespace(id="step-1")]),
+        )
+        for runtime_error in (
+            "approval challenge does not match the pending challenge",
+            "approval challenge has expired; a new challenge was issued",
+            "pending action changed after approval was requested",
+        ):
+            with self.subTest(runtime_error=runtime_error):
+                self.agent_runtime.approve.side_effect = ValueError(runtime_error)
+                with self.assertRaises(HTTPException) as raised:
+                    await approve_agent_current_step(
+                        "agent-1",
+                        UIAgentApprovalRequest(
+                            step_id="step-1",
+                            challenge_id="challenge-agent-0001",
+                        ),
+                        self.request,
+                        _principal=None,
+                        _mutation_guard=None,
+                    )
+                self.assertEqual(raised.exception.status_code, 409)
+                self.assertEqual(raised.exception.detail, APPROVAL_CONFLICT_DETAIL)
 
     async def test_approve_swarm_run_advances_each_child_current_step_then_resumes(self) -> None:
         swarm = SimpleNamespace(
@@ -219,6 +268,9 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
                     SimpleNamespace(id="a-1"), SimpleNamespace(id="a-2"),
                     SimpleNamespace(id="a-3"),
                 ]),
+                pending_approval=SimpleNamespace(
+                    step_id="a-2", challenge_id="challenge-swarm-a1",
+                ),
             ),
             "agent-b": SimpleNamespace(
                 id="agent-b",
@@ -227,24 +279,45 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
                 plan=SimpleNamespace(steps=[
                     SimpleNamespace(id="b-1"), SimpleNamespace(id="b-2"),
                 ]),
+                pending_approval=SimpleNamespace(
+                    step_id="b-1", challenge_id="challenge-swarm-b1",
+                ),
             ),
         }
         self.swarm_runtime.get_run.return_value = swarm
         self.agent_runtime.get_run.side_effect = agents.get
-        self.agent_runtime.approve.side_effect = lambda run_id, _steps: agents[run_id]
+        self.agent_runtime.approve.side_effect = lambda run_id, _steps, _challenge: agents[run_id]
         self.swarm_runtime.resume.return_value = SimpleNamespace(id="swarm-1", status="running")
 
         response = await approve_swarm_current_steps(
-            "swarm-1", self.request, _principal=None, _mutation_guard=None,
+            "swarm-1",
+            UISwarmApprovalRequest(approvals=[
+                UISwarmApprovalReference(
+                    agent_run_id="agent-a", step_id="a-2",
+                    challenge_id="challenge-swarm-a1",
+                ),
+                UISwarmApprovalReference(
+                    agent_run_id="agent-b", step_id="b-1",
+                    challenge_id="challenge-swarm-b1",
+                ),
+            ]),
+            self.request,
+            _principal=None,
+            _mutation_guard=None,
         )
 
         self.agent_runtime.approve.assert_has_awaits([
-            call("agent-a", ["a-2"]),
-            call("agent-b", ["b-1"]),
+            call("agent-a", ["a-2"], "challenge-swarm-a1"),
+            call("agent-b", ["b-1"], "challenge-swarm-b1"),
         ])
         self.assertEqual(self.agent_runtime.approve.await_count, 2)
         self.swarm_runtime.resume.assert_awaited_once_with("swarm-1")
         self.assertEqual(response["status"], "running")
+        self.assertEqual(response["code"], SWARM_APPROVAL_APPLIED_CODE)
+        self.assertTrue(response["applied"])
+        self.assertFalse(response["partial"])
+        self.assertEqual(response["applied_count"], 2)
+        self.assertEqual(response["applied_ids"], ["agent-a:a-2", "agent-b:b-1"])
 
     async def test_cancel_swarm_run_requests_runtime_cancellation(self) -> None:
         self.swarm_runtime.cancel.return_value = SimpleNamespace(id="swarm-1", status="stopping")
@@ -255,6 +328,148 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.swarm_runtime.cancel.assert_called_once_with("swarm-1")
         self.assertEqual(response["status"], "stopping")
+
+    async def test_swarm_resume_failure_is_synchronous_and_stable(self) -> None:
+        swarm = SimpleNamespace(
+            id="swarm-1",
+            status="awaiting_confirmation",
+            tasks={
+                "task-a": SimpleNamespace(
+                    status="awaiting_confirmation", agent_run_id="agent-a",
+                ),
+            },
+        )
+        child = SimpleNamespace(
+            id="agent-a",
+            status="awaiting_confirmation",
+            current_step=0,
+            plan=SimpleNamespace(steps=[SimpleNamespace(id="step-a")]),
+            pending_approval=SimpleNamespace(
+                step_id="step-a", challenge_id="challenge-swarm-a1",
+            ),
+        )
+        completed_child = SimpleNamespace(id="agent-a", status="completed")
+        self.swarm_runtime.get_run.return_value = swarm
+        self.agent_runtime.get_run.side_effect = [child, completed_child]
+        self.agent_runtime.approve.return_value = completed_child
+        self.swarm_runtime.resume.side_effect = RuntimeError("resume failed")
+
+        response = await approve_swarm_current_steps(
+            "swarm-1",
+            UISwarmApprovalRequest(approvals=[
+                UISwarmApprovalReference(
+                    agent_run_id="agent-a",
+                    step_id="step-a",
+                    challenge_id="challenge-swarm-a1",
+                ),
+            ]),
+            self.request,
+            _principal=None,
+            _mutation_guard=None,
+        )
+
+        self.assertEqual(response.status_code, 409)
+        receipt = json.loads(response.body)
+        self.assertEqual(receipt["code"], SWARM_APPROVAL_PARTIAL_CODE)
+        self.assertEqual(receipt["reason_code"], SWARM_RESUME_CONFLICT_DETAIL)
+        self.assertTrue(receipt["applied"])
+        self.assertTrue(receipt["partial"])
+        self.assertEqual(receipt["applied_count"], 1)
+        self.assertEqual(receipt["applied_ids"], ["agent-a:step-a"])
+        self.assertEqual(receipt["swarm_status"], "awaiting_confirmation")
+        self.assertEqual(receipt["child_statuses"][0]["agent_status"], "completed")
+        self.assertEqual(receipt["reconciliation"]["resume_status"], "failed")
+        self.assertIn("Refresh", receipt["message"])
+        self.swarm_runtime.resume.assert_awaited_once_with("swarm-1")
+
+    async def test_bulk_second_child_conflict_returns_applied_receipt_and_reconciles(self) -> None:
+        swarm = SimpleNamespace(
+            id="swarm-1",
+            status="awaiting_confirmation",
+            tasks={
+                "task-a": SimpleNamespace(
+                    status="awaiting_confirmation", agent_run_id="agent-a",
+                ),
+                "task-b": SimpleNamespace(
+                    status="awaiting_confirmation", agent_run_id="agent-b",
+                ),
+            },
+        )
+        pending = {
+            "agent-a": SimpleNamespace(
+                id="agent-a", status="awaiting_confirmation", current_step=0,
+                plan=SimpleNamespace(steps=[SimpleNamespace(id="step-a")]),
+                pending_approval=SimpleNamespace(
+                    step_id="step-a", challenge_id="challenge-swarm-a1",
+                ),
+            ),
+            "agent-b": SimpleNamespace(
+                id="agent-b", status="awaiting_confirmation", current_step=0,
+                plan=SimpleNamespace(steps=[SimpleNamespace(id="step-b")]),
+                pending_approval=SimpleNamespace(
+                    step_id="step-b", challenge_id="challenge-swarm-b1",
+                ),
+            ),
+        }
+        current = dict(pending)
+
+        def get_agent(run_id: str):
+            return current.get(run_id)
+
+        async def approve_agent(run_id: str, _steps, _challenge):
+            if run_id == "agent-b":
+                raise ValueError("approval challenge changed concurrently")
+            completed = SimpleNamespace(id=run_id, status="completed")
+            current[run_id] = completed
+            return completed
+
+        async def reconcile_swarm(_run_id: str):
+            swarm.tasks["task-a"].status = "completed"
+            swarm.status = "awaiting_confirmation"
+            return swarm
+
+        self.swarm_runtime.get_run.return_value = swarm
+        self.agent_runtime.get_run.side_effect = get_agent
+        self.agent_runtime.approve.side_effect = approve_agent
+        self.swarm_runtime.resume.side_effect = reconcile_swarm
+
+        response = await approve_swarm_current_steps(
+            "swarm-1",
+            UISwarmApprovalRequest(approvals=[
+                UISwarmApprovalReference(
+                    agent_run_id="agent-a", step_id="step-a",
+                    challenge_id="challenge-swarm-a1",
+                ),
+                UISwarmApprovalReference(
+                    agent_run_id="agent-b", step_id="step-b",
+                    challenge_id="challenge-swarm-b1",
+                ),
+            ]),
+            self.request,
+            _principal=None,
+            _mutation_guard=None,
+        )
+
+        self.assertEqual(response.status_code, 409)
+        receipt = json.loads(response.body)
+        self.assertEqual(receipt["code"], SWARM_APPROVAL_PARTIAL_CODE)
+        self.assertEqual(receipt["reason_code"], APPROVAL_CONFLICT_DETAIL)
+        self.assertTrue(receipt["applied"])
+        self.assertTrue(receipt["partial"])
+        self.assertFalse(receipt["retryable"])
+        self.assertEqual(receipt["applied_count"], 1)
+        self.assertEqual(receipt["requested_count"], 2)
+        self.assertEqual(receipt["applied_ids"], ["agent-a:step-a"])
+        self.assertEqual(receipt["failed_approval_id"], "agent-b:step-b")
+        self.assertEqual(receipt["swarm_status"], "awaiting_confirmation")
+        self.assertEqual(receipt["reconciliation"]["resume_status"], "awaiting_confirmation")
+        self.assertTrue(receipt["reconciliation"]["required"])
+        self.assertIn("do not retry a stale challenge", receipt["reconciliation"]["guidance"])
+        self.agent_runtime.approve.assert_has_awaits([
+            call("agent-a", ["step-a"], "challenge-swarm-a1"),
+            call("agent-b", ["step-b"], "challenge-swarm-b1"),
+        ])
+        self.swarm_runtime.resume.assert_awaited_once_with("swarm-1")
 
     async def test_new_router_aliases_update_validated_preferences(self) -> None:
         with patch("src.api.ui_routes._write_preferences") as write:
@@ -267,6 +482,28 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
             call({"primary_model": "z-ai/glm-5.2"}),
             call({"auto_mode": False}),
         ])
+
+    async def test_route_mutation_rejects_stale_catalog_without_writing_preferences(self) -> None:
+        self.jarvis._model_catalog_cached_at = time.monotonic() - 301.0
+
+        with patch("src.api.ui_routes._write_preferences") as write:
+            with self.assertRaises(HTTPException) as raised:
+                await self.invoke("set_route", {"modelId": "z-ai/glm-5.2"})
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("catalog is not ready", raised.exception.detail)
+        write.assert_not_called()
+
+    async def test_route_mutation_rejects_fresh_non_chat_catalog_endpoint(self) -> None:
+        self.jarvis._model_catalog.add("nvidia/nv-embedqa-e5-v5")
+
+        with patch("src.api.ui_routes._write_preferences") as write:
+            with self.assertRaises(HTTPException) as raised:
+                await self.invoke("set_route", {"modelId": "nvidia/nv-embedqa-e5-v5"})
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("chat-compatible", raised.exception.detail)
+        write.assert_not_called()
 
     async def test_auto_route_rejects_truthy_non_boolean(self) -> None:
         with self.assertRaises(HTTPException) as raised:
@@ -382,6 +619,9 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
             status="awaiting_confirmation",
             current_step=0,
             plan=SimpleNamespace(steps=[SimpleNamespace(id="step-1")]),
+            pending_approval=SimpleNamespace(
+                step_id="step-1", challenge_id="challenge-generic-01",
+            ),
         )
         self.agent_runtime.get_run.return_value = pending
         self.swarm_runtime.get_run.return_value = None
@@ -391,13 +631,20 @@ class UICommandTests(unittest.IsolatedAsyncioTestCase):
 
         response = await decide_approval(
             "agent-approval",
-            UIApprovalDecision(decision="approve", note="Reviewed"),
+            UIApprovalDecision(
+                decision="approve",
+                note="Reviewed",
+                step_id="step-1",
+                challenge_id="challenge-generic-01",
+            ),
             self.request,
             principal=self.principal,
             _mutation_guard=None,
         )
 
-        self.agent_runtime.approve.assert_awaited_once_with("agent-approval", ["step-1"])
+        self.agent_runtime.approve.assert_awaited_once_with(
+            "agent-approval", ["step-1"], "challenge-generic-01",
+        )
         self.assertEqual(response["status"], "running")
 
     async def test_reject_contract_cancels_only_selected_run_and_needs_run_scope(self) -> None:

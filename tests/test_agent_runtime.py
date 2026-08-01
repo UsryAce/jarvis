@@ -1,10 +1,23 @@
+import asyncio
+import hashlib
+import json
+import sqlite3
 import sys
 import unittest
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from src.core.agent import AgentPlan, AgentRuntime, AgentStep, ToolProcessError
+from src.core.agent import (
+    AgentPlan,
+    AgentRun,
+    AgentRuntime,
+    AgentStep,
+    InFlightEffectReceipt,
+    PendingApprovalChallenge,
+    ToolProcessError,
+)
 from src.core.model_router import RouteDecision
 
 
@@ -65,9 +78,842 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(run.status, "awaiting_confirmation")
         runtime._execute_tool.assert_not_awaited()
 
-        resumed = await runtime.approve(run.id, ["step-1"])
+        resumed = await runtime.approve(
+            run.id, ["step-1"], run.pending_approval.challenge_id,
+        )
         self.assertEqual(resumed.status, "completed")
         runtime._execute_tool.assert_awaited_once()
+
+    async def test_approval_rejects_argument_drift(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(
+                id="step-1", description="Create note", tool="note_create",
+                arguments={"title": "Expected", "content": "Safe content"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="Note saved")
+
+        run = await runtime.run("save note")
+        original_id = run.pending_approval.challenge_id
+        original_digest = run.pending_approval.action_digest
+        original_expiry = run.pending_approval.expires_at
+        run.plan.steps[0].arguments["content"] = "Changed after prompt"
+
+        with self.assertRaisesRegex(ValueError, "changed after approval was requested"):
+            await runtime.approve(run.id, ["step-1"], original_id)
+
+        self.assertEqual(run.status, "awaiting_confirmation")
+        self.assertNotEqual(run.pending_approval.challenge_id, original_id)
+        self.assertNotEqual(run.pending_approval.action_digest, original_digest)
+        self.assertGreater(run.pending_approval.expires_at, original_expiry)
+        self.assertEqual(
+            run.to_dict()["pending_approval"]["challenge_id"],
+            run.pending_approval.challenge_id,
+        )
+
+        refreshed_id = run.pending_approval.challenge_id
+        with self.assertRaisesRegex(ValueError, "current pending approval"):
+            await runtime.approve(run.id, ["step-1"], original_id)
+
+        resumed = await runtime.approve(run.id, ["step-1"], refreshed_id)
+        self.assertEqual(resumed.status, "completed")
+        runtime._execute_tool.assert_awaited_once()
+
+    async def test_approval_rejects_expired_challenge(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="Note saved")
+
+        run = await runtime.run("save note")
+        original_id = run.pending_approval.challenge_id
+        original_digest = run.pending_approval.action_digest
+        run.pending_approval.expires_at = (datetime.now() - timedelta(seconds=1)).isoformat()
+        expired_at = run.pending_approval.expires_at
+
+        with self.assertRaisesRegex(ValueError, "expired"):
+            await runtime.approve(run.id, ["step-1"], original_id)
+
+        self.assertEqual(run.status, "awaiting_confirmation")
+        self.assertNotEqual(run.pending_approval.challenge_id, original_id)
+        self.assertEqual(run.pending_approval.action_digest, original_digest)
+        self.assertGreater(run.pending_approval.expires_at, expired_at)
+        self.assertGreater(run.pending_approval.expires_at, datetime.now().isoformat())
+
+        refreshed_id = run.pending_approval.challenge_id
+        with self.assertRaisesRegex(ValueError, "current pending approval"):
+            await runtime.approve(run.id, ["step-1"], original_id)
+
+        resumed = await runtime.approve(run.id, ["step-1"], refreshed_id)
+        self.assertEqual(resumed.status, "completed")
+        runtime._execute_tool.assert_awaited_once()
+
+    async def test_durable_approval_rejects_local_expiry_extension(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="must not execute")
+
+        run = await runtime.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+        durable_expiry = run.pending_approval.expires_at
+        run.pending_approval.expires_at = (
+            datetime.now() + timedelta(days=1)
+        ).isoformat()
+
+        with self.assertRaisesRegex(ValueError, "already claimed|no longer current"):
+            await runtime.approve(run.id, ["step-1"], challenge_id)
+
+        runtime._execute_tool.assert_not_awaited()
+        self.assertEqual(run.status, "awaiting_confirmation")
+        self.assertEqual(run.pending_approval.expires_at, durable_expiry)
+        connection = sqlite3.connect(runtime.store.path)
+        try:
+            claims = connection.execute(
+                "SELECT COUNT(*) FROM agent_approval_claims WHERE run_id = ?",
+                (run.id,),
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        self.assertEqual(claims, 0)
+
+    async def test_approval_rejects_future_or_multiple_steps(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save two notes", summary="Save requested notes",
+            steps=[
+                AgentStep(id="step-1", description="Create first note", tool="note_create"),
+                AgentStep(id="step-2", description="Create second note", tool="note_create"),
+            ],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="Note saved")
+
+        run = await runtime.run("save two notes")
+        challenge_id = run.pending_approval.challenge_id
+        with self.assertRaisesRegex(ValueError, "current step"):
+            await runtime.approve(run.id, ["step-2"], challenge_id)
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            await runtime.approve(run.id, ["step-1", "step-2"], challenge_id)
+
+        self.assertEqual(run.current_step, 0)
+        self.assertEqual(run.pending_approval.step_id, "step-1")
+        runtime._execute_tool.assert_not_awaited()
+
+    async def test_approval_is_single_use_and_replay_is_rejected(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="Note saved")
+
+        run = await runtime.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+        await runtime.approve(run.id, ["step-1"], challenge_id)
+        with self.assertRaisesRegex(ValueError, "not awaiting approval"):
+            await runtime.approve(run.id, ["step-1"], challenge_id)
+
+        self.assertEqual(run.status, "completed")
+        self.assertIsNone(run.pending_approval)
+        runtime._execute_tool.assert_awaited_once()
+
+    async def test_stale_runtime_cannot_replay_durably_claimed_approval(self):
+        database = Path(self.tempdir.name) / "stale-approval.db"
+        winner = AgentRuntime(FakeJarvis(), database)
+        winner._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        winner._execute_tool = AsyncMock(return_value="Note saved")
+        run = await winner.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+
+        loser = AgentRuntime(FakeJarvis(), database)
+        loser._execute_tool = AsyncMock(return_value="must not execute")
+        await loser.start()
+        try:
+            stale_run = loser.get_run(run.id)
+            self.assertEqual(stale_run.pending_approval.challenge_id, challenge_id)
+
+            completed = await winner.approve(run.id, ["step-1"], challenge_id)
+            with self.assertRaisesRegex(ValueError, "already claimed|no longer current"):
+                await loser.approve(run.id, ["step-1"], challenge_id)
+
+            self.assertEqual(completed.status, "completed")
+            winner._execute_tool.assert_awaited_once()
+            loser._execute_tool.assert_not_awaited()
+            self.assertEqual(loser.get_run(run.id).status, "completed")
+        finally:
+            await loser.shutdown()
+
+    async def test_simultaneous_runtime_approval_attempts_execute_once(self):
+        database = Path(self.tempdir.name) / "simultaneous-approval.db"
+        first = AgentRuntime(FakeJarvis(), database)
+        first._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        run = await first.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+
+        second = AgentRuntime(FakeJarvis(), database)
+        await second.start()
+        effect_started = asyncio.Event()
+        release_effect = asyncio.Event()
+        executions = 0
+
+        async def blocking_effect(*_args):
+            nonlocal executions
+            executions += 1
+            effect_started.set()
+            await release_effect.wait()
+            return "Note saved"
+
+        first._execute_tool = AsyncMock(side_effect=blocking_effect)
+        second._execute_tool = AsyncMock(side_effect=blocking_effect)
+        attempts = [
+            asyncio.create_task(first.approve(run.id, ["step-1"], challenge_id)),
+            asyncio.create_task(second.approve(run.id, ["step-1"], challenge_id)),
+        ]
+        try:
+            await asyncio.wait_for(effect_started.wait(), timeout=2)
+            done, pending = await asyncio.wait(
+                attempts, timeout=2, return_when=asyncio.FIRST_COMPLETED,
+            )
+            self.assertEqual(len(done), 1)
+            self.assertEqual(len(pending), 1)
+            self.assertIsInstance(next(iter(done)).exception(), ValueError)
+            self.assertEqual(executions, 1)
+            release_effect.set()
+            results = await asyncio.gather(*attempts, return_exceptions=True)
+            self.assertEqual(sum(isinstance(item, ValueError) for item in results), 1)
+            self.assertEqual(executions, 1)
+        finally:
+            release_effect.set()
+            await asyncio.gather(*attempts, return_exceptions=True)
+            await second.shutdown()
+
+    async def test_pending_approval_challenge_persists_across_restart(self):
+        database = Path(self.tempdir.name) / "approval-agent.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+
+        run = await runtime.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "awaiting_confirmation")
+            self.assertEqual(recovered_run.pending_approval.challenge_id, challenge_id)
+            self.assertEqual(
+                recovered_run.pending_approval.action_digest,
+                run.pending_approval.action_digest,
+            )
+        finally:
+            await recovered.shutdown()
+
+    async def test_approval_requires_the_presented_challenge_id(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="Note saved")
+
+        run = await runtime.run("save note")
+        with self.assertRaisesRegex(ValueError, "challenge id is required"):
+            await runtime.approve(run.id, ["step-1"])
+
+        self.assertEqual(run.status, "awaiting_confirmation")
+        runtime._execute_tool.assert_not_awaited()
+
+    async def test_write_tool_is_attempted_once_even_when_retries_are_enabled(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(side_effect=RuntimeError("unknown write outcome"))
+
+        run = await runtime.run("save note", autonomy="full", max_retries=5)
+
+        self.assertEqual(run.status, "needs_attention")
+        self.assertEqual(run.error, "ambiguous_write_outcome")
+        self.assertEqual(runtime._execute_tool.await_count, 1)
+        self.assertEqual(run.attempts, 0)
+        self.assertEqual(run.current_step, 0)
+        self.assertFalse(run.observations[0]["ok"])
+        self.assertIsNotNone(run.in_flight_effect)
+
+        recovered = AgentRuntime(FakeJarvis(), runtime.store.path)
+        recovered._execute_tool = AsyncMock(return_value="must not execute")
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "needs_attention")
+            self.assertEqual(recovered_run.error, "ambiguous_write_outcome")
+            self.assertIsNotNone(recovered_run.in_flight_effect)
+            self.assertEqual(recovered_run.current_step, 0)
+            recovered._execute_tool.assert_not_awaited()
+        finally:
+            await recovered.shutdown()
+
+    async def test_restart_does_not_duplicate_ambiguous_in_flight_write(self):
+        class SimulatedProcessCrash(BaseException):
+            pass
+
+        database = Path(self.tempdir.name) / "crash-agent.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        runtime._execute_tool = AsyncMock(side_effect=SimulatedProcessCrash())
+
+        run = await runtime.run("save note")
+        challenge_id = run.pending_approval.challenge_id
+        with self.assertRaises(SimulatedProcessCrash):
+            await runtime.approve(run.id, ["step-1"], challenge_id)
+
+        self.assertIsNotNone(run.in_flight_effect)
+        self.assertEqual(run.observations, [])
+        self.assertEqual(runtime._execute_tool.await_count, 1)
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        recovered._execute_tool = AsyncMock(return_value="must not execute")
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "needs_attention")
+            self.assertEqual(recovered_run.error, "ambiguous_in_flight_effect")
+            self.assertIsNotNone(recovered_run.in_flight_effect)
+            self.assertEqual(recovered._queue.qsize(), 0)
+            recovered._execute_tool.assert_not_awaited()
+        finally:
+            await recovered.shutdown()
+
+    async def test_duplicate_step_id_cannot_falsely_reconcile_in_flight_write(self):
+        database = Path(self.tempdir.name) / "receipt-binding.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        run = runtime._new_run("save two notes", "z-ai/glm-5.2", 2, "full", 0)
+        run.plan = AgentPlan(
+            goal="save two notes",
+            summary="Legacy plan with duplicate ids",
+            steps=[
+                AgentStep(id="duplicate", description="First note", tool="note_create"),
+                AgentStep(id="duplicate", description="Second note", tool="note_create"),
+            ],
+        )
+        run.status = "running"
+        run.current_step = 1
+        run.observations = [{
+            "step_id": "duplicate",
+            "step_index": 0,
+            "tool": "note_create",
+            "action_digest": "a" * 64,
+            "ok": True,
+        }]
+        run.in_flight_effect = InFlightEffectReceipt(
+            step_id="duplicate",
+            step_index=1,
+            tool="note_create",
+            action_digest="b" * 64,
+            started_at=datetime.now().isoformat(),
+        )
+        runtime.store.save_run(run.to_dict())
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "needs_attention")
+            self.assertEqual(recovered_run.error, "ambiguous_in_flight_effect")
+            self.assertIsNotNone(recovered_run.in_flight_effect)
+            self.assertEqual(recovered._queue.qsize(), 0)
+        finally:
+            await recovered.shutdown()
+
+    async def test_new_plan_rejects_duplicate_step_ids_before_effect(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save two notes",
+            summary="Invalid duplicate ids",
+            steps=[
+                AgentStep(id="duplicate", description="First", tool="note_create"),
+                AgentStep(id="duplicate", description="Second", tool="note_create"),
+            ],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="must not execute")
+
+        run = await runtime.run("save two notes", autonomy="full")
+
+        self.assertEqual(run.status, "failed")
+        runtime._execute_tool.assert_not_awaited()
+
+    async def test_two_runtimes_cannot_execute_same_full_auto_queued_run(self):
+        database = Path(self.tempdir.name) / "worker-claim.db"
+        source = AgentRuntime(FakeJarvis(), database)
+        queued = source._new_run("write proof", "z-ai/glm-5.2", 1, "full", 0)
+        queued.plan = AgentPlan(
+            goal="write proof",
+            summary="Write one proof",
+            steps=[AgentStep(
+                id="step-1", description="Write proof", tool="workspace_write",
+                arguments={"path": "proof.txt", "content": "ready"},
+            )],
+        )
+        source.store.save_run(queued.to_dict())
+        payload = source.store.load_run(queued.id)
+
+        first = AgentRuntime(FakeJarvis(), database)
+        second = AgentRuntime(FakeJarvis(), database)
+        first_run = AgentRun.from_dict(payload)
+        second_run = AgentRun.from_dict(payload)
+        first.runs[first_run.id] = first_run
+        second.runs[second_run.id] = second_run
+        effect_started = asyncio.Event()
+        release_effect = asyncio.Event()
+        executions = 0
+
+        async def blocking_effect(*_args):
+            nonlocal executions
+            executions += 1
+            effect_started.set()
+            await release_effect.wait()
+            return {"path": "proof.txt", "written_chars": 5}
+
+        first._execute_tool = AsyncMock(side_effect=blocking_effect)
+        second._execute_tool = AsyncMock(side_effect=blocking_effect)
+        attempts = [
+            asyncio.create_task(first._run_existing(first_run)),
+            asyncio.create_task(second._run_existing(second_run)),
+        ]
+        try:
+            await asyncio.wait_for(effect_started.wait(), timeout=2)
+            await asyncio.sleep(0)
+            self.assertEqual(executions, 1)
+            self.assertTrue(any(task.done() for task in attempts))
+            release_effect.set()
+            await asyncio.gather(*attempts)
+            self.assertEqual(executions, 1)
+        finally:
+            release_effect.set()
+            await asyncio.gather(*attempts, return_exceptions=True)
+
+    async def test_write_losing_lease_after_await_is_persisted_as_ambiguous(self):
+        runtime = self.runtime()
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="write proof", summary="Write one proof",
+            steps=[AgentStep(
+                id="step-1", description="Write proof", tool="workspace_write",
+                arguments={"path": "proof.txt", "content": "ready"},
+            )],
+        ))
+
+        async def lose_lease(*_args):
+            active = next(iter(runtime.runs.values()))
+            runtime.store.release_run_execution(
+                active.id, owner_id=runtime._runtime_id,
+            )
+            await asyncio.sleep(0)
+            return {"path": "proof.txt", "written_chars": 5}
+
+        runtime._execute_tool = AsyncMock(side_effect=lose_lease)
+        run = await runtime.run("write proof", autonomy="full", max_retries=0)
+
+        self.assertEqual(run.status, "needs_attention")
+        self.assertEqual(run.error, "ambiguous_write_outcome")
+        self.assertIsNotNone(run.in_flight_effect)
+        self.assertEqual(run.observations, [])
+        stored = runtime.store.load_run(run.id)
+        self.assertEqual(stored["status"], "needs_attention")
+        self.assertIsNotNone(stored["in_flight_effect"])
+
+    async def test_legacy_waiting_run_receives_a_fresh_approval_challenge(self):
+        database = Path(self.tempdir.name) / "legacy-agent.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="save note", summary="Save requested note",
+            steps=[AgentStep(id="step-1", description="Create note", tool="note_create")],
+        ))
+        run = await runtime.run("save note")
+        payload = run.to_dict()
+        payload["pending_approval"] = None
+        payload["approved_steps"] = ["step-1"]
+        runtime.store.save_run(payload)
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "awaiting_confirmation")
+            self.assertIsNotNone(recovered_run.pending_approval)
+            self.assertEqual(recovered_run.pending_approval.step_id, "step-1")
+            self.assertEqual(recovered_run.approved_steps, set())
+            self.assertTrue(any(
+                event["stage"] == "approval" and event["event_type"] == "migrated"
+                for event in recovered_run.events
+            ))
+        finally:
+            await recovered.shutdown()
+
+    def test_agent_events_are_redacted_before_persistence(self):
+        runtime = self.runtime()
+        run = runtime._new_run("record safe event", "auto", 2, "guarded", 0)
+        generated_secret = "nvapi-" + ("A" * 32)
+
+        runtime._event(
+            run,
+            "approval",
+            "required",
+            f"Do not persist {generated_secret}",
+            {
+                "step": {
+                    "arguments": {
+                        "api_key": generated_secret,
+                        "description": f"credential={generated_secret}",
+                    }
+                }
+            },
+        )
+
+        rendered = str(run.events[-1])
+        self.assertNotIn(generated_secret, rendered)
+        self.assertIn("[REDACTED]", rendered)
+
+    def test_public_and_stored_run_projection_redacts_all_credential_forms(self):
+        runtime = self.runtime()
+        nvapi = "nvapi-" + ("N" * 32)
+        smtp_pass = "mail-password-canary"
+        database_password = "database-password-canary"
+        database_url = f"postgresql://jarvis:{database_password}@db.example/jarvis"
+        signature = "signed-url-canary-value"
+        signed_url = f"https://example.test/object?X-Amz-Signature={signature}&part=1"
+        run = runtime._new_run("safe projection test", "z-ai/glm-5.2", 1, "guarded", 0)
+        run.plan = AgentPlan(
+            goal="safe projection test",
+            summary="Project safely",
+            steps=[AgentStep(
+                id="step-1",
+                description="Use provider output",
+                tool="note_create",
+                arguments={
+                    "api_key": nvapi,
+                    "SMTP_PASS": smtp_pass,
+                    "database_url": database_url,
+                    "url": signed_url,
+                },
+            )],
+        )
+        run.status = "awaiting_confirmation"
+        run.result = f"result {database_url} SMTP_PASS={smtp_pass} {nvapi} {signed_url}"
+        run.observations = [{
+            "tool": "command_run",
+            "ok": True,
+            "data": {
+                "DATABASE_URL": database_url,
+                "SMTP_PASS": smtp_pass,
+                "stdout": f"{nvapi}\n{signed_url}\n{database_url}",
+            },
+        }]
+
+        projection = run.to_dict()
+        runtime.store.save_run(projection)
+        rendered = json.dumps(projection, ensure_ascii=False)
+        connection = sqlite3.connect(runtime.store.path)
+        try:
+            stored_json = connection.execute(
+                "SELECT payload FROM agent_runs WHERE id = ?", (run.id,)
+            ).fetchone()[0]
+        finally:
+            connection.close()
+
+        forbidden = (nvapi, smtp_pass, database_password, signature)
+        for value in forbidden:
+            with self.subTest(value=value):
+                self.assertNotIn(value, rendered)
+                self.assertNotIn(value, stored_json)
+        secret_hash = hashlib.sha256(nvapi.encode("utf-8")).hexdigest()
+        self.assertNotIn(secret_hash, rendered)
+        self.assertNotIn(secret_hash, stored_json)
+        self.assertEqual(projection["redacted_step_indices"], [0])
+        self.assertIn("REDACTED", json.dumps(projection["plan"]))
+        self.assertIn("REDACTED", json.dumps(projection["pending_step"]))
+
+    async def test_exact_token_field_clears_authority_and_secret_derived_digests(self):
+        database = Path(self.tempdir.name) / "legacy-token.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        raw_token = "plain-token-canary-that-must-never-persist"
+        run = runtime._new_run("legacy token recovery", "z-ai/glm-5.2", 1, "guarded", 0)
+        step = AgentStep(
+            id="step-1",
+            description="Legacy credential-bearing action",
+            tool="note_create",
+            arguments={"token": raw_token, "token_count": 37},
+        )
+        run.plan = AgentPlan(
+            goal="legacy token recovery",
+            summary="Legacy plan",
+            steps=[step],
+        )
+        run.status = "awaiting_confirmation"
+        action_digest = runtime._approval_action_digest(run, step)
+        token_digest = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        issued_at = datetime.now().isoformat()
+        run.pending_approval = PendingApprovalChallenge(
+            challenge_id="legacy-token-challenge",
+            step_id=step.id,
+            action_digest=action_digest,
+            issued_at=issued_at,
+            expires_at=(datetime.now() + timedelta(minutes=10)).isoformat(),
+        )
+        run.in_flight_effect = InFlightEffectReceipt(
+            step_id=step.id,
+            step_index=0,
+            tool=str(step.tool),
+            action_digest=action_digest,
+            started_at=issued_at,
+        )
+        run.approved_steps = {step.id}
+        run.result = f"derived {action_digest} {token_digest}"
+        run.events = [{
+            "stage": "legacy",
+            "event_type": "unsafe",
+            "message": "legacy payload",
+            "data": {
+                "step_index": 0,
+                "nested": {
+                    "action_digest": action_digest,
+                    "token_hash": {"action_digest": token_digest},
+                },
+            },
+        }]
+
+        projection = run.to_dict()
+        # Simulate authority left behind by a pre-redaction build. Saving the
+        # sanitized run must revoke it as well as scrub the public payload.
+        connection = sqlite3.connect(database)
+        try:
+            connection.execute(
+                """INSERT INTO agent_approval_claims(
+                       run_id, challenge_id, step_id, action_digest, claimed_at
+                   ) VALUES(?, ?, ?, ?, ?)""",
+                (run.id, "legacy-claim", step.id, action_digest, issued_at),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        runtime.store.save_run(projection)
+        connection = sqlite3.connect(database)
+        try:
+            stored_json = connection.execute(
+                "SELECT payload FROM agent_runs WHERE id = ?", (run.id,),
+            ).fetchone()[0]
+            remaining_claims = connection.execute(
+                "SELECT COUNT(*) FROM agent_approval_claims WHERE run_id = ?", (run.id,),
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        public_json = json.dumps(projection, ensure_ascii=False)
+
+        for forbidden in (raw_token, action_digest, token_digest):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, public_json)
+                self.assertNotIn(forbidden, stored_json)
+        self.assertEqual(
+            projection["plan"]["steps"][0]["arguments"]["token_count"], 37,
+        )
+        self.assertIn("REDACTED", projection["plan"]["steps"][0]["arguments"]["token"])
+        self.assertEqual(projection["status"], "needs_attention")
+        self.assertEqual(projection["error"], "secret_reentry_required")
+        self.assertIsNone(projection["pending_approval"])
+        self.assertIsNone(projection["in_flight_effect"])
+        self.assertEqual(projection["approved_steps"], [])
+        self.assertEqual(projection["events"][0]["data"]["nested"]["action_digest"], "0" * 64)
+        self.assertEqual(remaining_claims, 0)
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        recovered._execute_tool = AsyncMock(return_value="must not execute")
+        await recovered.start()
+        try:
+            recovered_run = recovered.get_run(run.id)
+            self.assertEqual(recovered_run.status, "needs_attention")
+            self.assertEqual(recovered_run.error, "secret_reentry_required")
+            self.assertIsNone(recovered_run.pending_approval)
+            self.assertIsNone(recovered_run.in_flight_effect)
+            self.assertEqual(recovered._queue.qsize(), 0)
+            recovered._execute_tool.assert_not_awaited()
+        finally:
+            await recovered.shutdown()
+
+    async def test_secret_bearing_goal_and_model_plan_are_rejected_before_effect(self):
+        runtime = self.runtime()
+        nvapi = "nvapi-" + ("G" * 32)
+        runtime.jarvis.route_model = AsyncMock()
+        with self.assertRaisesRegex(ValueError, "must not contain credentials"):
+            await runtime.run(f"inspect system with NVIDIA_API_KEY={nvapi}")
+        runtime.jarvis.route_model.assert_not_awaited()
+        self.assertEqual(runtime.store.load_runs(), [])
+        runtime.jarvis.route_model = AsyncMock(return_value=RouteDecision(
+            model="z-ai/glm-5.2", task_category="general", reason="test", auto_mode=True,
+        ))
+
+        runtime._create_plan = AsyncMock(return_value=AgentPlan(
+            goal="safe goal",
+            summary="Unsafe provider plan",
+            steps=[AgentStep(
+                id="step-1", description="Unsafe action", tool="note_create",
+                arguments={"SMTP_PASS": "provider-secret-canary"},
+            )],
+        ))
+        runtime._execute_tool = AsyncMock(return_value="must not execute")
+        run = await runtime.run("safe goal", autonomy="full")
+        runtime._execute_tool.assert_not_awaited()
+        self.assertEqual(run.status, "failed")
+        rendered = json.dumps(run.to_dict(), ensure_ascii=False)
+        self.assertNotIn("provider-secret-canary", rendered)
+
+    def test_schedule_goal_rejects_credentials_and_legacy_projection_is_disabled(self):
+        runtime = self.runtime()
+        nvapi = "nvapi-" + ("S" * 32)
+        with self.assertRaisesRegex(ValueError, "must not contain credentials"):
+            runtime.create_schedule(
+                f"run backup with API_KEY={nvapi}", datetime.now().isoformat(),
+            )
+        self.assertEqual(runtime.list_schedules(), [])
+
+        legacy = {
+            "id": "schedule-legacy",
+            "goal": f"legacy DATABASE_URL=postgresql://user:{nvapi}@db/jarvis",
+            "next_run_at": datetime.now().isoformat(),
+            "interval_seconds": None,
+            "model": "auto",
+            "max_steps": 1,
+            "autonomy": "guarded",
+            "enabled": True,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "last_run_id": None,
+        }
+        runtime.schedules[legacy["id"]] = legacy
+        runtime.store.save_schedule(legacy)
+        public = runtime.list_schedules()[0]
+        stored = runtime.store.load_schedules()[0]
+        self.assertFalse(public["enabled"])
+        self.assertFalse(stored["enabled"])
+        self.assertNotIn(nvapi, json.dumps(public))
+        self.assertNotIn(nvapi, json.dumps(stored))
+
+    async def test_schedule_occurrence_survives_post_transaction_crash_without_duplicate(self):
+        class SimulatedProcessCrash(BaseException):
+            pass
+
+        class CrashingQueue:
+            async def put(self, _run_id):
+                raise SimulatedProcessCrash()
+
+            def qsize(self):
+                return 0
+
+        database = Path(self.tempdir.name) / "schedule-occurrence.db"
+        runtime = AgentRuntime(FakeJarvis(), database)
+        due_at = (datetime.now() - timedelta(seconds=1)).isoformat()
+        schedule = runtime.create_schedule("inspect system", due_at)
+        runtime._queue = CrashingQueue()
+
+        with self.assertRaises(SimulatedProcessCrash):
+            await runtime._claim_due_schedule(
+                runtime.schedules[schedule["id"]],
+                runtime._parse_schedule_time(due_at),
+                datetime.now(),
+            )
+
+        self.assertEqual(len(runtime.store.load_runs()), 1)
+        self.assertFalse(runtime.store.load_schedules()[0]["enabled"])
+
+        recovered = AgentRuntime(FakeJarvis(), database)
+        recovered._run_existing = AsyncMock(return_value=None)
+        await recovered.start()
+        try:
+            await asyncio.sleep(0.05)
+            self.assertEqual(len(recovered.store.load_runs()), 1)
+            self.assertFalse(recovered.list_schedules()[0]["enabled"])
+            recovered._run_existing.assert_awaited_once()
+        finally:
+            await recovered.shutdown()
+
+    async def test_live_peer_recovers_occurrence_after_pre_enqueue_crash(self):
+        class SimulatedProcessCrash(BaseException):
+            pass
+
+        class CrashingQueue:
+            async def put(self, _run_id):
+                raise SimulatedProcessCrash()
+
+            def qsize(self):
+                return 0
+
+        database = Path(self.tempdir.name) / "schedule-live-peer.db"
+        winner = AgentRuntime(FakeJarvis(), database)
+        due_at = (datetime.now() - timedelta(seconds=1)).isoformat()
+        schedule = winner.create_schedule("inspect system", due_at)
+
+        peer = AgentRuntime(FakeJarvis(), database)
+        scheduler_parked = asyncio.Event()
+
+        async def park_scheduler():
+            await scheduler_parked.wait()
+
+        peer._scheduler_loop = park_scheduler
+        peer._run_existing = AsyncMock(return_value=None)
+        await peer.start()
+        stale_schedule = dict(peer.schedules[schedule["id"]])
+        winner._queue = CrashingQueue()
+        try:
+            with self.assertRaises(SimulatedProcessCrash):
+                await winner._claim_due_schedule(
+                    winner.schedules[schedule["id"]],
+                    winner._parse_schedule_time(due_at),
+                    datetime.now(),
+                )
+
+            committed_payload = winner.store.load_schedule_occurrence_run(
+                schedule_id=schedule["id"], due_at=due_at,
+            )
+            self.assertIsNotNone(committed_payload)
+            self.assertEqual(committed_payload["status"], "queued")
+
+            recovered = await peer._claim_due_schedule(
+                stale_schedule,
+                peer._parse_schedule_time(due_at),
+                datetime.now(),
+            )
+            repeated = await peer._claim_due_schedule(
+                stale_schedule,
+                peer._parse_schedule_time(due_at),
+                datetime.now(),
+            )
+            await asyncio.wait_for(peer._queue.join(), timeout=2)
+
+            self.assertIsNotNone(recovered)
+            self.assertEqual(recovered.id, committed_payload["id"])
+            self.assertEqual(repeated.id, committed_payload["id"])
+            self.assertEqual(len(peer.store.load_runs()), 1)
+            peer._run_existing.assert_awaited_once()
+        finally:
+            scheduler_parked.set()
+            await peer.shutdown()
 
     def test_tool_catalog_marks_mutations(self):
         tools = {item["name"]: item["risk"] for item in self.runtime().list_tools()}
@@ -278,7 +1124,10 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
             max_retries=0,
         )
 
-        self.assertEqual(run.status, "failed")
+        self.assertEqual(run.status, "needs_attention")
+        self.assertEqual(run.error, "ambiguous_write_outcome")
+        self.assertEqual(run.current_step, 0)
+        self.assertIsNotNone(run.in_flight_effect)
         self.assertFalse(run.observations[0]["ok"])
         self.assertEqual(run.observations[0]["code"], "tool_exit_9")
         self.assertEqual(run.result, "")

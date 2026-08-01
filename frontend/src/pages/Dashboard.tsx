@@ -242,43 +242,31 @@ const featuredModels = [
   {
     name: "GLM 5.2",
     route: GLM_MODEL,
-    count: 1,
-    latency: "LIVE",
     tone: "lime",
   },
   {
     name: "DEEPSEEK",
     route: "deepseek-ai/deepseek-v4-pro",
-    count: 3,
-    latency: "LIVE",
     tone: "cyan",
   },
   {
     name: "META LLAMA",
     route: "meta/llama-4-maverick-17b-128e-instruct",
-    count: 10,
-    latency: "LIVE",
     tone: "blue",
   },
   {
     name: "OPENAI",
     route: "openai/gpt-oss-120b",
-    count: 2,
-    latency: "LIVE",
     tone: "red",
   },
   {
     name: "MISTRAL",
     route: "mistralai/mistral-small-4-119b-2603",
-    count: 12,
-    latency: "LIVE",
     tone: "white",
   },
   {
     name: "KIMI",
     route: "moonshotai/kimi-k2.6",
-    count: 1,
-    latency: "LIVE",
     tone: "amber",
   },
 ];
@@ -442,6 +430,7 @@ function VoiceOnlyInterface({
   handsFree,
   clapWake,
   armed,
+  micReady,
   autoMode,
   routedModel,
   micLabel,
@@ -478,6 +467,7 @@ function VoiceOnlyInterface({
   handsFree: boolean;
   clapWake: boolean;
   armed: boolean;
+  micReady: boolean;
   autoMode: boolean;
   routedModel: string;
   micLabel: string;
@@ -521,10 +511,12 @@ function VoiceOnlyInterface({
         ? "THINKING"
         : speaking
           ? "SPEAKING"
-          : handsFree
-            ? "HANDS-FREE"
-            : armed
+          : handsFree && micReady
+            ? "HANDS-FREE READY"
+            : armed && micReady
               ? "READY"
+              : armed
+                ? "NOT READY"
               : "VOICE SAFE";
   const handlePttKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if ((event.key === " " || event.key === "Enter") && !event.repeat) {
@@ -540,7 +532,7 @@ function VoiceOnlyInterface({
   };
   return (
     <div
-      className={`voice-only-shell ${recording ? "is-listening" : ""} ${speaking ? "is-speaking" : ""} ${processing || transcribing ? "is-thinking" : ""} ${handsFree ? "is-handsfree" : ""} ${clapWake ? "is-clap-armed" : ""}`}
+      className={`voice-only-shell ${recording ? "is-listening" : ""} ${speaking ? "is-speaking" : ""} ${processing || transcribing ? "is-thinking" : ""} ${handsFree && micReady ? "is-handsfree" : ""} ${clapWake && micReady ? "is-clap-armed" : ""}`}
       style={{
         "--voice-level": voiceLevel.toFixed(3),
         "--voice-glow": `${30 + voiceLevel * 34}px`,
@@ -583,9 +575,11 @@ function VoiceOnlyInterface({
                     ? `${routedModel} is processing your command.`
                     : speaking
                       ? "Jarvis is responding through the selected voice engine."
-                      : clapWake
+                      : clapWake && micReady
                         ? "Clap once to wake Jarvis, then speak your command."
-                        : "Hold the reactor, use Push to Talk, or enable Free Talking."}
+                        : armed && !micReady
+                          ? "Voice is configured. Use Push to Talk, Free Talking, Clap Wake, or Test Mic to grant microphone access."
+                          : "Hold the reactor, use Push to Talk, or enable Free Talking."}
           </p>
           <div className="voice-live-grid">
             <span>
@@ -625,7 +619,13 @@ function VoiceOnlyInterface({
             <span>
               VOICE CHANNEL
               <strong>
-                {handsFree ? "FREE TALKING" : armed ? "ARMED" : "DISARMED"}
+                {handsFree && micReady
+                  ? "FREE TALKING READY"
+                  : armed && micReady
+                    ? "READY"
+                    : armed
+                      ? "CONFIGURED · NOT READY"
+                      : "DISARMED"}
               </strong>
             </span>
             <span>
@@ -668,8 +668,10 @@ function VoiceOnlyInterface({
             ))}
           </span>
           <span className="voice-reactor__label">
-            {handsFree
+            {handsFree && micReady
               ? "FREE TALKING ACTIVE"
+              : handsFree
+                ? "MICROPHONE NOT READY"
               : recording
                 ? "RELEASE TO SEND"
                 : processing
@@ -688,7 +690,11 @@ function VoiceOnlyInterface({
             <span>JARVIS</span>
             <p>
               {lastJarvis?.text ||
-                "Voice interface online. Awaiting your command."}
+                (armed && micReady
+                  ? "Voice input is ready. Awaiting your command."
+                  : armed
+                    ? "Voice is configured; microphone access is not ready yet."
+                    : "Voice input is disarmed.")}
             </p>
           </article>
         </section>
@@ -716,23 +722,35 @@ function VoiceOnlyInterface({
           </span>
         </button>
         <button
-          className={handsFree ? "handsfree active" : "handsfree"}
-          aria-pressed={handsFree}
+          className={handsFree && micReady ? "handsfree active" : "handsfree"}
+          aria-pressed={handsFree && micReady}
           disabled={!armed || processing}
           onClick={onToggleHandsFree}
         >
           <AudioLines />
-          <span>{handsFree ? "FREE TALKING ON" : "FREE TALKING"}</span>
+          <span>
+            {handsFree && micReady
+              ? "FREE TALKING ON"
+              : handsFree
+                ? "FREE TALKING · NOT READY"
+                : "FREE TALKING"}
+          </span>
         </button>
         <button
-          className={clapWake ? "handsfree active" : "handsfree"}
-          aria-pressed={clapWake}
+          className={clapWake && micReady ? "handsfree active" : "handsfree"}
+          aria-pressed={clapWake && micReady}
           disabled={!armed || processing || handsFree}
           onClick={onToggleClapWake}
           aria-label={clapWake ? "Disable clap wake" : "Enable clap wake"}
         >
           <Radio />
-          <span>{clapWake ? "CLAP WAKE ON" : "CLAP WAKE"}</span>
+          <span>
+            {clapWake && micReady
+              ? "CLAP WAKE ON"
+              : clapWake
+                ? "CLAP WAKE · NOT READY"
+                : "CLAP WAKE"}
+          </span>
         </button>
         <button
           className="voice-profile-button"
@@ -844,7 +862,10 @@ function Dashboard() {
     const saved = Number(localStorage.getItem("jarvis_swarm_budget_minutes") || "30");
     return Number.isFinite(saved) ? Math.min(120, Math.max(1, saved)) : 30;
   });
-  const [armed, setArmed] = useState(true);
+  const [armed, setArmed] = useState(
+    () => localStorage.getItem("jarvis_voice_enabled") !== "false",
+  );
+  const [micReady, setMicReady] = useState(false);
   const [autoMic, setAutoMic] = useState(true);
   const [clearWake, setClearWake] = useState(true);
   const [ownerOnly, setOwnerOnly] = useState(true);
@@ -856,7 +877,10 @@ function Dashboard() {
   const [requests, setRequests] = useState(0);
   const [tokenPeriod, setTokenPeriod] = useState("TODAY");
   const [catalogModels, setCatalogModels] = useState<string[]>([]);
-  const [catalogOnline, setCatalogOnline] = useState(false);
+  const [catalogReachable, setCatalogReachable] = useState(false);
+  const [catalogLastSyncedAt, setCatalogLastSyncedAt] = useState<number | null>(
+    null,
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastError, setLastError] = useState("");
@@ -953,6 +977,32 @@ function Dashboard() {
     );
   }, []);
 
+  const applyCatalogSnapshot = useCallback(
+    (catalog: {
+      catalog_fresh?: boolean;
+      models?: Array<{ id?: string; selectable?: boolean }>;
+    }) => {
+      const ids = (catalog.models || [])
+        .filter((item) => item.selectable === true)
+        .map((item) => String(item.id || "").trim())
+        .filter(Boolean)
+        .sort();
+      setCatalogModels(ids);
+      setCatalogReachable(catalog.catalog_fresh === true && ids.length > 0);
+      setCatalogLastSyncedAt(Date.now());
+      return ids;
+    },
+    [],
+  );
+
+  const confirmMicReady = useCallback((stream: MediaStream) => {
+    const track = stream.getAudioTracks()[0];
+    if (!track) throw new Error("Microphone stream has no audio track");
+    setMicLabel(track.label || "Active microphone");
+    setMicReady(true);
+    track.addEventListener("ended", () => setMicReady(false), { once: true });
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
@@ -1029,12 +1079,7 @@ function Dashboard() {
             api.getSwarmRuns(1).catch(() => null),
             api.getProjects().catch(() => null),
           ]);
-        const ids = catalog.models
-          .map((item) => item.id)
-          .filter(Boolean)
-          .sort();
-        setCatalogModels(ids);
-        setCatalogOnline(true);
+        const ids = applyCatalogSnapshot(catalog);
         const liveSystem = dashboard?.system as Record<string, any> | undefined;
         if (liveSystem) {
           const uptimeSeconds = Number(liveSystem.uptime_seconds || 0);
@@ -1077,26 +1122,35 @@ function Dashboard() {
             commit: String(brain.graph?.built_at_commit || "").slice(0, 7),
           });
         if (runtime) setAgentRuntime(runtime);
-        if (recentRuns?.runs?.length)
-          setAgentRun((current) => current || recentRuns.runs[0]);
+        setAgentRun(recentRuns?.runs?.[0] || null);
         if (swarmHealth) setSwarmRuntime(swarmHealth);
         if (recentSwarms?.runs?.length)
           setSwarmRun((current) => current || recentSwarms.runs[0]);
         if (projectData?.projects) setProjects(projectData.projects);
         if (notify) toast(`${ids.length} models synchronized`, "good");
       } catch {
-        setCatalogOnline(false);
+        setCatalogReachable(false);
         if (notify) toast("Backend catalog is unavailable", "warn");
       } finally {
         setRefreshing(false);
       }
     },
-    [toast],
+    [applyCatalogSnapshot, toast],
   );
 
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void api
+        .getModels()
+        .then(applyCatalogSnapshot)
+        .catch(() => setCatalogReachable(false));
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [applyCatalogSnapshot]);
 
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -1117,6 +1171,9 @@ function Dashboard() {
           }));
         setAudioInputs(inputs);
         setAudioOutputs(outputs);
+        if (!inputs.length || (selectedMicId && !inputs.some((device) => device.id === selectedMicId))) {
+          setMicReady(false);
+        }
         const selected = inputs.find((device) => device.id === selectedMicId);
         setMicLabel(selected?.label || inputs[0]?.label || "Default system microphone");
       } catch {
@@ -1130,6 +1187,7 @@ function Dashboard() {
   }, [selectedMicId]);
 
   const chooseMic = (id: string) => {
+    setMicReady(false);
     setSelectedMicId(id);
     localStorage.setItem("jarvis_voice_input_device", id);
     const label = audioInputs.find((device) => device.id === id)?.label;
@@ -1163,8 +1221,20 @@ function Dashboard() {
       ),
     [transcript, commandSearch],
   );
+  const catalogFresh = Boolean(
+    catalogReachable &&
+      catalogLastSyncedAt &&
+      now.getTime() - catalogLastSyncedAt <= 125_000,
+  );
+  const catalogEvidenceLabel = catalogLastSyncedAt
+    ? `${catalogFresh ? "SYNCED" : "STALE"} · ${new Date(catalogLastSyncedAt).toLocaleTimeString([], { hour12: false })}`
+    : "NOT SYNCED";
 
   const selectModel = (id: string) => {
+    if (!catalogFresh || !catalogModels.includes(id)) {
+      toast("That route is not selectable in the current catalog snapshot", "warn");
+      return;
+    }
     setModel(id);
     setAutoMode(false);
     persistPreferences({ auto_mode: false });
@@ -1631,6 +1701,7 @@ function Dashboard() {
       !navigator.mediaDevices?.getUserMedia ||
       typeof AudioContext === "undefined"
     ) {
+      setMicReady(false);
       toast("Microphone capture is unsupported in this browser", "warn");
       return false;
     }
@@ -1691,6 +1762,7 @@ function Dashboard() {
       audioContextRef.current = context;
       audioProcessorRef.current = processor;
       audioStreamRef.current = stream;
+      confirmMicReady(stream);
       recordingRef.current = true;
       captureStartingRef.current = false;
       setRecording(true);
@@ -1698,11 +1770,12 @@ function Dashboard() {
     } catch {
       captureStartingRef.current = false;
       autoStopRecordingRef.current = false;
+      setMicReady(false);
       if (handsFreeRef.current) {
         handsFreeRef.current = false;
         setHandsFree(false);
       }
-      toast("Microphone permission was denied", "warn");
+      toast("Microphone capture is not ready; check permission and device access", "warn");
       return false;
     }
   };
@@ -1759,6 +1832,7 @@ function Dashboard() {
   };
   const testMic = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
+      setMicReady(false);
       toast("Microphone test is unsupported", "warn");
       return;
     }
@@ -1770,7 +1844,7 @@ function Dashboard() {
           ? { deviceId: { exact: selectedMicId } }
           : true,
       });
-      setMicLabel(stream.getAudioTracks()[0]?.label || "Active microphone");
+      confirmMicReady(stream);
       toast("Microphone signal detected", "good");
       void playSpokenResponse("Voice output online. I can hear you, Ahmed.");
       window.setTimeout(
@@ -1778,6 +1852,7 @@ function Dashboard() {
         1200,
       );
     } catch {
+      setMicReady(false);
       toast("Microphone permission was denied", "warn");
     }
   };
@@ -1851,8 +1926,10 @@ function Dashboard() {
         clapAudioContextRef.current = context;
         clapAudioProcessorRef.current = processor;
         clapAudioStreamRef.current = stream;
+        confirmMicReady(stream);
       })
       .catch(() => {
+        setMicReady(false);
         setClapWake(false);
         localStorage.setItem("jarvis_clap_wake", "false");
         toast("Clap Wake needs microphone permission", "warn");
@@ -1871,6 +1948,7 @@ function Dashboard() {
     speaking,
     selectedMicId,
     playReactorWakeSting,
+    confirmMicReady,
     stopClapMonitor,
     toast,
   ]);
@@ -1939,7 +2017,7 @@ function Dashboard() {
       setClapWake(false);
       localStorage.setItem("jarvis_clap_wake", "false");
       stopClapMonitor();
-      toast("Free Talking enabled — speak naturally and pause to send", "good");
+      toast("Free Talking configured — requesting microphone access", "good");
       void startRecording();
     } else {
       if (recordingRef.current) void stopRecording(false);
@@ -1957,11 +2035,14 @@ function Dashboard() {
     setClapWake(next);
     localStorage.setItem("jarvis_clap_wake", String(next));
     if (next) {
-      if (!armed) setArmed(true);
+      if (!armed) {
+        setArmed(true);
+        localStorage.setItem("jarvis_voice_enabled", "true");
+      }
       clapCooldownRef.current = Date.now();
       void ensureSpokenAudioContext().catch(() => undefined);
       void playReactorWakeSting();
-      toast("Clap Wake armed — clap once, then speak", "good");
+      toast("Clap Wake configured — requesting microphone access", "good");
     } else {
       stopClapMonitor();
       toast("Clap Wake disabled");
@@ -1969,12 +2050,25 @@ function Dashboard() {
   };
 
   const toggleVoiceArmed = () => {
-    if (armed && handsFreeRef.current) {
+    const next = !armed;
+    if (!next && handsFreeRef.current) {
       handsFreeRef.current = false;
       setHandsFree(false);
       if (recordingRef.current) void stopRecording(false);
     }
-    setArmed((value) => !value);
+    if (!next) {
+      if (recordingRef.current) void stopRecording(false);
+      setMicReady(false);
+      stopClapMonitor();
+    }
+    setArmed(next);
+    localStorage.setItem("jarvis_voice_enabled", String(next));
+    toast(
+      next
+        ? "Voice input configured; use a microphone control to make it ready"
+        : "Voice input disarmed",
+      next ? "good" : undefined,
+    );
   };
 
   const switchInterface = (next: InterfaceMode) => {
@@ -2032,13 +2126,7 @@ function Dashboard() {
         disk: snapshot.disk,
         uptime,
       }));
-      setCatalogModels(
-        catalog.models
-          .map((item: { id: string }) => item.id)
-          .filter(Boolean)
-          .sort(),
-      );
-      setCatalogOnline(true);
+      applyCatalogSnapshot(catalog);
       setBrainStats({
         nodes: snapshot.brainNodes,
         edges: snapshot.brainEdges,
@@ -2070,11 +2158,27 @@ function Dashboard() {
 
   const approveAgentRun = async () => {
     const pending = agentRun?.pending_step;
-    if (!agentRun?.id || !pending?.id) return;
+    const challenge = agentRun?.pending_approval;
+    if (
+      !agentRun?.id || !pending?.id || !challenge?.challenge_id
+      || challenge.step_id !== pending.id
+    ) {
+      toast("Approval challenge is missing or stale; refresh the agent run", "warn");
+      return;
+    }
+    const runId = String(agentRun.id);
+    const stepId = String(pending.id);
+    const challengeId = String(challenge.challenge_id);
     setIsProcessing(true);
     try {
-      const resumed = await api.approveAgentRun(agentRun.id, [pending.id]);
-      setAgentRun(resumed);
+      const resumed = await api.approveAgentRun(
+        runId,
+        [stepId],
+        challengeId,
+      );
+      setAgentRun((current) =>
+        String(current?.id || "") === runId ? resumed : current,
+      );
       if (resumed.result)
         setTranscript((items) => [
           ...items,
@@ -2092,8 +2196,29 @@ function Dashboard() {
           : "Next protected step needs confirmation",
         resumed.status === "completed" ? "good" : "warn",
       );
-    } catch {
-      toast("Agent approval could not be applied", "warn");
+    } catch (error) {
+      const safe = error instanceof SafeApiException ? error.safe : null;
+      if (safe?.applied === null) markReconciliationRequired();
+      try {
+        const authoritative = await api.getAgentRun(runId);
+        setAgentRun((current) =>
+          String(current?.id || "") === runId ? authoritative : current,
+        );
+        toast(
+          "Approval state changed; the exact agent run was refreshed. Review the current challenge before approving.",
+          "warn",
+        );
+      } catch {
+        setAgentRun((current) =>
+          String(current?.id || "") === runId
+            ? { ...current, pending_approval: null }
+            : current,
+        );
+        toast(
+          "Approval result is unconfirmed and exact run refresh failed; stale approval is disabled.",
+          "warn",
+        );
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -2561,9 +2686,14 @@ function Dashboard() {
     handleNav(activeNav);
   };
 
-  const featuredOnlineCount = featuredModels.filter((item) =>
+  const featuredListedCount = featuredModels.filter((item) =>
     catalogModels.includes(item.route),
   ).length;
+  const approvalBindingValid = Boolean(
+    agentRun?.pending_step?.id &&
+      agentRun?.pending_approval?.challenge_id &&
+      agentRun.pending_approval.step_id === agentRun.pending_step.id,
+  );
 
   const selectedProject = projects.find(
     (project) => String(project.id) === swarmProject,
@@ -2609,13 +2739,17 @@ function Dashboard() {
     },
     {
       label: "VOICE SYSTEM",
-      value: armed ? "ONLINE" : "SAFE",
+      value: armed && micReady ? "READY" : armed ? "NOT READY" : "SAFE",
       icon: Mic,
       tone: "cyan",
     },
     {
       label: "API ROUTER",
-      value: catalogOnline ? `${catalogModels.length} MODELS` : "OFFLINE",
+      value: catalogFresh
+        ? `${catalogModels.length} ROUTES LISTED`
+        : catalogLastSyncedAt
+          ? "CATALOG STALE"
+          : "NOT SYNCED",
       icon: Network,
       tone: "amber",
     },
@@ -2639,6 +2773,7 @@ function Dashboard() {
         handsFree={handsFree}
         clapWake={clapWake}
         armed={armed}
+        micReady={micReady}
         autoMode={autoMode}
         routedModel={lastRoutedModel}
         micLabel={micLabel}
@@ -2688,11 +2823,19 @@ function Dashboard() {
             <span>
               {recording
                 ? "RECORDING..."
-                : armed
-                  ? "LISTENING..."
+                : armed && micReady
+                  ? "VOICE READY"
+                  : armed
+                    ? "VOICE CONFIGURED"
                   : "VOICE SAFE"}
             </span>
-            <b>{armed ? "VOICE CHANNEL ACTIVE" : "CLICK TO ARM"}</b>
+            <b>
+              {armed && micReady
+                ? "MICROPHONE READY"
+                : armed
+                  ? "MICROPHONE NOT READY"
+                  : "CLICK TO CONFIGURE"}
+            </b>
           </div>
         </button>
         <div className="local-time">
@@ -2723,9 +2866,9 @@ function Dashboard() {
             bar={system.disk}
           />
           <Metric
-            label="API"
-            value={catalogOnline ? "LIVE" : "OFF"}
-            bar={catalogOnline ? 100 : 0}
+            label="MODEL CATALOG"
+            value={catalogFresh ? "SYNCED" : catalogLastSyncedAt ? "STALE" : "OFF"}
+            bar={catalogFresh ? 100 : 0}
           />
         </div>
         <button
@@ -2862,12 +3005,12 @@ function Dashboard() {
             <label className="field-label">SELECT MODEL / PROVIDER</label>
             <select
               value={model}
-              disabled={autoMode}
+              disabled={autoMode || !catalogFresh}
               onChange={(event) => selectModel(event.target.value)}
             >
               {(catalogModels.length
                 ? catalogModels
-                : featuredModels.map((item) => item.route)
+                : [model]
               ).map((id) => (
                 <option key={id}>{id}</option>
               ))}
@@ -2894,17 +3037,18 @@ function Dashboard() {
             title="MODEL COUNCIL"
             action={
               <span className="status">
-                {featuredOnlineCount}/{featuredModels.length} ONLINE
+                {featuredListedCount}/{featuredModels.length} LISTED · {catalogEvidenceLabel}
               </span>
             }
             className="model-council"
           >
             <div className="model-list">
               {featuredModels.map((item) => {
-                const online = catalogModels.includes(item.route);
+                const listed = catalogModels.includes(item.route);
+                const selectable = catalogFresh && listed;
                 return (
                   <button
-                    disabled={catalogOnline && !online}
+                    disabled={!selectable}
                     className={
                       !autoMode && model === item.route
                         ? "model-row selected"
@@ -2921,28 +3065,37 @@ function Dashboard() {
                       <small>{item.route}</small>
                     </span>
                     <b>
-                      {online ? item.count : 0}
-                      <small>{online ? "MODELS" : "OFFLINE"}</small>
+                      {listed ? "YES" : "NO"}
+                      <small>
+                        {selectable
+                          ? "SELECTABLE"
+                          : listed
+                            ? "LAST LISTED"
+                            : "NOT LISTED"}
+                      </small>
                     </b>
                   </button>
                 );
               })}
             </div>
           </Panel>
-          <Panel title="PROVIDER STATUS" className="provider-status">
+          <Panel title="ROUTE INVENTORY" className="provider-status">
             <div className="provider-grid">
               {featuredModels.map((item) => {
-                const online = catalogModels.includes(item.route);
+                const listed = catalogModels.includes(item.route);
+                const selectable = catalogFresh && listed;
                 return (
                   <button
                     key={item.name}
-                    disabled={catalogOnline && !online}
+                    disabled={!selectable}
                     onClick={() => selectModel(item.route)}
                   >
                     <Radio />
                     <span>{item.name.split(" ")[0]}</span>
-                    <strong>{online ? "ONLINE" : "OFFLINE"}</strong>
-                    <small>{online ? item.latency : "--"}</small>
+                    <strong>
+                      {selectable ? "SELECTABLE" : listed ? "STALE" : "NOT LISTED"}
+                    </strong>
+                    <small>CATALOG</small>
                   </button>
                 );
               })}
@@ -3023,7 +3176,10 @@ function Dashboard() {
               </Panel>
               <button className="mini-status" onClick={toggleVoiceArmed}>
                 <span>
-                  LISTENING MODE<strong>{armed ? "ARMED" : "OFF"}</strong>
+                  VOICE INPUT
+                  <strong>
+                    {armed && micReady ? "READY" : armed ? "NOT READY" : "OFF"}
+                  </strong>
                 </span>
                 <span>JARVIS</span>
               </button>
@@ -3218,7 +3374,9 @@ function Dashboard() {
           <Panel
             title="VOICE AUTHORITY"
             action={
-              <span className="status armed">{armed ? "ARMED" : "SAFE"}</span>
+              <span className="status armed">
+                {armed && micReady ? "READY" : armed ? "CONFIGURED · NOT READY" : "SAFE"}
+              </span>
             }
           >
             <label className="field-label">INPUT DEVICE</label>
@@ -3477,11 +3635,12 @@ function Dashboard() {
                       <button
                         key={id}
                         className={id === model ? "selected" : ""}
+                        disabled={!catalogFresh}
                         onClick={() => selectModel(id)}
                       >
                         <Bot />
                         <span>{id}</span>
-                        <small>SELECT</small>
+                        <small>{catalogFresh ? "SELECT" : "LAST LISTED"}</small>
                       </button>
                     ))}
                   </div>
@@ -3745,11 +3904,16 @@ function Dashboard() {
                           <ShieldCheck />
                           <span>
                             <strong>AHMED'S CONFIRMATION REQUIRED</strong>
-                            <small>{agentRun.pending_step?.description}</small>
+                            <small>
+                              {agentRun.pending_step?.description}
+                              {agentRun.pending_approval?.challenge_id
+                                ? ` | CHALLENGE ${String(agentRun.pending_approval.challenge_id).slice(0, 8)}`
+                                : " | CHALLENGE UNAVAILABLE"}
+                            </small>
                           </span>
                           <button
                             onClick={() => void approveAgentRun()}
-                            disabled={isProcessing}
+                            disabled={isProcessing || !approvalBindingValid}
                           >
                             APPROVE STEP
                           </button>

@@ -13,12 +13,23 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.api.approval_receipts import (
+    APPROVAL_CONFLICT_DETAIL,
+    SWARM_APPROVAL_APPLIED_CODE,
+    SWARM_APPROVAL_PARTIAL_CODE,
+    SWARM_RESUME_CONFLICT_DETAIL,
+    approval_applied_item,
+    swarm_approval_receipt,
+)
 from src.api.dashboard_routes import DATA_DIR, KNOWLEDGE, PREFERENCES_FILE, _read_preferences
+from src.config import config
 from src.core.control import (
     ControlAuthorizationError,
     ControlCommand,
@@ -54,8 +65,19 @@ SCREEN_KEYS = {
 }
 _NET_SAMPLE: tuple[float, int, int] | None = None
 _GRAPH_VIZ_CACHE: tuple[int, int, dict[str, Any] | None] | None = None
-
-
+CAPABILITY_STATES = frozenset({
+    "available", "configured", "verified", "degraded", "unavailable",
+})
+CAPABILITY_TONES = {
+    "verified": "ok",
+    "available": "info",
+    "configured": "muted",
+    "degraded": "warn",
+    "unavailable": "danger",
+}
+MOBILE_ACCESS_FILE = DATA_DIR / "mobile-access.json"
+MOBILE_ACCESS_TTL_SECONDS = 300
+MODEL_CATALOG_TTL_SECONDS = 300.0
 class UICommand(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -63,11 +85,43 @@ class UICommand(BaseModel):
     payload: dict[str, Any] | None = None
 
 
+class UIAgentApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    step_id: str = Field(min_length=1, max_length=40)
+    challenge_id: str = Field(min_length=16, max_length=128)
+
+
+class UISwarmApprovalReference(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    agent_run_id: str = Field(alias="agentRunId", min_length=1, max_length=128)
+    step_id: str = Field(alias="stepId", min_length=1, max_length=40)
+    challenge_id: str = Field(alias="challengeId", min_length=16, max_length=128)
+
+
+class UISwarmApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approvals: list[UISwarmApprovalReference] = Field(min_length=1, max_length=8)
+
+
 class UIApprovalDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: Literal["approve", "reject"]
     note: str = Field(default="", max_length=2_000)
+    step_id: str | None = Field(default=None, min_length=1, max_length=40)
+    challenge_id: str | None = Field(default=None, min_length=16, max_length=128)
+    approvals: list[UISwarmApprovalReference] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def require_approval_evidence(self) -> "UIApprovalDecision":
+        if self.decision == "approve" and not (
+            (self.step_id and self.challenge_id) or self.approvals
+        ):
+            raise ValueError("approval challenge evidence is required")
+        return self
 
 
 def _jarvis(request: Request):
@@ -120,35 +174,387 @@ def _looks_chat_compatible(model_id: str) -> bool:
     return not any(marker in lowered for marker in excluded)
 
 
+def _model_catalog_evidence(
+    jarvis: Any,
+) -> tuple[set[str], bool, float | None]:
+    """Return sanitized catalog IDs plus bounded monotonic freshness evidence."""
+    raw_catalog = getattr(jarvis, "_model_catalog", set()) or set()
+    try:
+        live = {
+            item.strip()
+            for item in raw_catalog
+            if isinstance(item, str) and item.strip() and len(item.strip()) <= 200
+        }
+    except TypeError:
+        live = set()
+
+    try:
+        cached_at = float(getattr(jarvis, "_model_catalog_cached_at", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        cached_at = 0.0
+    age = time.monotonic() - cached_at if cached_at > 0.0 and math.isfinite(cached_at) else None
+    if age is not None and not math.isfinite(age):
+        age = None
+    fresh = bool(
+        live
+        and age is not None
+        and 0.0 <= age <= MODEL_CATALOG_TTL_SECONDS
+    )
+    return live, fresh, age
+
+
 def _model_inventory(jarvis: Any, primary: str) -> list[dict[str, Any]]:
-    """Merge configured knowledge with live availability without inventing health."""
+    """Merge configured knowledge with catalog availability without inventing health."""
     configured = {
         model.id: model
         for model in get_models_by_type(ModelType.CHAT)
         if not model.deprecated
     }
-    live = set(getattr(jarvis, "_model_catalog", set()))
+    live, catalog_fresh, catalog_age = _model_catalog_evidence(jarvis)
     routed = {
         model_id
         for candidates in ModelRouter.TASK_MODELS.values()
         for model_id in candidates
     }
     model_ids = set(configured) | live | routed | {primary}
+    now = time.monotonic()
+    disabled_until = getattr(jarvis, "_model_disabled_until", {})
     rows: list[dict[str, Any]] = []
     for model_id in sorted(model_ids, key=lambda value: (value != primary, value)):
         metadata = configured.get(model_id)
-        selectable = model_id in live and _looks_chat_compatible(model_id)
+        in_catalog = model_id in live
+        selectable = catalog_fresh and in_catalog and _looks_chat_compatible(model_id)
+        cooling_down = float(disabled_until.get(model_id, 0.0) or 0.0) > now
+        route_state = (
+            "degraded" if selectable and cooling_down
+            else "available" if selectable
+            else "configured" if metadata is not None or model_id in routed
+            else "unavailable"
+        )
         rows.append({
             "id": model_id,
             "name": metadata.name if metadata else _model_name(model_id),
             "provider": _model_provider(model_id),
             "variants": 1,
-            "health": "healthy" if selectable else ("down" if live else "unknown"),
+            # Catalog membership proves routing availability, not successful
+            # inference. Only a current cooldown is negative health evidence.
+            "health": "degraded" if cooling_down else "unknown",
             "latencyMs": 0,
             "selectable": selectable,
-            "catalogSource": "live" if model_id in live else "configured",
+            "catalogSource": (
+                "live" if in_catalog and catalog_fresh
+                else "stale_cache" if in_catalog and catalog_age is not None and catalog_age > MODEL_CATALOG_TTL_SECONDS
+                else "cached_unverified" if in_catalog
+                else "configured"
+            ),
+            "catalogFresh": bool(in_catalog and catalog_fresh),
+            "catalogAgeSeconds": round(catalog_age, 1) if in_catalog and catalog_age is not None else None,
+            "capabilityState": route_state,
+            "evidenceSource": (
+                "model.cooldown" if cooling_down
+                else "nvidia.model_catalog" if in_catalog and catalog_fresh
+                else "nvidia.model_catalog.stale" if in_catalog
+                else "configured.model_metadata"
+            ),
         })
     return rows
+
+
+def _capability(
+    capability_id: str,
+    label: str,
+    state: str,
+    summary: str,
+    *evidence: tuple[str, str],
+) -> dict[str, Any]:
+    """Build one bounded, evidence-citing capability digital-twin record."""
+    if state not in CAPABILITY_STATES:
+        raise ValueError(f"unsupported capability state: {state}")
+    rows = [
+        {"source": str(source)[:80], "detail": str(detail)[:240]}
+        for source, detail in evidence
+        if str(source).strip() and str(detail).strip()
+    ]
+    if not rows:
+        raise ValueError("capability evidence is required")
+    return {
+        "id": capability_id,
+        "label": label,
+        "state": state,
+        "summary": summary[:300],
+        "evidence": rows[:6],
+    }
+
+
+def _read_mobile_access_record() -> dict[str, Any] | None:
+    """Read non-secret tunnel publication metadata without probing the network."""
+    try:
+        value = json.loads(MOBILE_ACCESS_FILE.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    origin = str(value.get("tunnel", "")).strip()
+    public_url = str(value.get("url", "")).strip()
+    parsed = urlsplit(origin)
+    if parsed.scheme != "https" or not parsed.hostname or public_url != f"{origin}/mobile":
+        return None
+    updated_at = str(value.get("updated_at", "")).strip()
+    try:
+        published_at = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        if published_at.tzinfo is None:
+            published_at = published_at.astimezone()
+        age_seconds = (datetime.now().astimezone() - published_at).total_seconds()
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if age_seconds < -60 or age_seconds > MOBILE_ACCESS_TTL_SECONDS:
+        return None
+    return {
+        "published": True,
+        "scheme": parsed.scheme,
+        "host_kind": "trycloudflare" if parsed.hostname.endswith(".trycloudflare.com") else "custom",
+        "updated_at": updated_at[:64],
+        "age_seconds": max(0.0, age_seconds),
+    }
+
+
+def _request_transport(request: Any) -> tuple[bool, bool, str]:
+    """Describe only transport evidence visible on the current request."""
+    headers = getattr(request, "headers", {}) or {}
+    forwarded = str(headers.get("x-forwarded-proto", "") or "").split(",", 1)[0].strip()
+    request_scheme = str(getattr(getattr(request, "url", None), "scheme", "") or "").strip()
+    peer_host = str(getattr(getattr(request, "client", None), "host", "") or "").strip()
+    scope = getattr(request, "scope", {}) or {}
+    extensions = scope.get("extensions", {}) if isinstance(scope, dict) else {}
+    scope_scheme = str(scope.get("scheme", "") if isinstance(scope, dict) else "").strip()
+    explicit_tls_extension = bool(
+        isinstance(extensions, dict) and extensions.get("tls")
+        and request_scheme.casefold() in {"https", "wss"}
+    )
+    # Uvicorn derives ASGI scope["scheme"] from the actual socket transport.
+    # A proxy middleware can also rewrite that field, so scheme-only evidence is
+    # accepted as direct TLS only when no forwarding claim is present. Forwarded
+    # HTTPS remains subject to the explicit trusted-peer policy below.
+    uvicorn_direct_tls = bool(
+        not forwarded
+        and request_scheme.casefold() in {"https", "wss"}
+        and scope_scheme.casefold() in {"https", "wss"}
+    )
+    direct_tls = explicit_tls_extension or uvicorn_direct_tls
+    configured = config.get("security.trusted_proxy_hosts", ())
+    if isinstance(configured, str):
+        trusted_proxy_hosts = {
+            host.strip() for host in configured.split(",") if host.strip()
+        }
+    else:
+        trusted_proxy_hosts = {str(host).strip() for host in configured or () if str(host).strip()}
+    trusted_forwarded = bool(
+        peer_host and peer_host in trusted_proxy_hosts
+        and forwarded.casefold() == "https"
+    )
+    https_indicated = (
+        request_scheme.casefold() in {"https", "wss"}
+        or scope_scheme.casefold() in {"https", "wss"}
+        or forwarded.casefold() == "https"
+    )
+    secure = direct_tls or trusted_forwarded
+    observed = request_scheme.casefold() or "unknown"
+    if direct_tls:
+        observed = f"{observed};direct_tls=true"
+    if trusted_forwarded:
+        observed = f"{observed};trusted_proxy=https"
+    elif forwarded:
+        observed = f"{observed};forwarded={forwarded.casefold()};untrusted"
+    return secure, https_indicated, observed
+
+
+def _capability_projection(
+    *,
+    request: Any,
+    jarvis: Any,
+    tool_rows: list[dict[str, Any]],
+    model_rows: list[dict[str, Any]],
+    provider_connected: bool,
+    preferences: dict[str, Any],
+    agent_status: dict[str, Any],
+    knowledge: dict[str, Any],
+    mobile_access: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Project code/config/runtime facts without promoting presence into health."""
+    tool_names = {str(row.get("name", "")) for row in tool_rows}
+    browser_adapter_tools = sorted(
+        name for name in tool_names
+        if name in {
+            "browser_navigate", "browser_click", "browser_type", "browser_download",
+            "browser_screenshot", "browser_session",
+        }
+    )
+    selectable = [row for row in model_rows if row.get("selectable")]
+    active_cooldowns = [
+        row for row in model_rows if row.get("evidenceSource") == "model.cooldown"
+    ]
+    _catalog_ids, catalog_evidence_fresh, catalog_age = _model_catalog_evidence(jarvis)
+    catalog_fresh = bool(selectable) and catalog_evidence_fresh
+    stale_catalog = [
+        row for row in model_rows
+        if row.get("catalogSource") in {"stale_cache", "cached_unverified"}
+    ]
+    secure_request, https_indicated, observed_scheme = _request_transport(request)
+    mobile_access = mobile_access if mobile_access is not None else _read_mobile_access_record()
+    graph = knowledge.get("graph") if isinstance(knowledge.get("graph"), dict) else {}
+    vault = knowledge.get("vault") if isinstance(knowledge.get("vault"), dict) else {}
+    knowledge_available = knowledge.get("health") == "good"
+    knowledge_partial = bool(int(graph.get("node_count", 0) or 0) or vault.get("exists"))
+
+    if secure_request:
+        remote_state = "verified"
+        remote_summary = "The current dashboard request has explicit trusted HTTPS transport evidence."
+    elif https_indicated or mobile_access:
+        remote_state = "configured"
+        remote_summary = (
+            "HTTPS is indicated by runtime scope or a recent tunnel record, but transport and reachability are unverified."
+        )
+    else:
+        remote_state = "unavailable"
+        remote_summary = "No HTTPS transport evidence or published remote tunnel is visible to this runtime."
+
+    if catalog_fresh:
+        catalog_state = "verified"
+        catalog_summary = f"A live NVIDIA catalog was fetched recently with {len(selectable)} selectable chat routes."
+    elif stale_catalog:
+        catalog_state = "degraded"
+        catalog_summary = (
+            f"{len(stale_catalog)} cached NVIDIA catalog routes remain visible as historical evidence, "
+            "but freshness is expired or unverified and none are selectable."
+        )
+    elif provider_connected:
+        catalog_state = "configured"
+        catalog_summary = "The NVIDIA client is configured, but no selectable live catalog is cached."
+    else:
+        catalog_state = "unavailable"
+        catalog_summary = "No provider client or selectable live model catalog is available."
+
+    if not provider_connected:
+        inference_state = "unavailable"
+        inference_summary = "No NVIDIA provider client is constructed for inference."
+    elif active_cooldowns:
+        inference_state = "degraded"
+        inference_summary = f"{len(active_cooldowns)} model route(s) are in a failure cooldown."
+    else:
+        inference_state = "available"
+        inference_summary = "Inference is configured, but no durable active health probe is stored."
+
+    auto_enabled = bool(preferences.get("auto_mode", True))
+    auto_state = (
+        "degraded" if auto_enabled and inference_state in {"degraded", "unavailable"}
+        else "available" if auto_enabled
+        else "configured"
+    )
+    auto_summary = (
+        "Deterministic task routing is enabled; catalog and cooldown evidence guide selection, not live health scores."
+        if auto_enabled
+        else "Deterministic task routing is installed but disabled by operator preference."
+    )
+
+    capabilities = [
+        _capability(
+            "dashboard_projection", "Dashboard projection", "verified",
+            "This snapshot was produced by the authenticated live control plane.",
+            ("api.ui.snapshot", "The current request reached build_snapshot successfully."),
+        ),
+        _capability(
+            "agent_worker", "Agent worker",
+            "verified" if agent_status.get("worker_online") else "degraded",
+            "The durable agent worker reports online." if agent_status.get("worker_online")
+            else "The durable agent worker is not currently online.",
+            ("agent_runtime.status", f"worker_online={bool(agent_status.get('worker_online'))}"),
+        ),
+        _capability(
+            "tool_registry", "Guarded tool registry",
+            "available" if tool_rows else "unavailable",
+            f"{len(tool_rows)} tools are registered; registration is not an execution probe.",
+            ("agent_runtime.list_tools", f"registered_count={len(tool_rows)}"),
+        ),
+        _capability(
+            "web_search", "Web search",
+            "available" if "web_search" in tool_names else "unavailable",
+            "A guarded search tool is registered; no search was executed by this snapshot."
+            if "web_search" in tool_names else "No guarded web search tool is registered.",
+            ("agent.tool_registry", "web_search registered" if "web_search" in tool_names else "web_search absent"),
+        ),
+        _capability(
+            "url_launcher", "URL launcher",
+            "available" if "open_url" in tool_names else "unavailable",
+            "The default-browser URL launcher is registered; it is not browser automation."
+            if "open_url" in tool_names else "No URL-launch tool is registered.",
+            ("agent.tool_registry", "open_url registered" if "open_url" in tool_names else "open_url absent"),
+        ),
+        _capability(
+            "browser_automation", "Isolated browser automation",
+            "available" if browser_adapter_tools else "unavailable",
+            "An isolated browser action adapter is registered."
+            if browser_adapter_tools else "No isolated browser session/action adapter is registered.",
+            ("agent.tool_registry", ", ".join(browser_adapter_tools) if browser_adapter_tools else "no browser action adapter tools"),
+        ),
+        _capability(
+            "model_catalog", "Model catalog", catalog_state, catalog_summary,
+            ("jarvis.model_catalog", f"selectable_chat_routes={len(selectable)}"),
+            ("jarvis.model_catalog", "cache_age_seconds=unknown" if catalog_age is None else f"cache_age_seconds={catalog_age:.1f}"),
+        ),
+        _capability(
+            "model_inference", "Model inference", inference_state, inference_summary,
+            ("jarvis.provider_client", f"configured={provider_connected}"),
+            ("jarvis.model_cooldowns", f"active_count={len(active_cooldowns)}"),
+            ("health_probe", "no durable active inference probe"),
+        ),
+        _capability(
+            "auto_routing", "Auto model routing", auto_state, auto_summary,
+            ("dashboard.preferences", f"auto_mode={auto_enabled}"),
+            ("model_router", f"selectable_catalog_routes={len(selectable)}"),
+        ),
+        _capability(
+            "remote_https", "Remote HTTPS", remote_state, remote_summary,
+            ("current_request", f"observed_scheme={observed_scheme}"),
+            ("mobile_access_record", "recent record present" if mobile_access else "no recent record"),
+        ),
+        _capability(
+            "voice_authority", "Browser voice authority",
+            "configured" if preferences.get("auto_mic", True) else "unavailable",
+            "Voice capture is enabled by preference; browser permission and device readiness are client-observed."
+            if preferences.get("auto_mic", True) else "Voice capture is disabled by operator preference.",
+            ("dashboard.preferences", f"auto_mic={bool(preferences.get('auto_mic', True))}"),
+            ("browser_runtime", "permission and device signal are not visible in this backend snapshot"),
+        ),
+        _capability(
+            "knowledge_projection", "Graphify and Obsidian projection",
+            "available" if knowledge_available else "degraded" if knowledge_partial else "unavailable",
+            "Graph and vault artifacts are readable; availability does not prove commit freshness."
+            if knowledge_available else "One or more knowledge projection artifacts are unavailable.",
+            ("knowledge_vault.status", f"nodes={int(graph.get('node_count', 0) or 0)}"),
+            ("knowledge_vault.status", f"vault_exists={bool(vault.get('exists'))}"),
+        ),
+    ]
+    return capabilities
+
+
+def _capability_map(capabilities: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {str(item["id"]): item for item in capabilities}
+
+
+def _capability_tone(capability: dict[str, Any]) -> str:
+    return CAPABILITY_TONES[str(capability["state"])]
+
+
+def _capability_item(capability: dict[str, Any]) -> dict[str, Any]:
+    evidence = capability["evidence"][0]
+    return {
+        "name": capability["label"].upper(),
+        "sub": capability["summary"],
+        "tag": capability["state"].upper(),
+        "tone": _capability_tone(capability),
+        "pct": 0,
+        "meta": [["EVIDENCE", str(evidence["source"]).upper()], ["STATE", capability["state"].upper()]],
+    }
 
 
 def _gpu_percent() -> float:
@@ -272,6 +678,22 @@ def _active_swarm_task_count(swarm_runs: list[dict[str, Any]]) -> int:
     )
 
 
+def _serialized_approval_reference(run: dict[str, Any]) -> dict[str, str] | None:
+    pending = run.get("pending_approval")
+    step = run.get("pending_step")
+    if not isinstance(pending, dict) or not isinstance(step, dict):
+        return None
+    step_id = str(step.get("id", "")).strip()
+    challenge_id = str(pending.get("challenge_id", "")).strip()
+    bound_step_id = str(pending.get("step_id", "")).strip()
+    if (
+        not step_id or len(challenge_id) < 16
+        or bound_step_id != step_id
+    ):
+        return None
+    return {"stepId": step_id, "challengeId": challenge_id}
+
+
 def _agent_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
     """Return an explicit operator action for a durable agent card."""
 
@@ -280,10 +702,16 @@ def _agent_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
     if not run_id:
         return None
     if status == "awaiting_confirmation":
+        approval = _serialized_approval_reference(run)
+        if approval is None:
+            return None
         return {
             "command": "approve_agent_run",
-            "payload": {"runId": run_id},
-            "confirm": "Approve the currently pending guarded step for this agent run?",
+            "payload": {"runId": run_id, **approval},
+            "confirm": (
+                f"Approve guarded step {approval['stepId']} under challenge "
+                f"{approval['challengeId'][:8]}...?"
+            ),
         }
     if status in ACTIVE_STATES | {"awaiting_confirmation", "stopping"}:
         return {
@@ -294,7 +722,10 @@ def _agent_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _swarm_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
+def _swarm_card_action(
+    run: dict[str, Any],
+    agent_runs: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     """Return an explicit operator action for a durable swarm card."""
 
     status = str(run.get("status", ""))
@@ -302,10 +733,26 @@ def _swarm_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
     if not run_id:
         return None
     if status == "awaiting_confirmation":
+        approvals: list[dict[str, str]] = []
+        agent_runs = agent_runs or {}
+        for task in run.get("tasks", []):
+            if not isinstance(task, dict) or task.get("status") != "awaiting_confirmation":
+                continue
+            agent_run_id = str(task.get("agent_run_id", "")).strip()
+            child = agent_runs.get(agent_run_id)
+            approval = _serialized_approval_reference(child) if child else None
+            if not agent_run_id or approval is None:
+                return None
+            approvals.append({"agentRunId": agent_run_id, **approval})
+        if not approvals:
+            return None
         return {
             "command": "approve_swarm_run",
-            "payload": {"runId": run_id},
-            "confirm": "Approve each currently pending guarded swarm step and resume the mission?",
+            "payload": {"runId": run_id, "approvals": approvals},
+            "confirm": (
+                f"Approve {len(approvals)} guarded swarm step(s) under the "
+                "displayed challenges and resume the mission?"
+            ),
         }
     if status in ACTIVE_STATES | {"stopping"}:
         return {
@@ -316,7 +763,20 @@ def _swarm_card_action(run: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-async def _approve_agent_current_step(jarvis: Any, run_id: str) -> dict[str, Any]:
+def _card_action_label(action: dict[str, Any] | None) -> str:
+    command = str((action or {}).get("command", ""))
+    if command.startswith("approve_"):
+        return "APPROVE"
+    if command.startswith("cancel_"):
+        return "CANCEL"
+    return "DETAIL"
+
+
+async def _approve_agent_current_step(
+    jarvis: Any,
+    run_id: str,
+    approval: UIAgentApprovalRequest,
+) -> dict[str, Any]:
     run = jarvis.agent_runtime.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Agent run not found")
@@ -324,23 +784,35 @@ async def _approve_agent_current_step(jarvis: Any, run_id: str) -> dict[str, Any
         raise HTTPException(status_code=409, detail=f"Agent run is {run.status}, not awaiting confirmation")
     if not run.plan or run.current_step >= len(run.plan.steps):
         raise HTTPException(status_code=409, detail="Agent run has no pending step to approve")
-    step = run.plan.steps[run.current_step]
-    run = await jarvis.agent_runtime.approve(run_id, [step.id])
+    try:
+        run = await jarvis.agent_runtime.approve(
+            run_id, [approval.step_id], approval.challenge_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Agent run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409, detail=APPROVAL_CONFLICT_DETAIL,
+        ) from exc
     return {
         "ok": True,
-        "message": f"Approved guarded step {step.id}; agent is now {run.status}",
+        "message": f"Approved guarded step {approval.step_id}; agent is now {run.status}",
         "runId": run.id,
         "status": run.status,
     }
 
 
-async def _approve_swarm_current_steps(jarvis: Any, run_id: str) -> dict[str, Any]:
+async def _approve_swarm_current_steps(
+    jarvis: Any,
+    run_id: str,
+    request: UISwarmApprovalRequest,
+) -> dict[str, Any]:
     run = jarvis.swarm_runtime.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Swarm run not found")
     if run.status != "awaiting_confirmation":
         raise HTTPException(status_code=409, detail=f"Swarm run is {run.status}, not awaiting confirmation")
-    approved: list[str] = []
+    expected: dict[str, tuple[str, str]] = {}
     for task in run.tasks.values():
         if task.status != "awaiting_confirmation" or not task.agent_run_id:
             continue
@@ -348,20 +820,107 @@ async def _approve_swarm_current_steps(jarvis: Any, run_id: str) -> dict[str, An
         if (
             agent_run is None or agent_run.status != "awaiting_confirmation"
             or not agent_run.plan or agent_run.current_step >= len(agent_run.plan.steps)
+            or agent_run.pending_approval is None
         ):
-            continue
+            raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
         step = agent_run.plan.steps[agent_run.current_step]
-        await jarvis.agent_runtime.approve(agent_run.id, [step.id])
-        approved.append(f"{agent_run.id}:{step.id}")
-    if not approved:
+        expected[agent_run.id] = (
+            step.id, agent_run.pending_approval.challenge_id,
+        )
+    if not expected:
         raise HTTPException(status_code=409, detail="Swarm has no current guarded step to approve")
-    run = await jarvis.swarm_runtime.resume(run_id)
-    return {
+    supplied = {item.agent_run_id: item for item in request.approvals}
+    if len(supplied) != len(request.approvals) or set(supplied) != set(expected):
+        raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
+    for agent_run_id, (step_id, challenge_id) in expected.items():
+        item = supplied[agent_run_id]
+        if item.step_id != step_id or item.challenge_id != challenge_id:
+            raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
+
+    applied_items: list[dict[str, str]] = []
+    for agent_run_id in sorted(expected):
+        item = supplied[agent_run_id]
+        try:
+            approved_run = await jarvis.agent_runtime.approve(
+                agent_run_id, [item.step_id], item.challenge_id,
+            )
+        except (KeyError, ValueError) as exc:
+            if not applied_items:
+                if isinstance(exc, KeyError):
+                    raise HTTPException(
+                        status_code=404, detail="Linked agent run not found",
+                    ) from exc
+                raise HTTPException(
+                    status_code=409, detail=APPROVAL_CONFLICT_DETAIL,
+                ) from exc
+            resume_status = "unknown"
+            reconciliation_reason: str | None = None
+            try:
+                reconciled = await jarvis.swarm_runtime.resume(run_id)
+                resume_status = str(reconciled.status)
+            except (KeyError, ValueError, RuntimeError):
+                resume_status = "failed"
+                reconciliation_reason = SWARM_RESUME_CONFLICT_DETAIL
+            receipt = swarm_approval_receipt(
+                jarvis,
+                run_id,
+                applied_items=applied_items,
+                requested_count=len(expected),
+                code=SWARM_APPROVAL_PARTIAL_CODE,
+                reason_code=APPROVAL_CONFLICT_DETAIL,
+                ok=False,
+                resume_attempted=True,
+                failed_approval_id=f"{agent_run_id}:{item.step_id}",
+                resume_status=resume_status,
+                reconciliation_reason_code=reconciliation_reason,
+            )
+            receipt["message"] = (
+                f"Applied {len(applied_items)} of {len(expected)} guarded swarm "
+                "approval(s). Refresh mission status before any retry."
+            )
+            return JSONResponse(status_code=409, content=receipt)
+        applied_items.append(approval_applied_item(
+            agent_run_id, item.step_id, approved_run,
+        ))
+    try:
+        run = await jarvis.swarm_runtime.resume(run_id)
+    except (KeyError, ValueError, RuntimeError):
+        receipt = swarm_approval_receipt(
+            jarvis,
+            run_id,
+            applied_items=applied_items,
+            requested_count=len(expected),
+            code=SWARM_APPROVAL_PARTIAL_CODE,
+            reason_code=SWARM_RESUME_CONFLICT_DETAIL,
+            ok=False,
+            resume_attempted=True,
+            resume_status="failed",
+            reconciliation_reason_code=SWARM_RESUME_CONFLICT_DETAIL,
+        )
+        receipt["message"] = (
+            f"Applied {len(applied_items)} guarded swarm approval(s), but the "
+            "mission could not be fully resumed. Refresh status before any retry."
+        )
+        return JSONResponse(status_code=409, content=receipt)
+    receipt = swarm_approval_receipt(
+        jarvis,
+        run_id,
+        applied_items=applied_items,
+        requested_count=len(expected),
+        code=SWARM_APPROVAL_APPLIED_CODE,
+        reason_code=SWARM_APPROVAL_APPLIED_CODE,
+        ok=True,
+        resume_attempted=True,
+        resume_status=str(run.status),
+    )
+    receipt.update({
         "ok": True,
-        "message": f"Approved {len(approved)} guarded swarm step(s); mission is now {run.status}",
+        "message": f"Approved {len(applied_items)} guarded swarm step(s); mission is now {run.status}",
         "runId": run.id,
         "status": run.status,
-    }
+        "swarm_status": run.status,
+    })
+    return receipt
 
 
 def _require_dynamic_scope(principal: OperatorPrincipal, scope: str) -> None:
@@ -373,6 +932,10 @@ async def _decide_run_approval(
     jarvis: Any,
     approval_id: str,
     decision: str,
+    *,
+    step_id: str | None = None,
+    challenge_id: str | None = None,
+    approvals: list[UISwarmApprovalReference] | None = None,
 ) -> dict[str, Any]:
     """Resolve one approval id to exactly one guarded agent or swarm run."""
 
@@ -393,8 +956,23 @@ async def _decide_run_approval(
         )
     if decision == "approve":
         if agent_run is not None:
-            return await _approve_agent_current_step(jarvis, approval_id)
-        return await _approve_swarm_current_steps(jarvis, approval_id)
+            if not step_id or not challenge_id:
+                raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
+            return await _approve_agent_current_step(
+                jarvis,
+                approval_id,
+                UIAgentApprovalRequest(
+                    step_id=step_id,
+                    challenge_id=challenge_id,
+                ),
+            )
+        if not approvals:
+            raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
+        return await _approve_swarm_current_steps(
+            jarvis,
+            approval_id,
+            UISwarmApprovalRequest(approvals=approvals),
+        )
     if decision != "reject":
         raise HTTPException(status_code=422, detail="Decision must be approve or reject")
     try:
@@ -821,6 +1399,9 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
     agent_status = jarvis.agent_runtime.status()
     swarm_status = jarvis.swarm_runtime.status()
     agent_runs = jarvis.agent_runtime.list_runs(limit=200)
+    agent_runs_by_id = {
+        str(run.get("id")): run for run in agent_runs if run.get("id")
+    }
     swarm_runs = jarvis.swarm_runtime.list_runs(limit=100)
     history = list(jarvis.conversation_history[-100:])
     knowledge = await asyncio.to_thread(KNOWLEDGE.status)
@@ -855,12 +1436,31 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
     graph = knowledge["graph"]
     vault = knowledge["vault"]
     brain_viz = await asyncio.to_thread(_brain_viz_projection)
-    provider_connected = bool(jarvis.get_status().get("nvidia_connected"))
-    provider_health = "healthy" if provider_connected and selectable_models else "degraded" if provider_connected else "down"
+    jarvis_status = jarvis.get_status()
+    provider_connected = bool(jarvis_status.get("nvidia_connected"))
     project_rows = jarvis.workspace_registry.list()
     tool_rows = jarvis.agent_runtime.list_tools()
     schedule_rows = jarvis.agent_runtime.list_schedules()
     skill_rows = jarvis.get_available_skills()
+    capabilities = _capability_projection(
+        request=request,
+        jarvis=jarvis,
+        tool_rows=tool_rows,
+        model_rows=model_rows,
+        provider_connected=provider_connected,
+        preferences=preferences,
+        agent_status=agent_status,
+        knowledge=knowledge,
+    )
+    capability_by_id = _capability_map(capabilities)
+    model_inference = capability_by_id["model_inference"]
+    model_catalog = capability_by_id["model_catalog"]
+    auto_routing = capability_by_id["auto_routing"]
+    remote_https = capability_by_id["remote_https"]
+    voice_authority = capability_by_id["voice_authority"]
+    browser_search = capability_by_id["web_search"]
+    url_launcher = capability_by_id["url_launcher"]
+    browser_automation = capability_by_id["browser_automation"]
     viz: dict[str, dict[str, Any]] = {}
     if brain_viz is not None:
         viz["BRAIN"] = brain_viz
@@ -919,7 +1519,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 "tone": "danger" if r["status"] == "failed" else "info", "pct": 0,
                 "meta": [
                     ["MODEL", r.get("model", "auto")],
-                    ["ACTION", "APPROVE" if r.get("status") == "awaiting_confirmation" else "CANCEL" if _agent_card_action(r) else "DETAIL"],
+                    ["ACTION", _card_action_label(_agent_card_action(r))],
                 ],
                 "action": _agent_card_action(r),
             } for r in agent_runs[:12]],
@@ -932,9 +1532,9 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 "tone": "danger" if r["status"] == "failed" else "info", "pct": 0,
                 "meta": [
                     ["MODE", r.get("mode", "")],
-                    ["ACTION", "APPROVE" if r.get("status") == "awaiting_confirmation" else "CANCEL" if _swarm_card_action(r) else "DETAIL"],
+                    ["ACTION", _card_action_label(_swarm_card_action(r, agent_runs_by_id))],
                 ],
-                "action": _swarm_card_action(r),
+                "action": _swarm_card_action(r, agent_runs_by_id),
             } for r in swarm_runs[:12]],
         },
         "PROJECTS": {
@@ -985,7 +1585,7 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             "title": "OBSIDIAN KNOWLEDGE VAULT", "subtitle": "Durable reviewed decisions and handoffs",
             "kpis": [
                 {"k": "NOTES", "v": str(vault["markdown_count"]), "tone": "ok"},
-                {"k": "CONFIG", "v": "READY" if vault["obsidian_configured"] else "MISSING", "tone": "ok" if vault["obsidian_configured"] else "warn"},
+                {"k": "CONFIG", "v": "CONFIGURED" if vault["obsidian_configured"] else "MISSING", "tone": "info" if vault["obsidian_configured"] else "warn"},
                 {"k": "HEALTH", "v": knowledge["health"].upper(), "tone": "ok" if knowledge["health"] == "good" else "warn"},
             ],
             "items": [{
@@ -995,17 +1595,17 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             }],
         },
         "BROWSER": {
-            "title": "BROWSER CAPABILITIES", "subtitle": "Guarded web research and URL operations",
+            "title": "BROWSER CAPABILITIES", "subtitle": "Registration and runtime evidence are reported separately",
             "kpis": [
-                {"k": "SEARCH", "v": "READY" if any(row["name"] == "web_search" for row in tool_rows) else "OFFLINE", "tone": "ok"},
-                {"k": "OPEN URL", "v": "GATED" if any(row["name"] == "open_url" for row in tool_rows) else "OFFLINE", "tone": "warn"},
-                {"k": "SESSIONS", "v": "ON DEMAND", "tone": "muted"},
+                {"k": "SEARCH", "v": browser_search["state"].upper(), "tone": _capability_tone(browser_search)},
+                {"k": "URL LAUNCH", "v": url_launcher["state"].upper(), "tone": _capability_tone(url_launcher)},
+                {"k": "AUTOMATION", "v": browser_automation["state"].upper(), "tone": _capability_tone(browser_automation)},
             ],
-            "items": [{
-                "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
-                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
-                "meta": [["BOUNDARY", "GUARDED"], ["STATUS", "AVAILABLE"]],
-            } for row in tool_rows if row["name"] in {"web_search", "open_url", "github_repo_view"}],
+            "items": [
+                _capability_item(browser_search),
+                _capability_item(url_launcher),
+                _capability_item(browser_automation),
+            ],
         },
         "CODE": {
             "title": "CODE EXECUTION", "subtitle": "Workspace-bounded creation, patching, commands, and Git",
@@ -1016,8 +1616,8 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             ],
             "items": [{
                 "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
-                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
-                "meta": [["SCOPE", "WORKSPACE"], ["STATUS", "READY"]],
+                "tone": "warn" if row["risk"] == "write" else "info", "pct": 0,
+                "meta": [["EVIDENCE", "TOOL REGISTRY"], ["STATUS", "AVAILABLE"]],
             } for row in tool_rows if row["name"] in {"workspace_read", "workspace_search", "workspace_write", "workspace_patch", "command_run", "project_create", "directory_create"}],
         },
         "TASKS": {
@@ -1032,13 +1632,13 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 "tag": str(run.get("status", "unknown")).upper(), "tone": "danger" if run.get("status") == "failed" else "info",
                 "pct": 0, "meta": [
                     ["MODEL", str(run.get("model", "auto"))],
-                    ["ACTION", "APPROVE" if run.get("status") == "awaiting_confirmation" else "CANCEL" if _agent_card_action(run) else "DETAIL"],
+                    ["ACTION", _card_action_label(_agent_card_action(run))],
                 ],
                 "action": _agent_card_action(run),
             } for run in agent_runs[:20]],
         },
         "TOOLS": {
-            "title": "GUARDED TOOL REGISTRY", "subtitle": "Real capabilities exposed to planner and agents",
+            "title": "GUARDED TOOL REGISTRY", "subtitle": "Registered capabilities; execution health requires separate evidence",
             "kpis": [
                 {"k": "TOTAL", "v": str(len(tool_rows)), "tone": "info"},
                 {"k": "READ", "v": str(sum(row["risk"] == "read" for row in tool_rows)), "tone": "ok"},
@@ -1046,9 +1646,9 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 {"k": "SKILLS", "v": str(len(skill_rows)), "tone": "info"},
             ],
             "items": [{
-                "name": row["name"].upper(), "sub": row["description"], "tag": row["risk"].upper(),
-                "tone": "warn" if row["risk"] == "write" else "ok", "pct": 0,
-                "meta": [["POLICY", "CONFIRM" if row["risk"] == "write" else "ALLOW"], ["STATUS", "REGISTERED"]],
+                "name": row["name"].upper(), "sub": row["description"], "tag": "AVAILABLE",
+                "tone": "warn" if row["risk"] == "write" else "info", "pct": 0,
+                "meta": [["EVIDENCE", "TOOL REGISTRY"], ["POLICY", "CONFIRM" if row["risk"] == "write" else "ALLOW"]],
             } for row in tool_rows],
         },
         "AUTOMATIONS": {
@@ -1085,21 +1685,22 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 {"k": "SPEND", "v": "NOT METERED", "tone": "muted"},
             ],
             "items": [{
-                "name": "NVIDIA NIM", "sub": f"{len(selectable_models)} selectable / {len(model_rows)} known models",
-                "tag": provider_health.upper(), "tone": "ok" if provider_health == "healthy" else "danger", "pct": 0,
-                "meta": [["TOKENS", "UNAVAILABLE"], ["SPEND", "UNAVAILABLE"]],
+                "name": "NVIDIA NIM", "sub": model_inference["summary"],
+                "tag": model_inference["state"].upper(), "tone": _capability_tone(model_inference), "pct": 0,
+                "meta": [["CATALOG", model_catalog["state"].upper()], ["METERING", "UNAVAILABLE"]],
             }],
         },
         "DEVICES": {
             "title": "DEVICE CHANNELS", "subtitle": "Browser-selected microphone and system output",
             "kpis": [
-                {"k": "VOICE AUTHORITY", "v": "ENABLED" if preferences.get("auto_mic", True) else "DISABLED", "tone": "ok" if preferences.get("auto_mic", True) else "warn"},
+                {"k": "VOICE", "v": voice_authority["state"].upper(), "tone": _capability_tone(voice_authority)},
                 {"k": "HOST", "v": platform.node().upper(), "tone": "info"},
-                {"k": "REMOTE", "v": "HTTPS", "tone": "ok"},
+                {"k": "REMOTE HTTPS", "v": remote_https["state"].upper(), "tone": _capability_tone(remote_https)},
             ],
             "items": [
-                {"name": "MICROPHONE", "sub": "Capture state is reported by the active browser after permission", "tag": "AUTHORITY ON" if preferences.get("auto_mic", True) else "DISABLED", "tone": "ok", "pct": 0, "meta": [["PROFILE", str(preferences.get("voice_profile", "en-GB"))], ["SENSITIVITY", str(preferences.get("sensitivity", 6))]]},
-                {"name": "SPEAKER", "sub": "System default audio output", "tag": "READY", "tone": "ok", "pct": 0, "meta": [["VOICE", str(preferences.get("voice_profile", "en-GB"))], ["OUTPUT", "BROWSER"]]},
+                _capability_item(voice_authority),
+                _capability_item(remote_https),
+                {"name": "SPEAKER PROFILE", "sub": "A browser output profile is configured; playback readiness is client-observed.", "tag": "CONFIGURED", "tone": "muted", "pct": 0, "meta": [["VOICE", str(preferences.get("voice_profile", "en-GB"))], ["EVIDENCE", "PREFERENCE"]]},
             ],
         },
         "SETTINGS": {
@@ -1111,8 +1712,8 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
                 {"k": "AUTONOMY", "v": f"L{autonomy_level}", "tone": "warn" if autonomy_level == 4 else "info"},
             ],
             "items": [
-                {"name": "AUTO ROUTING", "sub": "Health-aware model selection", "tag": "ON" if preferences.get("auto_mode", True) else "OFF", "tone": "ok", "pct": 0, "meta": [["PRIMARY", primary], ["CATALOG", str(len(selectable_models))]]},
-                {"name": "VOICE AUTHORITY", "sub": "Microphone capture is browser-permission gated", "tag": "ENABLED" if preferences.get("auto_mic", True) else "DISABLED", "tone": "ok", "pct": 0, "meta": [["PROFILE", str(preferences.get("voice_profile", "en-GB"))], ["SENSITIVITY", str(preferences.get("sensitivity", 6))]]},
+                {"name": "AUTO ROUTING", "sub": auto_routing["summary"], "tag": auto_routing["state"].upper(), "tone": _capability_tone(auto_routing), "pct": 0, "meta": [["PRIMARY", primary], ["CATALOG", model_catalog["state"].upper()]]},
+                _capability_item(voice_authority),
                 {"name": "AUTONOMY LEVEL", "sub": "Capability policy and confirmation gates remain enforced at every level", "tag": f"L{autonomy_level}", "tone": "warn" if autonomy_level == 4 else "info", "pct": 0, "meta": [["L4", "FULL WORKSPACE"], ["GUARDS", "ENFORCED"]]},
             ],
         },
@@ -1139,18 +1740,36 @@ async def build_snapshot(request: Request) -> dict[str, Any]:
             ],
         },
         "flow": [
-            {"name": "UI INTERFACE", "state": "ONLINE", "tone": "ok"},
-            {"name": "AGENT CORE", "state": "ONLINE" if agent_status["worker_online"] else "DEGRADED", "tone": "ok" if agent_status["worker_online"] else "warn"},
-            {"name": "VOICE SYSTEM", "state": "BROWSER AUTHORITY ON" if preferences.get("auto_mic", True) else "DISABLED", "tone": "info"},
-            {"name": "API ROUTER", "state": f"{len(selectable_models)} READY / {len(model_rows)} KNOWN", "tone": "ok" if selectable_models else "warn"},
-            {"name": "BRAIN GRAPH", "state": f"{graph['node_count']} NODES", "tone": "ok" if knowledge["health"] == "good" else "warn"},
+            {"name": "UI INTERFACE", "state": capability_by_id["dashboard_projection"]["state"].upper(), "tone": _capability_tone(capability_by_id["dashboard_projection"])},
+            {"name": "AGENT CORE", "state": capability_by_id["agent_worker"]["state"].upper(), "tone": _capability_tone(capability_by_id["agent_worker"])},
+            {"name": "VOICE SYSTEM", "state": voice_authority["state"].upper(), "tone": _capability_tone(voice_authority)},
+            {"name": "API ROUTER", "state": auto_routing["state"].upper(), "tone": _capability_tone(auto_routing)},
+            {"name": "BRAIN GRAPH", "state": capability_by_id["knowledge_projection"]["state"].upper(), "tone": _capability_tone(capability_by_id["knowledge_projection"])},
         ],
         "graph": {"nodes": graph["node_count"], "edges": graph["edge_count"], "vaultNotes": vault["markdown_count"], "health": "healthy" if knowledge["health"] == "good" else "degraded"},
-        "router": {"auto": bool(preferences.get("auto_mode", True)), "primary": primary, "models": model_rows},
-        "providers": [{"id": "nvidia", "name": "NVIDIA NIM", "status": provider_health, "latencyMs": 0, "circuit": "closed" if provider_health != "down" else "open"}],
-        "voice": {"armed": bool(preferences.get("auto_mic", True)), "inputDevice": "Browser selected input", "outputDevice": "System default", "profile": str(preferences.get("voice_profile", "en-GB")), "sensitivity": int(preferences.get("sensitivity", 6)), "level": 0},
+        "router": {
+            "auto": bool(preferences.get("auto_mode", True)), "primary": primary,
+            "models": model_rows, "capabilityState": auto_routing["state"],
+            "evidence": auto_routing["evidence"],
+        },
+        "providers": [{
+            "id": "nvidia", "name": "NVIDIA NIM",
+            "status": "degraded" if model_inference["state"] == "degraded" else "down" if model_inference["state"] == "unavailable" else "unknown",
+            "latencyMs": 0, "latencyVerified": False,
+            "circuit": "unknown",
+            "capabilityState": model_inference["state"],
+            "evidence": model_inference["evidence"],
+        }],
+        "voice": {
+            "armed": bool(preferences.get("auto_mic", True)),
+            "inputDevice": "Browser selected input", "outputDevice": "System default",
+            "profile": str(preferences.get("voice_profile", "en-GB")),
+            "sensitivity": int(preferences.get("sensitivity", 6)), "level": 0,
+            "capabilityState": voice_authority["state"],
+        },
         "usage": {"requests": sum(item.get("role") == "assistant" for item in history), "tokens": 0, "spendUsd": 0, "capUsd": 0, "metered": False, "series": []},
         "events": _events(history, agent_runs, swarm_runs), "screens": screens, "viz": viz,
+        "capabilities": capabilities,
         "runtime": {
             "platform": platform.platform(),
             "controlRevision": control.revision,
@@ -1193,18 +1812,22 @@ async def decide_approval(
         _require_dynamic_scope(principal, RUNS_CONTROL)
     return await _decide_run_approval(
         _jarvis(request), approval_id, decision.decision,
+        step_id=decision.step_id,
+        challenge_id=decision.challenge_id,
+        approvals=decision.approvals,
     )
 
 
 @router.post("/agent/runs/{run_id}/approve-current")
 async def approve_agent_current_step(
     run_id: str,
+    approval: UIAgentApprovalRequest,
     request: Request,
     _principal: OperatorPrincipal = Depends(require_scope(APPROVALS_WRITE)),
     _mutation_guard: OperatorPrincipal = Depends(require_mutation_guard),
 ):
     """Approve exactly the currently pending agent step under the approval scope."""
-    return await _approve_agent_current_step(_jarvis(request), run_id)
+    return await _approve_agent_current_step(_jarvis(request), run_id, approval)
 
 
 @router.post("/agent/runs/{run_id}/cancel")
@@ -1228,12 +1851,13 @@ async def cancel_agent_run(
 @router.post("/swarm/runs/{run_id}/approve-current")
 async def approve_swarm_current_steps(
     run_id: str,
+    approval: UISwarmApprovalRequest,
     request: Request,
     _principal: OperatorPrincipal = Depends(require_scope(APPROVALS_WRITE)),
     _mutation_guard: OperatorPrincipal = Depends(require_mutation_guard),
 ):
     """Approve one current guarded step per waiting child, then resume the swarm."""
-    return await _approve_swarm_current_steps(_jarvis(request), run_id)
+    return await _approve_swarm_current_steps(_jarvis(request), run_id, approval)
 
 
 @router.post("/swarm/runs/{run_id}/cancel")
@@ -1317,7 +1941,26 @@ async def command(
         approval_id = str(payload.get("id") or "").strip()
         required_scope = APPROVALS_WRITE if command.action == "approve" else RUNS_CONTROL
         _require_dynamic_scope(principal, required_scope)
-        return await _decide_run_approval(jarvis, approval_id, command.action)
+        approvals = []
+        raw_approvals = payload.get("approvals")
+        if isinstance(raw_approvals, list):
+            try:
+                approvals = [
+                    UISwarmApprovalReference.model_validate(item)
+                    for item in raw_approvals
+                ]
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=422, detail="Invalid approval references",
+                ) from exc
+        return await _decide_run_approval(
+            jarvis,
+            approval_id,
+            command.action,
+            step_id=str(payload.get("step_id") or payload.get("stepId") or "").strip() or None,
+            challenge_id=str(payload.get("challenge_id") or payload.get("challengeId") or "").strip() or None,
+            approvals=approvals,
+        )
     if command.action == "emergency_stop":
         return _transition_global_control(request, principal, "emergency_stop")
     if command.action == "hold":
@@ -1337,9 +1980,12 @@ async def command(
             if row["selectable"]
         }
         if not selectable:
-            raise HTTPException(status_code=409, detail="The live NVIDIA model catalog is not ready")
+            raise HTTPException(
+                status_code=409,
+                detail="The NVIDIA model catalog is not ready; fresh evidence is unavailable",
+            )
         if model not in selectable:
-            raise HTTPException(status_code=409, detail="Model is not a live chat-compatible NVIDIA route")
+            raise HTTPException(status_code=409, detail="Model is not a currently selectable chat-compatible NVIDIA route")
         _write_preferences({"primary_model": model})
         return {"ok": True, "message": f"Primary route set to {model}"}
     if command.action in {"set_autonomy", "set_autonomy_level"}:

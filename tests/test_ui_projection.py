@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.api.ui_routes import (
     _active_swarm_task_count,
@@ -14,6 +15,11 @@ from src.api.ui_routes import (
     _tool_event_times,
     _tool_topology,
 )
+
+
+DASHBOARD_SOURCE = (
+    Path(__file__).resolve().parents[1] / "frontend" / "src" / "pages" / "Dashboard.tsx"
+).read_text(encoding="utf-8")
 
 
 def test_agent_projection_ignores_historical_terminal_failure() -> None:
@@ -104,24 +110,58 @@ def test_active_swarm_tasks_exclude_terminal_parent_orphans() -> None:
 
 
 def test_agent_card_exposes_only_current_guarded_approval_or_live_cancel() -> None:
-    approval = _agent_card_action({"id": "agent-1", "status": "awaiting_confirmation"})
+    approval = _agent_card_action({
+        "id": "agent-1",
+        "status": "awaiting_confirmation",
+        "pending_step": {"id": "step-1", "description": "Write the file"},
+        "pending_approval": {
+            "step_id": "step-1",
+            "challenge_id": "challenge-agent-0001",
+        },
+    })
     cancel = _agent_card_action({"id": "agent-2", "status": "running"})
 
     assert approval == {
         "command": "approve_agent_run",
-        "payload": {"runId": "agent-1"},
-        "confirm": "Approve the currently pending guarded step for this agent run?",
+        "payload": {
+            "runId": "agent-1",
+            "stepId": "step-1",
+            "challengeId": "challenge-agent-0001",
+        },
+        "confirm": "Approve guarded step step-1 under challenge challeng...?",
     }
     assert cancel and cancel["command"] == "cancel_agent_run"
+    assert _agent_card_action({"id": "agent-stale", "status": "awaiting_confirmation"}) is None
     assert _agent_card_action({"id": "agent-3", "status": "completed"}) is None
 
 
 def test_swarm_card_exposes_guarded_approval_and_live_cancel() -> None:
-    approval = _swarm_card_action({"id": "swarm-1", "status": "awaiting_confirmation"})
+    agent_runs = {
+        "agent-a": {
+            "id": "agent-a",
+            "pending_step": {"id": "step-a"},
+            "pending_approval": {
+                "step_id": "step-a",
+                "challenge_id": "challenge-swarm-a1",
+            },
+        },
+    }
+    approval = _swarm_card_action({
+        "id": "swarm-1",
+        "status": "awaiting_confirmation",
+        "tasks": [{"status": "awaiting_confirmation", "agent_run_id": "agent-a"}],
+    }, agent_runs)
     cancel = _swarm_card_action({"id": "swarm-2", "status": "queued"})
 
     assert approval and approval["command"] == "approve_swarm_run"
-    assert approval["payload"] == {"runId": "swarm-1"}
+    assert approval["payload"] == {
+        "runId": "swarm-1",
+        "approvals": [{
+            "agentRunId": "agent-a",
+            "stepId": "step-a",
+            "challengeId": "challenge-swarm-a1",
+        }],
+    }
     assert cancel and cancel["command"] == "cancel_swarm_run"
     assert _swarm_card_action({"id": "swarm-3", "status": "failed"}) is None
 
@@ -230,3 +270,30 @@ def test_tool_activity_series_uses_only_matching_real_tool_start_events() -> Non
     }]
 
     assert _tool_event_times(runs, {"workspace_read"}) == ["2026-07-29T12:00:00Z"]
+
+
+def test_dashboard_reconciles_failed_approval_against_exact_run() -> None:
+    assert "[stepId],\n        challengeId," in DASHBOARD_SOURCE
+    assert "const authoritative = await api.getAgentRun(runId);" in DASHBOARD_SOURCE
+    assert "pending_approval: null" in DASHBOARD_SOURCE
+    assert "setAgentRun(recentRuns?.runs?.[0] || null);" in DASHBOARD_SOURCE
+    assert "disabled={isProcessing || !approvalBindingValid}" in DASHBOARD_SOURCE
+
+
+def test_dashboard_separates_voice_preference_from_microphone_readiness() -> None:
+    assert "const [micReady, setMicReady] = useState(false);" in DASHBOARD_SOURCE
+    assert "confirmMicReady(stream);" in DASHBOARD_SOURCE
+    assert 'track.addEventListener("ended", () => setMicReady(false)' in DASHBOARD_SOURCE
+    assert '"CONFIGURED · NOT READY"' in DASHBOARD_SOURCE
+    assert 'value: armed && micReady ? "READY" : armed ? "NOT READY" : "SAFE"' in DASHBOARD_SOURCE
+
+
+def test_dashboard_projects_catalog_inventory_without_fake_provider_health() -> None:
+    assert "catalogLastSyncedAt" in DASHBOARD_SOURCE
+    assert "catalogEvidenceLabel" in DASHBOARD_SOURCE
+    assert 'title="ROUTE INVENTORY"' in DASHBOARD_SOURCE
+    assert '"SELECTABLE"' in DASHBOARD_SOURCE
+    assert '"LAST LISTED"' in DASHBOARD_SOURCE
+    assert 'title="PROVIDER STATUS"' not in DASHBOARD_SOURCE
+    assert "item.latency" not in DASHBOARD_SOURCE
+    assert "featuredOnlineCount" not in DASHBOARD_SOURCE

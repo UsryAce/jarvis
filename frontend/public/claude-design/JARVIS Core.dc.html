@@ -210,7 +210,7 @@
           <sc-for list="{{ providers }}" as="p" hint-placeholder-count="6">
             <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
               <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8FA8B6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#7CFFE6">ONLINE</div>
+              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ p.col }}">{{ p.state }}</div>
               <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#3F5B69">{{ p.ms }}</div>
             </div>
           </sc-for>
@@ -828,9 +828,9 @@ const VIZ = {
 
 class Component extends DCLogic {
   state = {
-    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:true,
+    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:false,
     model:'z-ai/glm-5.2', draft:'', extra:[], submitting:false, toast:'Deploy gate is blocking mission MERIDIAN — approval required', toastOn:true,
-    voice:{ready:false,armed:false,capturing:false,transcribing:false,processing:false,speaking:false,handsFree:false,clapWake:false,level:0,inputDevice:'Browser microphone',inputDeviceId:'',inputDevices:[],profile:'JARVIS · BRITISH',lastUser:'',lastJarvis:'',error:''}
+    voice:{connected:false,ready:false,armed:false,capturing:false,transcribing:false,processing:false,speaking:false,handsFree:false,clapWake:false,level:0,inputDevice:'Browser microphone',inputDeviceId:'',inputDevices:[],profile:'JARVIS · BRITISH',lastUser:'',lastJarvis:'',error:''}
   };
 
   advance(){
@@ -913,7 +913,7 @@ class Component extends DCLogic {
       if (event.origin !== window.location.origin || event.source !== window.parent) return;
       const data = event.data;
       if (!data || data.type !== 'jarvis-voice-state' || !data.value || typeof data.value !== 'object') return;
-      this.setState(s=>({voice:{...s.voice,...data.value,ready:true}, mic:typeof data.value.armed==='boolean'?data.value.armed:s.mic}));
+      this.setState(s=>({voice:{...s.voice,...data.value,connected:true}, mic:typeof data.value.armed==='boolean'?data.value.armed:s.mic}));
     };
     window.addEventListener('message', this.voiceMessage);
     this.voiceControl('state');
@@ -1492,7 +1492,7 @@ class Component extends DCLogic {
       return;
     }
     if ((command === 'approve' || command === 'reject') && this.store && typeof this.store.approval === 'function'){
-      this.store.approval(payload.id, command, payload.note || '').then((result)=>this.toast(result.message || (result.ok?'Decision recorded':'Decision failed')));
+      this.store.approval(payload.id, command, payload.note || '', payload).then((result)=>this.toast(result.message || (result.ok?'Decision recorded':'Decision failed')));
       return;
     }
     this.runCommand(command,payload);
@@ -1510,7 +1510,8 @@ class Component extends DCLogic {
   renderVals(){
     const s = this.state, V = s.voice || {}, st = this.cur(), col = this.accent();
     const stale = !!(s.meta && s.meta.stale);
-    const voiceArmed = V.ready ? !!V.armed : !!s.mic;
+    const voiceEnabled = V.connected ? !!V.armed : !!s.mic;
+    const voiceReady = !!(V.connected && V.ready);
     const now = new Date();
     const pct = (seed, base, span)=> Math.min(99, Math.round(base + (s.t*3 + seed*13) % span));
     const cpu = pct(1,14,22), ram = pct(2,58,18), disk = 46, gpu = pct(4,9,26);
@@ -1586,8 +1587,8 @@ class Component extends DCLogic {
         pick: ()=> this.runCommand('set_route',{modelId:c[1]},()=>this.setState({model:c[1]}))
       })),
       providers: [
-        {name:'GLM', ms:'118 ms'},{name:'DEEPSEEK', ms:'134 ms'},{name:'META', ms:'96 ms'},
-        {name:'OPENAI', ms:'128 ms'},{name:'MISTRAL', ms:'115 ms'},{name:'KIMI', ms:'165 ms'}
+        {name:'GLM', state:'DEMO', col:DIM, ms:'118 ms'},{name:'DEEPSEEK', state:'DEMO', col:DIM, ms:'134 ms'},{name:'META', state:'DEMO', col:DIM, ms:'96 ms'},
+        {name:'OPENAI', state:'DEMO', col:DIM, ms:'128 ms'},{name:'MISTRAL', state:'DEMO', col:DIM, ms:'115 ms'},{name:'KIMI', state:'DEMO', col:DIM, ms:'165 ms'}
       ],
       flow: [
         {name:'UI INTERFACE', state:'ONLINE', col:TE},{name:'AGENT CORE', state:'ARMED', col:col},
@@ -1632,9 +1633,9 @@ class Component extends DCLogic {
       setDraft: (e)=> this.setState({draft:e.target.value}),
       onKey: (e)=> { if (e.key === 'Enter') this.send(); },
       send: this.send,
-      voiceState: !V.ready ? (s.mic?'PREFERENCE ON':'DISARMED') : V.error ? 'ERROR' : V.capturing ? 'LISTENING' : V.transcribing ? 'TRANSCRIBING' : V.processing ? 'THINKING' : V.speaking ? 'SPEAKING' : V.handsFree ? 'HANDS-FREE' : V.armed ? 'ARMED' : 'DISARMED',
+      voiceState: !voiceEnabled ? 'DISARMED' : V.error ? 'ERROR' : V.capturing ? 'LISTENING' : V.transcribing ? 'TRANSCRIBING' : V.processing ? 'THINKING' : V.speaking ? 'SPEAKING' : voiceReady ? (V.handsFree ? 'HANDS-FREE' : V.clapWake ? 'CLAP-WAKE' : 'READY') : 'CONFIGURED',
       voiceBtns: [
-        {label: voiceArmed?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceArmed)},
+        {label: voiceEnabled?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceEnabled)},
         {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:this.togglePushToTalk},
         {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=>this.voiceQuick('test-mic')}
       ],
@@ -1684,7 +1685,7 @@ class Component extends DCLogic {
         {k:'MODEL', v: (s.auto?'AUTO · ':'')+s.model, col:'#DCE8F2'},
         {k:'INPUT DEVICE', v:V.inputDevice||'SYSTEM DEFAULT', col:'#DCE8F2'},
         {k:'SPEAKER', v:V.profile||'JARVIS · BRITISH', col:'#DCE8F2'},
-        {k:'VOICE CHANNEL', v:V.capturing?'CAPTURING':voiceArmed?'ARMED':'DISARMED', col:voiceArmed?TE:RD},
+        {k:'VOICE CHANNEL', v:V.capturing?'CAPTURING':!voiceEnabled?'DISARMED':voiceReady?'READY':'CONFIGURED', col:voiceReady?TE:voiceEnabled?AM:RD},
         {k:'AGENT TEAM', v:s.live ? (s.live.workspace ? ('SWARM · '+s.live.workspace.agentsActive+'/'+s.live.workspace.agentsTotal+' ACTIVE · '+s.live.workspace.tasksTotal+' TASKS') : 'NO LIVE TEAM DATA') : 'SWARM · 2/6 ACTIVE · 6 TASKS', col:col}
       ],
       voiceLines: [
@@ -1692,7 +1693,7 @@ class Component extends DCLogic {
         {who:'JARVIS', col:TE, text:V.error?('Voice error: '+V.error):(V.lastJarvis||'Voice controller ready. Arm the microphone or use push to talk.')}
       ],
       voiceControls: [
-        {label: voiceArmed?'DISARM VOICE':'ARM VOICE', dot:voiceArmed?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceArmed)},
+        {label: voiceEnabled?'DISARM VOICE':'ARM VOICE', dot:voiceEnabled?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceEnabled)},
         {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', dot:V.capturing?TE:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:this.togglePushToTalk},
         {label:V.handsFree?'FREE TALKING ON':'FREE TALKING', dot:V.handsFree?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-handsfree')},
         {label:V.clapWake?'CLAP WAKE ON':'CLAP WAKE', dot:V.clapWake?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-clap')},
@@ -1724,13 +1725,16 @@ class Component extends DCLogic {
   applyLive(out, L){
     const col = this.accent(), st = this.cur(), s = this.state;
     const T = (t)=> TONE[t] || CY;
+    const cap = (id)=> (L.capabilities||[]).find(c=>c.id===id);
+    const autoCapability = cap('auto_routing');
+    const inferenceCapability = cap('model_inference');
     const tl = L.telemetry;
     out.stateColor = st.color; out.stateLabel = st.label;
     out.stateSub = L.agent.detail || st.sub;
     out.statusMeta = [
       {k:'LAST UPDATE', v:(L.at||'').slice(11,19)||'—', col:'#DCE8F2'},
       {k:'AUTONOMY', v:'LEVEL '+L.agent.autonomy, col:TE},
-      {k:'VOICE', v:L.voice ? (L.voice.armed ? (L.voice.profile||'ARMED') : 'DISARMED') : 'NO LIVE DATA', col:L.voice&&L.voice.armed?col:AM}
+      {k:'VOICE', v:L.voice ? ((s.voice&&s.voice.connected) ? out.voiceState : (L.voice.capabilityState||'UNVERIFIED').toUpperCase()) : 'NO LIVE DATA', col:(s.voice&&s.voice.ready&&s.voice.armed)?col:AM}
     ];
     out.coreReadouts = [
       {k:'CPU', v:Math.round(tl.cpuPct)+'%', col:TE},
@@ -1751,7 +1755,7 @@ class Component extends DCLogic {
       {k:'CPU LOAD', v:Math.round(tl.cpuPct)+'%', col:col, w:Math.round(tl.cpuPct)+'%'},
       {k:'MEMORY', v:Math.round(tl.ramPct)+'%', col:AM, w:Math.round(tl.ramPct)+'%'},
       {k:'DISK', v:Math.round(tl.diskPct)+'%', col:col, w:Math.round(tl.diskPct)+'%'},
-      {k:'NETWORK · '+tl.netUpMbs.toFixed(1)+' / '+tl.netDownMbs.toFixed(1)+' MB/S', v:'ONLINE', col:TE, w:'78%'}
+      {k:'NETWORK · '+tl.netUpMbs.toFixed(1)+' / '+tl.netDownMbs.toFixed(1)+' MB/S', v:(tl.netUpMbs||tl.netDownMbs)?'TRAFFIC OBSERVED':'IDLE', col:(tl.netUpMbs||tl.netDownMbs)?TE:DIM, w:(tl.netUpMbs||tl.netDownMbs)?'78%':'0%'}
     ];
     if (L.session) out.session = [
       {k:'SESSION ID', v:L.session.id}, {k:'STARTED', v:(L.session.startedAt||'').slice(11,19)},
@@ -1766,11 +1770,13 @@ class Component extends DCLogic {
       out.model = s.model && selectableModels.some(m=>m.id===s.model)
         ? s.model
         : (selectableModels.some(m=>m.id===L.router.primary) ? L.router.primary : (selectableModels[0]||{}).id||'');
-      out.routeSub = L.router.models.length + ' MODELS · ' + (L.providers.length) + ' PROVIDERS';
-      out.councilStatus = L.router.models.filter(m=>m.health==='healthy').length + '/' + L.router.models.length + ' ONLINE';
+      out.routeSub = autoCapability
+        ? autoCapability.state.toUpperCase()+' · '+autoCapability.summary
+        : L.router.models.length+' KNOWN MODELS · ROUTING EVIDENCE UNAVAILABLE';
+      out.councilStatus = selectableModels.length+'/'+L.router.models.length+' SELECTABLE · HEALTH UNVERIFIED';
       out.council = L.router.models.map(m=>({
         name:m.name.toUpperCase(), id:m.id, n:m.variants,
-        col: m.health === 'healthy' ? TE : m.health === 'degraded' ? AM : m.health === 'down' ? RD : DIM,
+        col: m.health === 'degraded' ? AM : m.health === 'down' ? RD : m.selectable ? CY : DIM,
         bd: out.model===m.id ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
         bg: out.model===m.id ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
         pick: ()=> m.selectable
@@ -1778,16 +1784,30 @@ class Component extends DCLogic {
           : this.toast(m.name+' is visible in inventory but unavailable as a live chat route')
       }));
     }
-    if (L.providers.length) out.providers = L.providers.map(p=>({name:p.name.toUpperCase(), ms:p.latencyMs+' ms'}));
-    if (L.voice && !(s.voice&&s.voice.ready)){
-      out.voiceState = L.voice.armed ? 'ARMED' : 'DISARMED';
+    if (L.providers.length) out.providers = L.providers.map(p=>({
+      name:p.name.toUpperCase(),
+      state:(p.capabilityState||'unavailable').toUpperCase(),
+      col:p.capabilityState==='degraded'?AM:p.capabilityState==='unavailable'?RD:p.capabilityState==='verified'?TE:DIM,
+      ms:p.latencyVerified ? p.latencyMs+' ms' : 'LATENCY UNVERIFIED'
+    }));
+    if (inferenceCapability && !L.providers.length) out.providers = [{
+      name:'MODEL INFERENCE', state:inferenceCapability.state.toUpperCase(),
+      col:inferenceCapability.state==='degraded'?AM:inferenceCapability.state==='unavailable'?RD:DIM,
+      ms:'LATENCY UNVERIFIED'
+    }];
+    if (L.voice && !(s.voice&&s.voice.connected)){
+      out.voiceState = (L.voice.capabilityState||'unverified').toUpperCase();
       out.sens = L.voice.sensitivity + ' / 10';
       out.sensW = Math.round(L.voice.sensitivity*10) + '%';
     }
-    if (L.usage) out.tokenStats = [
+    if (L.usage) out.tokenStats = L.usage.metered ? [
       {k:'REQUESTS', v:String(L.usage.requests), col:col},
       {k:'TOKENS', v:(L.usage.tokens>=1000 ? (L.usage.tokens/1000).toFixed(1)+'k' : String(L.usage.tokens)), col:TE},
       {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
+    ] : [
+      {k:'REQUESTS', v:String(L.usage.requests), col:col},
+      {k:'TOKENS', v:'NOT METERED', col:DIM},
+      {k:'SPEND', v:'NOT METERED', col:DIM}
     ];
     if (L.events.length) out.rows = L.events.map(e=>({
       time:(e.at||'').slice(11,19), who:e.who, meta:e.meta, text:e.text,

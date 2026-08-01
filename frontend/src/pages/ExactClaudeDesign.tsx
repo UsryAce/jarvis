@@ -2,8 +2,9 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useExactJarvisVoice } from "../hooks/useExactJarvisVoice";
 import api, {
+  type ApprovalReference,
   clearProtectedTransportState,
-  SafeApiException,
+  safeUiCommandFailure,
 } from "../services/api";
 import "./ExactClaudeDesign.css";
 
@@ -40,6 +41,17 @@ export default function ExactClaudeDesign({ mobile = false }: ExactClaudeDesignP
           payload.id,
           payload.decision,
           typeof payload.note === "string" ? payload.note : "",
+          typeof payload.stepId === "string" && typeof payload.challengeId === "string"
+            ? { stepId: payload.stepId, challengeId: payload.challengeId }
+            : undefined,
+          Array.isArray(payload.approvals)
+            ? payload.approvals.filter((item: unknown): item is ApprovalReference & { agentRunId: string } => (
+              !!item && typeof item === "object"
+              && typeof (item as Record<string, unknown>).agentRunId === "string"
+              && typeof (item as Record<string, unknown>).stepId === "string"
+              && typeof (item as Record<string, unknown>).challengeId === "string"
+            ))
+            : [],
         )
           .then((result) => {
             frameRef.current?.contentWindow?.postMessage(
@@ -48,15 +60,12 @@ export default function ExactClaudeDesign({ mobile = false }: ExactClaudeDesignP
             );
           })
           .catch((error: unknown) => {
-            const message = error instanceof SafeApiException
-              ? error.safe.code
-              : "Approval failed";
             frameRef.current?.contentWindow?.postMessage(
               {
                 source: "jarvis-host",
                 action: "command-result",
                 requestId,
-                result: { ok: false, message },
+                result: safeUiCommandFailure(error, "Approval failed"),
               },
               window.location.origin,
             );
@@ -81,15 +90,12 @@ export default function ExactClaudeDesign({ mobile = false }: ExactClaudeDesignP
             );
           })
           .catch((error: unknown) => {
-            const message = error instanceof SafeApiException
-              ? error.safe.code
-              : "Command failed";
             frameRef.current?.contentWindow?.postMessage(
               {
                 source: "jarvis-host",
                 action: "command-result",
                 requestId,
-                result: { ok: false, message },
+                result: safeUiCommandFailure(error, "Command failed"),
               },
               window.location.origin,
             );

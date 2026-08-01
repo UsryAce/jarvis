@@ -24,7 +24,19 @@ from src.api.auth_routes import router as auth_router
 from src.api.control_routes import router as control_router
 from src.api.credential_routes import router as credential_router
 from src.api.dashboard_routes import router as dashboard_router
-from src.api.ui_routes import router as ui_router, stream_router as ui_stream_router
+from src.api.approval_receipts import (
+    APPROVAL_CONFLICT_DETAIL,
+    SWARM_APPROVAL_APPLIED_CODE,
+    SWARM_APPROVAL_PARTIAL_CODE,
+    SWARM_RESUME_CONFLICT_DETAIL,
+    approval_applied_item,
+    swarm_approval_receipt,
+)
+from src.api.ui_routes import (
+    _looks_chat_compatible,
+    router as ui_router,
+    stream_router as ui_stream_router,
+)
 from src.core.audit import AuditService
 from src.core.control import ControlService
 from src.core.control_store import ControlStore
@@ -52,7 +64,6 @@ from src.voice.nvidia_speech import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 # Global Jarvis instance - will be initialized in lifespan
 jarvis: Jarvis = None
@@ -242,6 +253,7 @@ class AgentRunRequest(BaseModel):
 
 
 class AgentApprovalRequest(BaseModel):
+    challenge_id: str = Field(min_length=16, max_length=128)
     step_ids: list[str] = Field(default_factory=list, max_length=12)
 
 
@@ -265,6 +277,7 @@ class SwarmRunRequest(BaseModel):
 
 
 class SwarmApprovalRequest(BaseModel):
+    challenge_id: str = Field(min_length=16, max_length=128)
     step_ids: list[str] = Field(default_factory=list, max_length=12)
 
 
@@ -455,9 +468,15 @@ async def agent_run_status(run_id: str):
 @app.post("/api/agent/runs/{run_id}/approve")
 async def agent_run_approve(run_id: str, request: AgentApprovalRequest):
     try:
-        run = await jarvis.agent_runtime.approve(run_id, request.step_ids)
+        run = await jarvis.agent_runtime.approve(
+            run_id, request.step_ids, request.challenge_id,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Agent run was not found") from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409, detail=APPROVAL_CONFLICT_DETAIL,
+        ) from exc
     return run.to_dict()
 
 
@@ -587,14 +606,70 @@ async def swarm_task_approve(run_id: str, task_id: str, request: SwarmApprovalRe
         raise HTTPException(status_code=409, detail="Linked agent run was not found")
     step_ids = request.step_ids
     if not step_ids and agent_run.status == "awaiting_confirmation" and agent_run.plan:
+        if agent_run.current_step >= len(agent_run.plan.steps):
+            raise HTTPException(status_code=409, detail=APPROVAL_CONFLICT_DETAIL)
         step_ids = [agent_run.plan.steps[agent_run.current_step].id]
-
-    async def approve_and_resume() -> None:
-        await jarvis.agent_runtime.approve(task.agent_run_id, step_ids)
-        await jarvis.swarm_runtime.resume(run_id)
-
-    asyncio.create_task(approve_and_resume())
-    return {"accepted": True, "swarm_id": run_id, "task_id": task_id, "agent_run_id": task.agent_run_id}
+    applied_items: list[dict[str, str]] = []
+    try:
+        approved_run = await jarvis.agent_runtime.approve(
+            task.agent_run_id, step_ids, request.challenge_id,
+        )
+        applied_items.extend(
+            approval_applied_item(task.agent_run_id, step_id, approved_run)
+            for step_id in (step_ids or ["current"])
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Linked agent run was not found") from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409, detail=APPROVAL_CONFLICT_DETAIL,
+        ) from exc
+    try:
+        resumed = await jarvis.swarm_runtime.resume(run_id)
+    except (KeyError, ValueError, RuntimeError):
+        receipt = swarm_approval_receipt(
+            jarvis,
+            run_id,
+            applied_items=applied_items,
+            requested_count=max(1, len(step_ids)),
+            code=SWARM_APPROVAL_PARTIAL_CODE,
+            reason_code=SWARM_RESUME_CONFLICT_DETAIL,
+            ok=False,
+            resume_attempted=True,
+            resume_status="failed",
+            reconciliation_reason_code=SWARM_RESUME_CONFLICT_DETAIL,
+        )
+        receipt.update({
+            "accepted": False,
+            "task_id": task_id,
+            "agent_run_id": task.agent_run_id,
+            "message": (
+                "The child approval was applied, but the swarm could not be fully "
+                "resumed. Refresh mission status before any retry."
+            ),
+        })
+        return JSONResponse(status_code=409, content=receipt)
+    receipt = swarm_approval_receipt(
+        jarvis,
+        run_id,
+        applied_items=applied_items,
+        requested_count=max(1, len(step_ids)),
+        code=SWARM_APPROVAL_APPLIED_CODE,
+        reason_code=SWARM_APPROVAL_APPLIED_CODE,
+        ok=True,
+        resume_attempted=True,
+        resume_status=resumed.status,
+    )
+    receipt.update({
+        "accepted": True,
+        "swarm_id": run_id,
+        "task_id": task_id,
+        "agent_run_id": task.agent_run_id,
+        "agent_status": approved_run.status,
+        "status": resumed.status,
+        "swarm_status": resumed.status,
+    })
+    return receipt
 
 
 @app.get("/api/projects")
@@ -654,14 +729,36 @@ async def status():
 
 @app.get("/api/models")
 async def models():
-    """Return the live NVIDIA model catalog available to this API key."""
+    """Return current NVIDIA inventory and refresh bounded routing evidence."""
     try:
         if jarvis is None:
             raise ValueError("provider_runtime_unavailable")
         client = await jarvis._require_provider_client()
         catalog = await client.list_models()
-        items = catalog.get("data", [])
-        return {"models": items, "count": len(items), "provider": "nvidia"}
+        raw_items = catalog.get("data", [])
+        items = raw_items if isinstance(raw_items, list) else []
+        model_ids = jarvis.model_router.normalize_catalog(items)
+        if model_ids:
+            jarvis._model_catalog = model_ids
+            jarvis._model_catalog_cached_at = time.monotonic()
+        projected = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("id") or "").strip()
+            if not model_id or len(model_id) > 200:
+                continue
+            projected.append({
+                **item,
+                "id": model_id,
+                "selectable": _looks_chat_compatible(model_id),
+            })
+        return {
+            "models": projected,
+            "count": len(projected),
+            "provider": "nvidia",
+            "catalog_fresh": bool(model_ids),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=503, detail="NVIDIA model catalog is unavailable") from exc
     except Exception as exc:
@@ -935,12 +1032,21 @@ async def skills():
 
 @app.post("/api/skills/{skill_name}")
 async def execute_skill(skill_name: str, request: ExecuteSkillRequest):
-    """Execute a skill."""
+    """Execute an explicitly reviewed read-only legacy skill."""
     try:
-        result = await jarvis.execute_skill(skill_name, request.params)
+        result = await jarvis.skills.execute_read_only(
+            skill_name, request.params, jarvis,
+        )
         return {"result": result}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Skill was not found") from exc
+    except PermissionError as exc:
+        # Legacy skills may expose read-only diagnostics, but consequential
+        # execution must enter through the guarded agent capability boundary.
+        raise HTTPException(
+            status_code=403,
+            detail="Skill action is outside the guarded capability boundary",
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Skill execution failed") from exc
 

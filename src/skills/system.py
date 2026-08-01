@@ -1,12 +1,14 @@
-"""System skill for Jarvis - system operations."""
-import os
+"""Read-only system diagnostics for Jarvis.
+
+Consequential process execution belongs to the guarded ``command_run`` agent
+tool.  Keeping that boundary here prevents chat skill dispatch and the generic
+skill API from becoming an unapproved shell escape hatch.
+"""
 import platform
 import psutil
-import subprocess
 from typing import Any, Dict
 
 from src.skills.registry import Skill
-from src.config import config
 
 
 class SystemSkill(Skill):
@@ -36,10 +38,9 @@ class SystemSkill(Skill):
         elif action == "network":
             return self._get_network_info()
         elif action == "shell":
-            command = params.get("command", "")
-            if not command:
-                return "No command specified"
-            return await self._run_shell(command)
+            raise PermissionError(
+                "Shell execution is available only through the guarded command_run tool"
+            )
         else:
             return self._get_system_info()
 
@@ -57,8 +58,6 @@ class SystemSkill(Skill):
             return "uptime"
         if any(w in text for w in ["network", "ip", "connection"]):
             return "network"
-        if any(w in text for w in ["shell", "cmd", "command", "run "]):
-            return "shell"
         return "info"
 
     def _get_system_info(self) -> str:
@@ -180,33 +179,6 @@ class SystemSkill(Skill):
 
         return "\n".join(lines)
 
-    async def _run_shell(self, command: str) -> str:
-        """Run shell command safely."""
-        # Safety check
-        dangerous = ['rm -rf', 'dd ', 'mkfs', 'fdisk', 'format', 'shutdown', 'reboot']
-        for d in dangerous:
-            if d in command.lower():
-                return f"Blocked dangerous command: {d}"
-
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-
-            output = ""
-            if stdout:
-                output += stdout.decode()
-            if stderr:
-                output += f"\n[stderr]\n{stderr.decode()}"
-
-            return output.strip() or "[No output]"
-        except asyncio.TimeoutError:
-            return "Command timed out (30s)"
-        except Exception as e:
-            return f"Error: {e}"
 
     def _format_bytes(self, bytes_val: int) -> str:
         """Format bytes to human readable."""

@@ -35,6 +35,8 @@
  *   voice: { armed, inputDevice, outputDevice, profile, sensitivity, level: number 0..1 }
  *   usage: { requests, tokens, spendUsd, capUsd, series:[{t,v}] }   series = 24h sparkline
  *   events: [{ at, who, meta, text, level: 'info'|'warn'|'error' }]
+ *   capabilities: [{ id, label, state: CapabilityState, summary,
+ *                    evidence:[{source,detail}] }]
  *   screens: { [ScreenKey]: Screen }
  *   viz: { [ScreenKey]: Viz }
  * }
@@ -49,6 +51,7 @@
  *   { kind:'series',   points:[{t,v}], compare:[{t,v}]|null, unit, axis:[string] }
  *
  * AgentState: see STATE_ENUM. Health: 'healthy'|'degraded'|'down'|'unknown'.
+ * CapabilityState: 'available'|'configured'|'verified'|'degraded'|'unavailable'.
  * ScreenKey:  see SCREEN_KEYS.
  */
 (function () {
@@ -61,6 +64,7 @@
     'GIT', 'SECURITY', 'USAGE', 'DEVICES', 'SETTINGS'];
 
   var TONES = ['ok', 'info', 'warn', 'danger', 'muted'];
+  var CAPABILITY_STATES = ['available', 'configured', 'verified', 'degraded', 'unavailable'];
 
   /* Endpoints the adapter will call. Rename here only — the UI never sees URLs. */
   var EXPECTED_ENDPOINTS = {
@@ -75,12 +79,20 @@
   function num(v, d) { v = Number(v); return isFinite(v) ? v : (d || 0); }
   function str(v, d) { return typeof v === 'string' && v.length ? v : (d || ''); }
   function tone(v) { return TONES.indexOf(v) >= 0 ? v : 'info'; }
+  function arr(v) { return Array.isArray(v) ? v : []; }
+  function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
 
   /* Coerce whatever the backend sends into the canonical model. Never throws:
      it returns { data, problems } so the UI can show a degraded, honest state. */
   function normalize(raw) {
     var problems = [];
     if (!raw || typeof raw !== 'object') return { data: null, problems: ['empty payload'] };
+    ['providers', 'flow', 'events', 'capabilities'].forEach(function (key) {
+      if (raw[key] != null && !Array.isArray(raw[key])) problems.push(key + ' must be an array');
+    });
+    if (raw.router && raw.router.models != null && !Array.isArray(raw.router.models)) {
+      problems.push('router.models must be an array');
+    }
 
     var a = raw.agent || {};
     var state = STATE_ENUM.indexOf(a.state) >= 0 ? a.state : (problems.push('unknown agent.state: ' + a.state), 'idle');
@@ -105,30 +117,50 @@
       } : null,
       router: raw.router ? {
         auto: !!raw.router.auto, primary: str(raw.router.primary),
-        models: (raw.router.models || []).map(function (m) {
+        capabilityState: CAPABILITY_STATES.indexOf(raw.router.capabilityState) >= 0
+          ? raw.router.capabilityState : 'unavailable',
+        evidence: arr(raw.router.evidence).slice(0, 6).map(function (e) {
+          e = obj(e);
+          return { source: str(e.source), detail: str(e.detail) };
+        }),
+        models: arr(raw.router.models).map(function (m) {
+          m = obj(m);
           return {
             id: str(m.id), name: str(m.name, m.id), provider: str(m.provider),
             variants: num(m.variants, 1), health: str(m.health, 'unknown'), latencyMs: num(m.latencyMs),
-            selectable: m.selectable === true, catalogSource: str(m.catalogSource, 'configured')
+            selectable: m.selectable === true, catalogSource: str(m.catalogSource, 'configured'),
+            capabilityState: CAPABILITY_STATES.indexOf(m.capabilityState) >= 0
+              ? m.capabilityState : 'unavailable',
+            evidenceSource: str(m.evidenceSource, 'unavailable')
           };
         })
       } : null,
-      providers: (raw.providers || []).map(function (p) {
+      providers: arr(raw.providers).map(function (p) {
+        p = obj(p);
         return {
           id: str(p.id), name: str(p.name, p.id), status: str(p.status, 'unknown'),
-          latencyMs: num(p.latencyMs), circuit: str(p.circuit, 'closed')
+          latencyMs: num(p.latencyMs), latencyVerified: p.latencyVerified === true,
+          circuit: str(p.circuit, 'unknown'),
+          capabilityState: CAPABILITY_STATES.indexOf(p.capabilityState) >= 0
+            ? p.capabilityState : 'unavailable',
+          evidence: arr(p.evidence).slice(0, 6).map(function (e) {
+            e = obj(e);
+            return { source: str(e.source), detail: str(e.detail) };
+          })
         };
       }),
       voice: raw.voice ? {
         armed: !!raw.voice.armed, inputDevice: str(raw.voice.inputDevice),
         outputDevice: str(raw.voice.outputDevice), profile: str(raw.voice.profile),
-        sensitivity: num(raw.voice.sensitivity, 6), level: num(raw.voice.level)
+        sensitivity: num(raw.voice.sensitivity, 6), level: num(raw.voice.level),
+        capabilityState: CAPABILITY_STATES.indexOf(raw.voice.capabilityState) >= 0
+          ? raw.voice.capabilityState : 'unavailable'
       } : null,
       usage: raw.usage ? {
         requests: num(raw.usage.requests), tokens: num(raw.usage.tokens),
         spendUsd: num(raw.usage.spendUsd), capUsd: num(raw.usage.capUsd),
         metered: raw.usage.metered === true,
-        series: (raw.usage.series || []).map(function (p) { return { t: str(p.t), v: num(p.v) }; })
+        series: arr(raw.usage.series).map(function (p) { p = obj(p); return { t: str(p.t), v: num(p.v) }; })
       } : null,
       workspace: raw.workspace ? {
         project: str(raw.workspace.project), branch: str(raw.workspace.branch),
@@ -136,21 +168,37 @@
         agentsActive: num(raw.workspace.agentsActive), agentsTotal: num(raw.workspace.agentsTotal),
         tasksComplete: num(raw.workspace.tasksComplete), tasksTotal: num(raw.workspace.tasksTotal),
         missionWindow: str(raw.workspace.missionWindow),
-        projects: (raw.workspace.projects || []).map(function (p) {
+        projects: arr(raw.workspace.projects).map(function (p) {
+          p = obj(p);
           return { id: str(p.id), name: str(p.name, p.id), protected: p.protected === true };
         })
       } : null,
-      flow: (raw.flow || []).map(function (f) {
+      flow: arr(raw.flow).map(function (f) {
+        f = obj(f);
         return { name: str(f.name), state: str(f.state), tone: tone(f.tone) };
       }),
       graph: raw.graph ? {
         nodes: num(raw.graph.nodes), edges: num(raw.graph.edges),
         vaultNotes: num(raw.graph.vaultNotes), health: str(raw.graph.health, 'unknown')
       } : null,
-      events: (raw.events || []).map(function (e) {
+      events: arr(raw.events).map(function (e) {
+        e = obj(e);
         return {
           at: str(e.at), who: str(e.who, 'SYSTEM'), meta: str(e.meta),
           text: str(e.text), level: ['info', 'warn', 'error'].indexOf(e.level) >= 0 ? e.level : 'info'
+        };
+      }),
+      capabilities: arr(raw.capabilities).map(function (c) {
+        c = obj(c);
+        var state = CAPABILITY_STATES.indexOf(c.state) >= 0 ? c.state : 'unavailable';
+        if (state !== c.state) problems.push('unknown capability state for ' + str(c.id, 'unknown'));
+        return {
+          id: str(c.id), label: str(c.label, c.id), state: state,
+          summary: str(c.summary),
+          evidence: arr(c.evidence).slice(0, 6).map(function (e) {
+            e = obj(e);
+            return { source: str(e.source), detail: str(e.detail) };
+          })
         };
       }),
       screens: {}, viz: {}
@@ -158,15 +206,16 @@
 
     Object.keys(raw.screens || {}).forEach(function (k) {
       if (SCREEN_KEYS.indexOf(k) < 0) { problems.push('unknown screen key: ' + k); return; }
-      var s = raw.screens[k] || {};
+      var s = obj(raw.screens[k]);
       data.screens[k] = {
         title: str(s.title, k), subtitle: str(s.subtitle),
-        kpis: (s.kpis || []).slice(0, 4).map(function (x) { return { k: str(x.k), v: str(x.v), tone: tone(x.tone) }; }),
-        items: (s.items || []).map(function (i) {
+        kpis: arr(s.kpis).slice(0, 4).map(function (x) { x = obj(x); return { k: str(x.k), v: str(x.v), tone: tone(x.tone) }; }),
+        items: arr(s.items).map(function (i) {
+          i = obj(i);
           var action = i.action && typeof i.action === 'object' ? i.action : null;
           return {
             name: str(i.name), sub: str(i.sub), tag: str(i.tag), tone: tone(i.tone),
-            pct: num(i.pct), meta: (i.meta || []).slice(0, 2).map(function (m) { return [str(m[0]), str(m[1])]; }),
+            pct: num(i.pct), meta: arr(i.meta).slice(0, 2).map(function (m) { m = arr(m); return [str(m[0]), str(m[1])]; }),
             action: action ? {
               id: str(action.id, str(i.id)),
               command: str(action.command), payload: action.payload && typeof action.payload === 'object' ? action.payload : {},
@@ -178,27 +227,28 @@
     });
 
     Object.keys(raw.viz || {}).forEach(function (k) {
-      var v = raw.viz[k]; if (!v || SCREEN_KEYS.indexOf(k) < 0) return;
+      var v = obj(raw.viz[k]); if (!Object.keys(v).length || SCREEN_KEYS.indexOf(k) < 0) return;
       if (v.kind === 'graph') {
         data.viz[k] = {
           kind: 'graph',
-          nodes: (v.nodes || []).map(function (n) {
+          nodes: arr(v.nodes).map(function (n) {
+            n = obj(n);
             return { id: str(n.id), x: num(n.x), y: num(n.y), z: num(n.z), cluster: num(n.cluster), size: num(n.size, 1), label: str(n.label) };
           }),
-          edges: (v.edges || []).filter(function (e) { return e && e.length >= 2; })
+          edges: arr(v.edges).filter(function (e) { return e && e.length >= 2; })
         };
       } else if (v.kind === 'topology') {
         data.viz[k] = {
           kind: 'topology',
           hub: { label: str((v.hub || {}).label, 'ORCHESTRATOR'), state: str((v.hub || {}).state, 'idle') },
-          spokes: (v.spokes || []).map(function (s) { return { label: str(s.label), state: str(s.state, 'idle'), ring: num(s.ring, 1) }; })
+          spokes: arr(v.spokes).map(function (s) { s = obj(s); return { label: str(s.label), state: str(s.state, 'idle'), ring: num(s.ring, 1) }; })
         };
       } else if (v.kind === 'series') {
         data.viz[k] = {
           kind: 'series', unit: str(v.unit),
-          points: (v.points || []).map(function (p) { return { t: str(p.t), v: num(p.v) }; }),
-          compare: v.compare ? v.compare.map(function (p) { return { t: str(p.t), v: num(p.v) }; }) : null,
-          axis: (v.axis || []).map(String)
+          points: arr(v.points).map(function (p) { p = obj(p); return { t: str(p.t), v: num(p.v) }; }),
+          compare: Array.isArray(v.compare) ? v.compare.map(function (p) { p = obj(p); return { t: str(p.t), v: num(p.v) }; }) : null,
+          axis: arr(v.axis).map(String)
         };
       } else problems.push('unknown viz kind for ' + k + ': ' + v.kind);
     });
@@ -239,7 +289,7 @@
       });
     }
 
-    function hostApproval(id, decision, note) {
+    function hostApproval(id, decision, note, reference) {
       if (window.parent === window) return null;
       var requestId = 'exact-approval-' + Date.now() + '-' + (++commandSequence);
       return new Promise(function (resolve) {
@@ -248,7 +298,12 @@
           resolve({ ok: false, message: 'Approval bridge timed out' });
         }, 30000);
         pendingCommands[requestId] = { resolve: resolve, timeout: timeout };
-        postHost('approval', { id: id, decision: decision, note: note || '' }, requestId);
+        reference = obj(reference);
+        postHost('approval', {
+          id: id, decision: decision, note: note || '',
+          stepId: str(reference.stepId), challengeId: str(reference.challengeId),
+          approvals: arr(reference.approvals)
+        }, requestId);
       });
     }
 
@@ -320,6 +375,70 @@
     if (base) { poll(); openWs(); timer = setInterval(poll, pollMs); }
     else onChange(null, meta({ error: 'no baseUrl configured — running on demo data' }));
 
+    function bounded(v, fallback, maxLength) {
+      return typeof v === 'string' && v.length
+        ? v.slice(0, maxLength || 512)
+        : (fallback || '');
+    }
+
+    function safeFailureReceipt(raw, status) {
+      raw = obj(raw);
+      var failure = {
+        ok: false,
+        message: bounded(raw.message || raw.detail || raw.code, 'HTTP ' + status, 800)
+      };
+      if (typeof raw.code === 'string') failure.code = bounded(raw.code, '', 128);
+      if (typeof raw.correlation_id === 'string') {
+        failure.correlation_id = bounded(raw.correlation_id, '', 128);
+      }
+      if (raw.retryable === true || raw.retryable === false) failure.retryable = raw.retryable;
+      if (Object.prototype.hasOwnProperty.call(raw, 'applied')) {
+        failure.applied = raw.applied === true ? true : raw.applied === false ? false : null;
+      }
+      if (raw.partial === true || raw.partial === false) failure.partial = raw.partial;
+      ['applied_count', 'requested_count'].forEach(function (key) {
+        if (typeof raw[key] === 'number' && isFinite(raw[key])) {
+          failure[key] = Math.max(0, Math.floor(raw[key]));
+        }
+      });
+      failure.applied_ids = arr(raw.applied_ids).slice(0, 64).map(function (value) {
+        return bounded(value, '', 192);
+      }).filter(Boolean);
+      failure.applied_items = arr(raw.applied_items).slice(0, 64).map(function (item) {
+        item = obj(item);
+        return {
+          id: bounded(item.id, '', 192),
+          agent_run_id: bounded(item.agent_run_id, '', 128),
+          step_id: bounded(item.step_id, '', 80),
+          status: bounded(item.status, 'unknown', 80)
+        };
+      });
+      ['failed_approval_id', 'reason_code', 'swarm_id', 'swarm_status', 'status'].forEach(function (key) {
+        if (typeof raw[key] === 'string') failure[key] = bounded(raw[key], '', 192);
+      });
+      failure.child_statuses = arr(raw.child_statuses).slice(0, 64).map(function (item) {
+        item = obj(item);
+        return {
+          task_id: bounded(item.task_id, '', 128),
+          task_status: bounded(item.task_status, 'unknown', 80),
+          agent_run_id: bounded(item.agent_run_id, '', 128),
+          agent_status: bounded(item.agent_status, 'unknown', 80)
+        };
+      });
+      if (raw.reconciliation && typeof raw.reconciliation === 'object') {
+        var reconciliation = obj(raw.reconciliation);
+        failure.reconciliation = {
+          required: reconciliation.required === true,
+          action: bounded(reconciliation.action, 'refresh_before_retry', 80),
+          guidance: bounded(reconciliation.guidance, 'Refresh status before retry.', 1200),
+          resume_attempted: reconciliation.resume_attempted === true,
+          resume_status: bounded(reconciliation.resume_status, 'unknown', 80),
+          reason_code: bounded(reconciliation.reason_code, '', 128)
+        };
+      }
+      return failure;
+    }
+
     function securePost(path, body) {
       return fetch(base + '/api/auth/session', {
         credentials: 'same-origin', headers: { accept: 'application/json' }
@@ -334,7 +453,7 @@
         });
       }).then(function (r) {
         return r.json().then(function (body) {
-          if (!r.ok) return { ok: false, message: body.detail || body.code || ('HTTP ' + r.status) };
+          if (!r.ok) return safeFailureReceipt(body, r.status);
           return Object.assign({ ok: true }, body);
         });
       }).catch(function (e) { return { ok: false, message: String(e && e.message || e) }; });
@@ -352,30 +471,62 @@
         if (ws) try { ws.close(); } catch (e) { }
       },
       command: function (action, payload) {
-        var runId = payload && typeof payload.runId === 'string' ? payload.runId.trim() : '';
-        var bridged = hostCommand(action, payload || {});
+        payload = obj(payload);
+        var runId = typeof payload.runId === 'string' ? payload.runId.trim() : '';
+        var bridged = hostCommand(action, payload);
         if (bridged) return bridged;
-        var protectedPath = null;
+        var protectedPath = null, protectedBody = {};
         if (runId) {
           var encoded = encodeURIComponent(runId);
-          if (action === 'approve_agent_run') protectedPath = '/api/ui/agent/runs/' + encoded + '/approve-current';
+          if (action === 'approve_agent_run') {
+            if (!str(payload.stepId) || !str(payload.challengeId)) {
+              return Promise.resolve({ ok: false, message: 'Approval challenge is missing; refresh the run card' });
+            }
+            protectedPath = '/api/ui/agent/runs/' + encoded + '/approve-current';
+            protectedBody = { step_id: payload.stepId, challenge_id: payload.challengeId };
+          }
           else if (action === 'cancel_agent_run') protectedPath = '/api/ui/agent/runs/' + encoded + '/cancel';
-          else if (action === 'approve_swarm_run') protectedPath = '/api/ui/swarm/runs/' + encoded + '/approve-current';
+          else if (action === 'approve_swarm_run') {
+            var approvals = arr(payload.approvals);
+            if (!approvals.length) {
+              return Promise.resolve({ ok: false, message: 'Swarm approval challenges are missing; refresh the mission card' });
+            }
+            protectedPath = '/api/ui/swarm/runs/' + encoded + '/approve-current';
+            protectedBody = { approvals: approvals.map(function (item) {
+              item = obj(item);
+              return {
+                agent_run_id: str(item.agentRunId),
+                step_id: str(item.stepId),
+                challenge_id: str(item.challengeId)
+              };
+            }) };
+          }
           else if (action === 'cancel_swarm_run') protectedPath = '/api/ui/swarm/runs/' + encoded + '/cancel';
         }
         if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
-        if (protectedPath) return securePost(protectedPath, {});
-        return securePost(EXPECTED_ENDPOINTS.command, { action: action, payload: payload || null });
+        if (protectedPath) return securePost(protectedPath, protectedBody);
+        return securePost(EXPECTED_ENDPOINTS.command, { action: action, payload: payload });
       },
-      approval: function (id, decision, note) {
+      approval: function (id, decision, note, reference) {
         id = typeof id === 'string' ? id.trim() : '';
         decision = decision === 'reject' ? 'reject' : decision === 'approve' ? 'approve' : '';
         if (!id || !decision) return Promise.resolve({ ok: false, message: 'A valid approval id and decision are required' });
-        var bridged = hostApproval(id, decision, note);
+        reference = obj(reference);
+        var bridged = hostApproval(id, decision, note, reference);
         if (bridged) return bridged;
         if (!base) return Promise.resolve({ ok: false, message: 'demo mode — no backend attached' });
         return securePost(EXPECTED_ENDPOINTS.approve.replace('{id}', encodeURIComponent(id)), {
-          decision: decision, note: typeof note === 'string' ? note : ''
+          decision: decision, note: typeof note === 'string' ? note : '',
+          step_id: str(reference.stepId) || null,
+          challenge_id: str(reference.challengeId) || null,
+          approvals: arr(reference.approvals).map(function (item) {
+            item = obj(item);
+            return {
+              agent_run_id: str(item.agentRunId),
+              step_id: str(item.stepId),
+              challenge_id: str(item.challengeId)
+            };
+          })
         });
       },
       emergencyStop: function () {
@@ -398,6 +549,7 @@
   window.JarvisAdapter = {
     connect: connect, normalize: normalize,
     STATE_ENUM: STATE_ENUM, SCREEN_KEYS: SCREEN_KEYS, TONES: TONES,
+    CAPABILITY_STATES: CAPABILITY_STATES,
     EXPECTED_ENDPOINTS: EXPECTED_ENDPOINTS
   };
 })();

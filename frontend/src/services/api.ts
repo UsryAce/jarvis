@@ -34,6 +34,30 @@ export interface JarvisUISnapshot {
   events: Array<{ at: string; who: string; meta: string; text: string; level: string }>;
 }
 
+export interface ApprovalReference {
+  agentRunId?: string;
+  stepId: string;
+  challengeId: string;
+}
+
+export interface ApprovalAppliedItem {
+  id: string;
+  agent_run_id: string;
+  step_id: string;
+  status: string;
+}
+
+export interface ApprovalReconciliation {
+  required: boolean;
+  action: "refresh_before_retry" | "none" | string;
+  guidance: string;
+  resume_attempted: boolean;
+  resume_status: string;
+  reason_code?: string | null;
+  swarm_status_endpoint?: string;
+  agent_status_endpoints?: string[];
+}
+
 export interface SafeApiError {
   code:
     | "authentication_required"
@@ -48,6 +72,18 @@ export interface SafeApiError {
   audit_id?: string;
   retryable: boolean;
   applied: boolean | null;
+  partial?: boolean;
+  applied_count?: number;
+  requested_count?: number;
+  applied_ids?: string[];
+  applied_items?: ApprovalAppliedItem[];
+  failed_approval_id?: string | null;
+  reason_code?: string;
+  swarm_id?: string;
+  swarm_status?: string;
+  status?: string;
+  message?: string;
+  reconciliation?: ApprovalReconciliation;
 }
 
 export class SafeApiException extends Error {
@@ -60,6 +96,64 @@ export class SafeApiException extends Error {
     this.safe = safe;
     this.status = status;
   }
+}
+
+export function safeUiCommandFailure(
+  error: unknown,
+  fallback: string,
+): {
+  ok: false;
+  message: string;
+  code?: string;
+  applied?: boolean | null;
+  partial?: boolean;
+  appliedCount?: number;
+  appliedIds?: string[];
+  status?: string;
+  refreshRequired?: boolean;
+} {
+  if (!(error instanceof SafeApiException)) {
+    return { ok: false, message: fallback };
+  }
+  const safe = error.safe;
+  if (safe.applied === true || safe.partial === true) {
+    const count = Math.max(
+      1,
+      typeof safe.applied_count === "number" && Number.isFinite(safe.applied_count)
+        ? safe.applied_count
+        : 0,
+    );
+    const ids = Array.isArray(safe.applied_ids)
+      ? safe.applied_ids.filter((id): id is string => typeof id === "string")
+      : [];
+    const idSummary = ids.length ? ` (${ids.slice(0, 3).join(", ")})` : "";
+    const reconciliation = safe.reconciliation && typeof safe.reconciliation === "object"
+      ? safe.reconciliation
+      : undefined;
+    const guidance = typeof reconciliation?.guidance === "string"
+      ? reconciliation.guidance
+      : "Refresh the mission and linked agent runs before approving again; do not retry a stale challenge.";
+    return {
+      ok: false,
+      message: `${count} child approval(s) were already applied${idSummary}. ${guidance}`,
+      code: safe.code,
+      applied: safe.applied,
+      partial: safe.partial ?? true,
+      appliedCount: safe.applied_count ?? count,
+      appliedIds: ids,
+      status: safe.swarm_status || safe.status,
+      refreshRequired: true,
+    };
+  }
+  return {
+    ok: false,
+    message: safe.message || safe.code || fallback,
+    code: safe.code,
+    applied: safe.applied,
+    partial: safe.partial,
+    status: safe.swarm_status || safe.status,
+    refreshRequired: safe.reconciliation?.required,
+  };
 }
 
 export type ControlState =
@@ -853,10 +947,10 @@ class APIClient {
     return response.data as Record<string, any>;
   }
 
-  async approveAgentRun(id: string, stepIds: string[]) {
+  async approveAgentRun(id: string, stepIds: string[], challengeId: string) {
     const response = await this.client.post(
       `/api/agent/runs/${encodeURIComponent(id)}/approve`,
-      { step_ids: stepIds },
+      { step_ids: stepIds, challenge_id: challengeId },
     );
     return response.data as Record<string, any>;
   }
@@ -1057,8 +1151,10 @@ class APIClient {
     return response.data as {
       count: number;
       provider: string;
+      catalog_fresh: boolean;
       models: Array<{
         id: string;
+        selectable: boolean;
         object?: string;
         created?: number;
         owned_by?: string;
@@ -1074,9 +1170,16 @@ class APIClient {
     const runId = typeof payload.runId === "string" ? payload.runId.trim() : "";
     const encodedRunId = runId ? encodeURIComponent(runId) : "";
     if (action === "approve_agent_run" && encodedRunId) {
+      const stepId = typeof payload.stepId === "string" ? payload.stepId.trim() : "";
+      const challengeId = typeof payload.challengeId === "string"
+        ? payload.challengeId.trim()
+        : "";
+      if (!stepId || !challengeId) {
+        return { ok: false, message: "Approval challenge is missing; refresh the run card" };
+      }
       return (await this.client.post(
         `/api/ui/agent/runs/${encodedRunId}/approve-current`,
-        {},
+        { step_id: stepId, challenge_id: challengeId },
       )).data as { ok: boolean; message: string; runId?: string };
     }
     if (action === "cancel_agent_run" && encodedRunId) {
@@ -1086,9 +1189,26 @@ class APIClient {
       )).data as { ok: boolean; message: string; runId?: string };
     }
     if (action === "approve_swarm_run" && encodedRunId) {
+      const approvals = Array.isArray(payload.approvals)
+        ? payload.approvals.filter((item): item is ApprovalReference & { agentRunId: string } => (
+          !!item && typeof item === "object"
+          && typeof (item as ApprovalReference).agentRunId === "string"
+          && typeof (item as ApprovalReference).stepId === "string"
+          && typeof (item as ApprovalReference).challengeId === "string"
+        ))
+        : [];
+      if (!approvals.length) {
+        return { ok: false, message: "Swarm approval challenges are missing; refresh the mission card" };
+      }
       return (await this.client.post(
         `/api/ui/swarm/runs/${encodedRunId}/approve-current`,
-        {},
+        {
+          approvals: approvals.map((item) => ({
+            agent_run_id: item.agentRunId.trim(),
+            step_id: item.stepId.trim(),
+            challenge_id: item.challengeId.trim(),
+          })),
+        },
       )).data as { ok: boolean; message: string; runId?: string };
     }
     if (action === "cancel_swarm_run" && encodedRunId) {
@@ -1123,11 +1243,23 @@ class APIClient {
     id: string,
     decision: "approve" | "reject",
     note = "",
+    reference?: ApprovalReference,
+    approvals: Array<ApprovalReference & { agentRunId: string }> = [],
   ) {
     return (
       await this.client.post(
         `/api/ui/approval/${encodeURIComponent(id)}`,
-        { decision, note },
+        {
+          decision,
+          note,
+          step_id: reference?.stepId,
+          challenge_id: reference?.challengeId,
+          approvals: approvals.map((item) => ({
+            agent_run_id: item.agentRunId,
+            step_id: item.stepId,
+            challenge_id: item.challengeId,
+          })),
+        },
       )
     ).data as { ok: boolean; message: string; runId?: string; status?: string };
   }

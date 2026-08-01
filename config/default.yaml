@@ -114,6 +114,10 @@ memory:
   path: "./data/memory"
   collection: "jarvis_memory"
   embedding_model: "nvidia/nv-embedqa-e5-v5"
+  embedding_version: "nvidia-api-v2-query-passage"
+  embedding_dimensions: 1024
+  fallback_embedding_dimensions: 1024
+  promotion_batch_size: 25
   max_context: 8192
   similarity_threshold: 0.7
 

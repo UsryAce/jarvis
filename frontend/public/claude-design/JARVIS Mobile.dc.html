@@ -26,7 +26,7 @@ a{color:#35D6FF;text-decoration:none}a:hover{color:#9BE9FF}
 
   <div style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(4,9,15,.9)">
     <div style="font:700 13px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF">JARVIS</div>
-    <div style="font:500 7px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#5C7C8C">REMOTE</div>
+    <div style="font:500 7px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#5C7C8C">{{ linkLabel }}</div>
     <div style="flex:1"></div>
     <div onClick="{{ reconnect }}" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid {{ sourceCol }}">
       <div style="width:4px;height:4px;border-radius:50%;background:{{ sourceCol }};box-shadow:0 0 7px {{ sourceCol }}"></div>
@@ -50,7 +50,7 @@ a{color:#35D6FF;text-decoration:none}a:hover{color:#9BE9FF}
         <canvas ref="{{ coreRef }}" width="720" height="500" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
         <div style="position:absolute;left:12px;top:11px;pointer-events:none">
           <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#9BE9FF">REACTOR CORE</div>
-          <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#3F5B69;margin-top:6px">TAP TO SURGE · REMOTE LINK</div>
+          <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#3F5B69;margin-top:6px">TAP TO SURGE · {{ linkDetail }}</div>
         </div>
         <div onClick="{{ surge }}" style="position:absolute;inset:0;cursor:pointer"></div>
         <div style="position:absolute;right:12px;bottom:11px;font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:{{ stateColor }};pointer-events:none">AUTONOMY {{ autonomy }}</div>
@@ -229,8 +229,8 @@ const OPS = {
 };
 
 class Component extends DCLogic {
-  state = {tab:'HOME', si:0, held:false, armed:true, t:0, live:null, meta:null, level:2, voice:{},
-    toast:'Remote link established · all commands are gated', toastOn:true,
+  state = {tab:'HOME', si:0, held:false, armed:false, t:0, live:null, meta:null, level:2, voice:{connected:false,ready:false,armed:false},
+    toast:'Waiting for live transport evidence · commands remain gated', toastOn:true,
     transcript:'No voice command captured yet.'};
 
   componentDidMount(){
@@ -251,7 +251,7 @@ class Component extends DCLogic {
       const data = event.data;
       if (!data || data.type !== 'jarvis-voice-state' || !data.value || typeof data.value !== 'object') return;
       this.setState(s=>({
-        voice:{...s.voice,...data.value},
+        voice:{...s.voice,...data.value,connected:true},
         armed:typeof data.value.armed === 'boolean' ? data.value.armed : s.armed,
         transcript:data.value.lastUser ? '"'+data.value.lastUser+'"' : s.transcript
       }));
@@ -270,8 +270,7 @@ class Component extends DCLogic {
       onChange: (snap, meta)=> this.setState(s=>({
         live:snap, meta:meta,
         held:snap && snap.agent ? snap.agent.held : s.held,
-        level:snap && snap.agent ? snap.agent.autonomy : s.level,
-        armed:snap && snap.voice ? snap.voice.armed : s.armed
+        level:snap && snap.agent ? snap.agent.autonomy : s.level
       }))
     });
   }
@@ -548,6 +547,7 @@ class Component extends DCLogic {
     const s = this.state, st = this.cur(), L = s.live, col = this.accent();
     const live = !!L;
     const stale = !!(s.meta && s.meta.stale);
+    const remoteCapability = L && (L.capabilities||[]).find(c=>c.id==='remote_https');
     const go = (tab)=> ()=> this.openTab(tab);
     const cmd = (name)=> ()=>{
       if (name === 'HOLD ALL AGENTS') return this.runCommand('hold', {});
@@ -575,9 +575,11 @@ class Component extends DCLogic {
       {time:'00:41:12', who:'JARVIS', meta:'router · 1.2s', col:TE, text:'Patch staged on checkout-svc. Deploy gate held for your approval.'},
       {time:'00:39:04', who:'SECURITY', meta:'policy', col:AM, text:'Workspace boundary enforced — /system32 request denied.'},
       {time:'00:36:50', who:'TESTER', meta:'suite', col:col, text:'Integration suite passing 148 of 210 · no new failures.'},
-      {time:'00:31:22', who:'YOU', meta:'remote', col:'#DCE8F2', text:'Directive received over secure link.'}]).slice(0,5);
+      {time:'00:31:22', who:'YOU', meta:'demo', col:'#DCE8F2', text:'Illustrative directive event · no live transport evidence.'}]).slice(0,5);
     return {
       clock: new Date().toTimeString().slice(0,8),
+      linkLabel: stale ? 'STALE' : remoteCapability ? remoteCapability.state.toUpperCase() : live ? 'UNVERIFIED' : 'DEMO',
+      linkDetail: stale ? ('TRANSPORT EVIDENCE EXPIRED · '+fmtAge(L&&L.at)) : remoteCapability ? remoteCapability.summary.toUpperCase() : live ? 'TRANSPORT EVIDENCE UNAVAILABLE' : 'DEMO LINK',
       stateColor: st.color, stateLabel: st.label,
       stateSub: L ? (L.agent.detail || st.sub) : st.sub,
       autonomy: 'L' + (L ? L.agent.autonomy : s.level),
@@ -592,7 +594,7 @@ class Component extends DCLogic {
       }),
       sourceLabel: stale ? 'STALE '+fmtAge(L&&L.at) : live ? 'LIVE' : 'DEMO', sourceCol: stale ? AM : live ? TE : AM,
       src: stale ? SRC('stale') : (s.tab === 'MISSIONS' || s.tab === 'AGENTS' || s.tab === 'ALERTS' ? opsSrc : SRC(live)), opsSrcLabel: stale ? 'STALE' : opsSrc.label,
-      reconnect: ()=>{ this.connectBackend(); this.toastMsg('Reconnecting to '+((this.props.apiBase ?? '')||'this secure origin')); },
+      reconnect: ()=>{ this.connectBackend(); this.toastMsg('Reconnecting to '+((this.props.apiBase ?? '')||'the current origin')); },
       estop: ()=>{
         if (s.held) return this.toastMsg('Emergency stop is already active · use the protected control rail to reset it');
         if (!this.store || !this.store.emergencyStop) return this.toastMsg('Control plane is not connected');
@@ -605,11 +607,15 @@ class Component extends DCLogic {
       pttStart: this.pttStart,
       pttStop: this.pttStop,
       toggleArm: ()=>{
-        const armed = !(s.voice && typeof s.voice.armed === 'boolean' ? s.voice.armed : (L && L.voice ? L.voice.armed : s.armed));
+        const armed = !(s.voice && s.voice.connected && typeof s.voice.armed === 'boolean' ? s.voice.armed : (L && L.voice ? L.voice.armed : s.armed));
         this.voiceControl(armed ? 'arm' : 'disarm');
         this.runCommand(armed ? 'voice_arm' : 'voice_disarm', {}, ()=>this.setState({armed:armed}));
       },
-      voiceState: (s.voice && typeof s.voice.armed === 'boolean' ? s.voice.armed : (L && L.voice ? L.voice.armed : s.armed)) ? 'ARMED' : 'DISARMED',
+      voiceState: (s.voice && s.voice.connected)
+        ? (!s.voice.armed ? 'DISARMED' : s.voice.error ? 'ERROR' : s.voice.capturing ? 'LISTENING' : s.voice.transcribing ? 'TRANSCRIBING' : s.voice.processing ? 'THINKING' : s.voice.speaking ? 'SPEAKING' : s.voice.ready ? (s.voice.handsFree ? 'HANDS-FREE' : s.voice.clapWake ? 'CLAP-WAKE' : 'READY') : 'CONFIGURED')
+        : L && L.voice
+        ? (L.voice.capabilityState||'unverified').toUpperCase()
+        : (s.armed ? 'CONFIGURED' : 'DISARMED'),
       transcript: s.transcript,
       coreRef: this.coreRef,
       isHome: s.tab === 'HOME', isVoice: s.tab === 'VOICE',

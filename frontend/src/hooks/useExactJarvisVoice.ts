@@ -17,6 +17,7 @@ export type ExactJarvisVoiceAction =
 
 export type ExactJarvisVoiceState = {
   armed: boolean;
+  ready: boolean;
   capturing: boolean;
   transcribing: boolean;
   processing: boolean;
@@ -174,7 +175,8 @@ export function useExactJarvisVoice(
     readStored("jarvis_voice_input_device"),
   );
   const [voice, setVoice] = useState<ExactJarvisVoiceState>(() => ({
-    armed: true,
+    armed: false,
+    ready: false,
     capturing: false,
     transcribing: false,
     processing: false,
@@ -472,7 +474,7 @@ export function useExactJarvisVoice(
     async (submit = true) => {
       if (!stateRef.current.capturing && !captureStartingRef.current) return;
       const { chunks, sampleRate } = releaseCapture();
-      updateVoice({ capturing: false, level: 0 });
+      updateVoice({ capturing: false, ready: false, level: 0 });
       const sampleCount = chunks.reduce(
         (total, chunk) => total + chunk.length,
         0,
@@ -517,7 +519,10 @@ export function useExactJarvisVoice(
       !navigator.mediaDevices?.getUserMedia ||
       typeof AudioContext === "undefined"
     ) {
-      updateVoice({ error: "Microphone capture is unsupported in this browser" });
+      updateVoice({
+        ready: false,
+        error: "Microphone capture is unsupported in this browser",
+      });
       return false;
     }
     captureStartingRef.current = true;
@@ -592,8 +597,21 @@ export function useExactJarvisVoice(
       captureProcessorRef.current = processor;
       captureStreamRef.current = stream;
       captureStartingRef.current = false;
-      const label = stream.getAudioTracks()[0]?.label;
+      const inputTrack = stream.getAudioTracks()[0];
+      inputTrack?.addEventListener(
+        "ended",
+        () => {
+          updateVoice({
+            ready: false,
+            error: "Microphone device became unavailable",
+          });
+          void stopCaptureRef.current?.(false);
+        },
+        { once: true },
+      );
+      const label = inputTrack?.label;
       updateVoice({
+        ready: true,
         capturing: true,
         inputDevice: label || stateRef.current.inputDevice,
         error: "",
@@ -610,7 +628,10 @@ export function useExactJarvisVoice(
       if (attempt === captureAttemptRef.current)
         captureStartingRef.current = false;
       autoStopCaptureRef.current = false;
-      updateVoice({ error: errorText(error, "Microphone permission was denied") });
+      updateVoice({
+        ready: false,
+        error: errorText(error, "Microphone permission was denied"),
+      });
       return false;
     }
   }, [refreshInputs, selectedInputId, updateVoice]);
@@ -629,7 +650,8 @@ export function useExactJarvisVoice(
     clapStreamRef.current = null;
     void clapContextRef.current?.close();
     clapContextRef.current = null;
-  }, []);
+    updateVoice({ ready: false });
+  }, [updateVoice]);
 
   const playWakeSignal = useCallback(async () => {
     const context = new AudioContext();
@@ -671,14 +693,19 @@ export function useExactJarvisVoice(
   const setArmed = useCallback(
     (armed: boolean) => {
       if (!armed) {
-        updateVoice({ armed, handsFree: false, clapWake: false });
+        updateVoice({
+          armed,
+          ready: false,
+          handsFree: false,
+          clapWake: false,
+        });
         writeStored("jarvis_clap_wake", "false");
         stopClapMonitor();
         void stopCaptureRef.current?.(false);
         stopPlayback();
         updateVoice({ speaking: false });
       } else {
-        updateVoice({ armed, error: "" });
+        updateVoice({ armed, ready: false, error: "" });
       }
       persistArmed(armed);
     },
@@ -740,6 +767,7 @@ export function useExactJarvisVoice(
         (device) => device.deviceId === deviceId,
       );
       updateVoice({
+        ready: false,
         inputDeviceId: deviceId,
         inputDevice:
           String(payload?.label || "").slice(0, 160) ||
@@ -753,7 +781,7 @@ export function useExactJarvisVoice(
 
   const testMic = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      updateVoice({ error: "Microphone test is unsupported" });
+      updateVoice({ ready: false, error: "Microphone test is unsupported" });
       return;
     }
     if (stateRef.current.capturing) await stopCaptureRef.current?.(false);
@@ -767,6 +795,7 @@ export function useExactJarvisVoice(
           ? { deviceId: { exact: selectedInputId } }
           : true,
       });
+      updateVoice({ ready: true });
       context = new AudioContext();
       if (context.state === "suspended") await context.resume();
       const source = context.createMediaStreamSource(stream);
@@ -790,6 +819,7 @@ export function useExactJarvisVoice(
       await context.close();
       context = null;
       updateVoice({
+        ready: false,
         inputDevice: label || stateRef.current.inputDevice,
         lastJarvis:
           peak > 0.001
@@ -799,7 +829,10 @@ export function useExactJarvisVoice(
       await speak("Voice output online. I can hear you, Ahmed.");
       void refreshInputs();
     } catch (error) {
-      updateVoice({ error: errorText(error, "Microphone permission was denied") });
+      updateVoice({
+        ready: false,
+        error: errorText(error, "Microphone permission was denied"),
+      });
     } finally {
       stream?.getTracks().forEach((track) => track.stop());
       void context?.close();
@@ -908,9 +941,24 @@ export function useExactJarvisVoice(
         clapContextRef.current = context;
         clapProcessorRef.current = processor;
         clapStreamRef.current = stream;
+        stream.getAudioTracks()[0]?.addEventListener(
+          "ended",
+          () => {
+            updateVoice({
+              ready: false,
+              clapWake: false,
+              error: "Clap Wake microphone became unavailable",
+            });
+            writeStored("jarvis_clap_wake", "false");
+            stopClapMonitor();
+          },
+          { once: true },
+        );
+        updateVoice({ ready: true, error: "" });
       })
       .catch((error) => {
         updateVoice({
+          ready: false,
           clapWake: false,
           error: errorText(error, "Clap Wake needs microphone permission"),
         });
@@ -1054,14 +1102,17 @@ export function useExactJarvisVoice(
 
   useEffect(() => {
     void refreshInputs();
-    const onDeviceChange = () => void refreshInputs();
+    const onDeviceChange = () => {
+      updateVoice({ ready: false });
+      void refreshInputs();
+    };
     navigator.mediaDevices?.addEventListener?.("devicechange", onDeviceChange);
     return () =>
       navigator.mediaDevices?.removeEventListener?.(
         "devicechange",
         onDeviceChange,
       );
-  }, [refreshInputs]);
+  }, [refreshInputs, updateVoice]);
 
   useEffect(() => {
     void api
