@@ -60,8 +60,8 @@ Plans:
 - [ ] 02-02-PLAN.md - Wave 0 idempotency, gateway, and direct-sink hostile contracts
 - [ ] 02-03-PLAN.md - Wave 0 Windows filesystem and process containment contracts
 - [ ] 02-04-PLAN.md - Wave 0 browser, egress, download, and artifact contracts
-- [ ] 02-05-PLAN.md - Blocking human direct/transitive package legitimacy and hash approvals
-- [ ] 02-06-PLAN.md - Offline no-deps package install and Chromium artifact verification
+- [ ] 02-05-PLAN.md - Executable direct/transitive provenance validation and blocking Python artifact approvals
+- [ ] 02-06-PLAN.md - Offline no-deps Python install, non-executing Chromium byte approval, and post-approval smoke launch
 - [ ] 02-07-PLAN.md - Sealed action manifests and deterministic policy kernel
 - [ ] 02-08-PLAN.md - ControlStore authority, receipts, idempotency, and reconciliation
 - [ ] 02-09-PLAN.md - Separated approval issuer/verifier and atomic consume/reserve

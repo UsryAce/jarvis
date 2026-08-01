@@ -41,7 +41,12 @@ created: 2026-08-01
 | 02-03-02 | 02-03 | 0 | CTRL-06, TOOL-03 | T-11..T-16 | argv-only execution, minimal env, suspended Job assignment, stream/resource caps and verified descendant termination | `python -m pytest -q tests/test_execution_broker_windows.py -x` | final owner assigned |
 | 02-04-01/02 | 02-04 | 0 | TOOL-05 | T-17..T-23 | ephemeral state, every-hop/subresource/popup/WebSocket egress policy, resolver pinning, download quarantine and artifact redaction | `python -m pytest -q tests/test_browser_broker.py -x` | final owner assigned |
 | 02-02-02 | 02-02 | 0 | CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, TOOL-07 | T-01..T-25 | authenticated callers reach one broker; aliases and legacy sinks cannot bypass; receipts/audit stay safe | `python -m pytest -q tests/test_execution_gateway_integration.py tests/test_execution_sink_inventory.py -x` | final owner assigned |
-| 02-14-01/02/03 | 02-14 | 6 | all Phase 2 | T-01..T-25 | complete fresh Phase 1 and Phase 2 bundles plus all hostile suites and real drills pass before the capability router or any production adapter opens; code route remains 423 | `python -m pytest -q tests/test_phase2_release_verifier.py -x` before evidence, then full suite/checked frontend and documented Windows/browser drills at the blocking release checkpoint | final release owner assigned |
+| 02-05-01 | 02-05 | 1 | CTRL-03, TOOL-05 | T-02-SC | executable validator proves complete direct/transitive wheel closure, exact dependency edges/tags/filenames/sizes, and registry/download/approval SHA-256 equality without installation | `python -m pytest -q tests/test_phase2_package_provenance.py -x && python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status pending` | final owner assigned |
+| 02-05-02/03 | 02-05 | 1 | CTRL-03, TOOL-05 | T-02-SC | blocking human approvals name both exact Python closures and hashes while Chromium exact-byte approval remains pending | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --require-chromium-status absent-or-pending` | final owner assigned; non-auto-approvable |
+| 02-06-01 | 02-06 | 2 | CTRL-03, TOOL-05 | T-02-SC | Python wheels install offline with no dependency resolution; exact Chromium archive/executable bytes are collected, hashed, and extracted without any browser helper or process execution | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope chromium --require-status pending --verify-current-bytes --no-execute` | final owner assigned |
+| 02-06-02 | 02-06 | 2 | CTRL-03, TOOL-05 | T-02-SC | blocking human gate approves exact Chromium source/revision, archive/executable filenames, sizes, and SHA-256 before first process start | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope chromium --require-status approved --verify-current-bytes --no-execute` | final owner assigned; non-auto-approvable |
+| 02-06-03 | 02-06 | 2 | TOOL-05 | T-02-SC, T-17, T-23 | approved executable is rehashed, offline-staged, then and only then smoke-launched in a no-network ephemeral context with no ambient fallback | provenance validator command followed by the explicit approved-executable smoke command in 02-06 Task 3 | final owner assigned |
+| 02-14-01/02/03 | 02-14 | 6 | all Phase 2 | T-01..T-25, T-02-SC | complete fresh Phase 1 and Phase 2 bundles, approved package/Chromium rehash and approval-before-launch proof, hostile suites, and real drills pass before the capability router or any production adapter opens; code route remains 423 | `python -m pytest -q tests/test_phase2_release_verifier.py -x` before evidence, then full suite/checked frontend, provenance validator, and documented Windows/browser drills at the blocking release checkpoint | final release owner assigned |
 
 ## Threat References
 
@@ -70,6 +75,7 @@ created: 2026-08-01
 - T-23: Browser context closes incompletely and retains credentials, processes, profiles, files, ports, or state.
 - T-24: Direct `subprocess`, `os.startfile`, legacy file/code skill, Git/GitHub CLI, or browser launch remains reachable outside the broker.
 - T-25: Decision, approval, reservation, start, result, cancellation, ambiguity, or reconciliation truth is missing from the tamper-evident audit or durable receipt.
+- T-02-SC: The Python dependency closure is incomplete/substituted, Chromium archive or executable bytes drift, or a Chromium process starts before exact-byte human approval.
 
 ## Wave 0 Producer/Consumer Map
 
@@ -83,6 +89,7 @@ created: 2026-08-01
 - [x] Every Phase 2 requirement maps to at least one executable contract and one release-gate assertion.
 - [x] The live code-execution route remains closed independently of fixture progress.
 - [x] Package installation is separated into a human legitimacy gate for the exact direct/transitive versions, dependency edges, artifact hashes, and browser identities; install is offline local-only with `--no-deps`.
+- [x] Chromium collection is non-executing and separated from a second non-auto-approvable exact archive/executable byte gate; first launch and release both rehash the approved bytes.
 - [x] Planner replaced producer labels above with final plan/task IDs without reducing coverage.
 
 ## Wave 0 Requirements
@@ -95,14 +102,16 @@ created: 2026-08-01
 - [ ] `tests/test_browser_broker.py` with offline pages and injected resolver/egress/download fakes — TOOL-05.
 - [ ] `tests/test_execution_gateway_integration.py` — authenticated resolved request through one durable receipt.
 - [ ] `tests/test_execution_sink_inventory.py` — direct-sink inventory and monkeypatch/AST guards.
-- [ ] Human package checkpoint for the complete direct/transitive `cryptography==49.0.0` and `playwright==1.61.0` publisher/source/wheel dependency closure plus browser hashes before installation.
+- [ ] Executable provenance validator and hostile fixtures for complete direct/transitive `cryptography==49.0.0` and `playwright==1.61.0` closure, dependency edges, tags, filenames, sizes, and registry/download/approval hash equality.
+- [ ] Human Python package checkpoints before offline `--no-index --no-deps` installation, followed by non-executing Chromium archive/executable collection and a separate exact-byte human checkpoint before first launch.
 - [ ] Complete fresh Phase 1 evidence bundle for route/auth, Origin/CSRF, migrations/restore, canary, DPAPI current-owner/wrong-SID, credential lifecycle, audit tamper, and persistent emergency stop before production enablement.
 
 ## Manual-Only Verifications
 
 | Behavior | Requirement | Why Manual | Gate |
 |----------|-------------|------------|------|
-| Verify exact direct/transitive cryptography and Playwright package closure plus browser artifact hashes | CTRL-03, TOOL-05 | New executable and cryptographic supply-chain seam | before offline local-only package install and browser/process implementation |
+| Verify exact direct/transitive cryptography and Playwright package closure | CTRL-03, TOOL-05 | New executable and cryptographic supply-chain seam | before offline local-only `--no-index --no-deps` Python install |
+| Verify exact Chromium source/revision, archive/executable filenames, sizes, and SHA-256 | TOOL-05 | Exact executable bytes exist only after non-executing collection and extraction | blocking non-auto-approvable gate after collection and before first Chromium process start |
 | Distinct-Windows-SID DPAPI release receipt | Phase 1 dependency | Requires a genuinely different Windows user identity | before any production adapter enablement |
 | Real Windows child/grandchild cleanup with timeout, cancel, emergency stop and backend shutdown | CTRL-06, TOOL-03 | OS process-tree and residue behavior cannot be proven by mocks | process broker and release gate |
 | Resolver-pinned browser egress and DNS-rebinding drill | TOOL-05 | Browser/OS resolver behavior and actual socket destination require live controlled observation | browser broker and release gate |
