@@ -52,8 +52,25 @@ Jarvis v1.0 is delivered in nine dependency-ordered phases. The roadmap first es
   3. Approved browser work runs in an ephemeral context whose domains, redirects, private-network access, downloads, and captured artifacts are controlled and recorded.
   4. Retried or ambiguously timed-out external writes use stable idempotency keys and reconciliation evidence so the same request cannot silently duplicate an effect.
 
-**Plans**: TBD
-**Security gate**: Tool and browser adapters remain default-deny outside controlled fixtures until Phase 1 is verified and the injection, path escape, environment leak, process-grandchild cancellation, stale approval, SSRF/redirect, download, idempotency, and artifact-redaction suites pass. GitHub and autonomous project-write authority remain closed until Phase 3 also passes.
+**Plans**: 14 plans
+
+Plans:
+
+- [ ] 02-01-PLAN.md - Wave 0 sealed action, policy, and approval hostile contracts
+- [ ] 02-02-PLAN.md - Wave 0 idempotency, gateway, and direct-sink hostile contracts
+- [ ] 02-03-PLAN.md - Wave 0 Windows filesystem and process containment contracts
+- [ ] 02-04-PLAN.md - Wave 0 browser, egress, download, and artifact contracts
+- [ ] 02-05-PLAN.md - Blocking human direct/transitive package legitimacy and hash approvals
+- [ ] 02-06-PLAN.md - Offline no-deps package install and Chromium artifact verification
+- [ ] 02-07-PLAN.md - Sealed action manifests and deterministic policy kernel
+- [ ] 02-08-PLAN.md - ControlStore authority, receipts, idempotency, and reconciliation
+- [ ] 02-09-PLAN.md - Separated approval issuer/verifier and atomic consume/reserve
+- [ ] 02-10-PLAN.md - Handle-verified filesystem and suspended Job Object local adapters
+- [ ] 02-11-PLAN.md - Resolver-pinned ephemeral browser, quarantine, and artifacts
+- [ ] 02-12-PLAN.md - Single execution gateway and release-registered capability API
+- [ ] 02-13-PLAN.md - Legacy sink cutover with exact raw code route closure
+- [ ] 02-14-PLAN.md - Full hostile/real-host release evidence and typed-capability gate
+**Security gate**: The capability router remains unregistered and tool/browser adapters remain default-deny outside explicit test-only fixtures until a complete fresh Phase 1 route/auth, Origin/CSRF, migration/restore, canary, DPAPI owner/wrong-SID, credential-lifecycle, audit-tamper, and persistent-stop bundle plus the Phase 2 injection, path escape, environment leak, process-grandchild cancellation, stale approval, SSRF/redirect, download, idempotency, and artifact-redaction evidence are atomically digest-bound and released. GitHub and autonomous project-write authority remain closed until Phase 3 also passes.
 
 ### Phase 3: Project Isolation, Durable Queue, Scheduling, and Recovery
 

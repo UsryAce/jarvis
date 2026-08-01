@@ -35,13 +35,13 @@ created: 2026-08-01
 
 | Task ID | Producer Plan | Wave | Requirements | Threats | Secure Behavior | Automated Command | Contract State |
 |---------|---------------|------|--------------|---------|-----------------|-------------------|----------------|
-| 02-01-* | policy/approval Wave 0 | 0 | CTRL-02, CTRL-03 | T-01..T-05 | strict sealed action corpus; deterministic total decision; exact signed binding; atomic single-use consume | `python -m pytest -q tests/test_policy_kernel.py tests/test_approval_envelope.py -x` | producer required |
-| 02-02-* | effect truth Wave 0 | 0 | CTRL-03, TOOL-07 | T-03, T-06, T-07 | stable request identity, conflict rejection, reservation, crash points, fencing, and reconciliation without replay | `python -m pytest -q tests/test_effect_reconciliation.py -x` | producer required |
-| 02-03-* | filesystem broker | 1 | CTRL-06, TOOL-03 | T-08..T-10 | Windows namespaces, ADS, links/reparse points, handle containment, TOCTOU and atomic staging stay within grant | `python -m pytest -q tests/test_filesystem_broker_windows.py -x` | producer required |
-| 02-04-* | process broker | 1 | CTRL-06, TOOL-03 | T-11..T-16 | argv-only execution, minimal env, suspended Job assignment, stream/resource caps and verified descendant termination | `python -m pytest -q tests/test_execution_broker_windows.py -x` | producer required |
-| 02-05-* | browser broker | 1 | TOOL-05 | T-17..T-23 | ephemeral state, every-hop/subresource/popup/WebSocket egress policy, resolver pinning, download quarantine and artifact redaction | `python -m pytest -q tests/test_browser_broker.py -x` | producer required |
-| 02-06-* | gateway integration | 2 | CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, TOOL-07 | T-01..T-25 | authenticated callers reach one broker; aliases and legacy sinks cannot bypass; receipts/audit stay safe | `python -m pytest -q tests/test_execution_gateway_integration.py tests/test_execution_sink_inventory.py -x` | producer required |
-| 02-07-* | release gate | 3 | all Phase 2 | T-01..T-25 | all hostile suites and real drills pass before any production adapter opens; code route remains 423 otherwise | `python -m pytest -q` plus checked frontend build and documented Windows/browser drills | release gate required |
+| 02-01-01/02 | 02-01 | 0 | CTRL-02, CTRL-03 | T-01..T-05 | strict sealed action corpus; deterministic total decision; exact signed binding; atomic single-use consume | `python -m pytest -q tests/test_policy_kernel.py tests/test_approval_envelope.py -x` | final owner assigned |
+| 02-02-01 | 02-02 | 0 | CTRL-03, TOOL-07 | T-03, T-06, T-07 | stable request identity, conflict rejection, reservation, crash points, fencing, and reconciliation without replay | `python -m pytest -q tests/test_effect_reconciliation.py -x` | final owner assigned |
+| 02-03-01 | 02-03 | 0 | CTRL-06, TOOL-03 | T-08..T-10 | Windows namespaces, ADS, links/reparse points, handle containment, TOCTOU and atomic staging stay within grant | `python -m pytest -q tests/test_filesystem_broker_windows.py -x` | final owner assigned |
+| 02-03-02 | 02-03 | 0 | CTRL-06, TOOL-03 | T-11..T-16 | argv-only execution, minimal env, suspended Job assignment, stream/resource caps and verified descendant termination | `python -m pytest -q tests/test_execution_broker_windows.py -x` | final owner assigned |
+| 02-04-01/02 | 02-04 | 0 | TOOL-05 | T-17..T-23 | ephemeral state, every-hop/subresource/popup/WebSocket egress policy, resolver pinning, download quarantine and artifact redaction | `python -m pytest -q tests/test_browser_broker.py -x` | final owner assigned |
+| 02-02-02 | 02-02 | 0 | CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, TOOL-07 | T-01..T-25 | authenticated callers reach one broker; aliases and legacy sinks cannot bypass; receipts/audit stay safe | `python -m pytest -q tests/test_execution_gateway_integration.py tests/test_execution_sink_inventory.py -x` | final owner assigned |
+| 02-14-01/02/03 | 02-14 | 6 | all Phase 2 | T-01..T-25 | complete fresh Phase 1 and Phase 2 bundles plus all hostile suites and real drills pass before the capability router or any production adapter opens; code route remains 423 | `python -m pytest -q tests/test_phase2_release_verifier.py -x` before evidence, then full suite/checked frontend and documented Windows/browser drills at the blocking release checkpoint | final release owner assigned |
 
 ## Threat References
 
@@ -75,15 +75,15 @@ created: 2026-08-01
 
 | Producer | Contract | Consumers |
 |----------|----------|-----------|
-| policy/approval contract plan | `tests/test_policy_kernel.py`, `tests/test_approval_envelope.py`, bounded hostile corpus, signature/consume fixtures | all adapters and gateway |
-| effect-truth contract plan | `tests/test_effect_reconciliation.py`, SQLite contention/crash/fencing fixtures | process, browser, external-write adapters and gateway |
-| containment fixture plan(s) | safe child/grandchild, output, resource, Windows path/reparse, offline browser/DNS/download helpers | process, filesystem, browser, and release plans |
+| 02-01 Tasks 1-2 | `tests/test_policy_kernel.py`, `tests/test_approval_envelope.py`, bounded hostile corpus, signature/consume fixtures | 02-07, 02-09, 02-12 and all adapters |
+| 02-02 Tasks 1-2 | `tests/test_effect_reconciliation.py`, gateway integration/sink inventory, SQLite contention/crash/fencing fixtures | 02-08 through 02-14 |
+| 02-03 Tasks 1-2 and 02-04 Tasks 1-2 | safe child/grandchild, output, resource, Windows path/reparse, offline browser/DNS/download helpers | 02-10, 02-11 and 02-14 |
 
 - [x] Every missing test family has a required producer before implementation consumers.
 - [x] Every Phase 2 requirement maps to at least one executable contract and one release-gate assertion.
 - [x] The live code-execution route remains closed independently of fixture progress.
-- [x] Package installation is separated into a human legitimacy gate for exact versions and artifact hashes.
-- [ ] Planner must replace producer labels above with final plan/task IDs without reducing coverage.
+- [x] Package installation is separated into a human legitimacy gate for the exact direct/transitive versions, dependency edges, artifact hashes, and browser identities; install is offline local-only with `--no-deps`.
+- [x] Planner replaced producer labels above with final plan/task IDs without reducing coverage.
 
 ## Wave 0 Requirements
 
@@ -95,14 +95,14 @@ created: 2026-08-01
 - [ ] `tests/test_browser_broker.py` with offline pages and injected resolver/egress/download fakes — TOOL-05.
 - [ ] `tests/test_execution_gateway_integration.py` — authenticated resolved request through one durable receipt.
 - [ ] `tests/test_execution_sink_inventory.py` — direct-sink inventory and monkeypatch/AST guards.
-- [ ] Human package checkpoint for exact `cryptography==49.0.0` and `playwright==1.61.0` publisher/source/wheel/browser hashes before installation.
-- [ ] Real second-Windows-SID Phase 1 receipt before production enablement.
+- [ ] Human package checkpoint for the complete direct/transitive `cryptography==49.0.0` and `playwright==1.61.0` publisher/source/wheel dependency closure plus browser hashes before installation.
+- [ ] Complete fresh Phase 1 evidence bundle for route/auth, Origin/CSRF, migrations/restore, canary, DPAPI current-owner/wrong-SID, credential lifecycle, audit tamper, and persistent emergency stop before production enablement.
 
 ## Manual-Only Verifications
 
 | Behavior | Requirement | Why Manual | Gate |
 |----------|-------------|------------|------|
-| Verify exact cryptography and Playwright packages plus browser artifact hashes | CTRL-03, TOOL-05 | New executable and cryptographic supply-chain seam | before package install and browser/process implementation |
+| Verify exact direct/transitive cryptography and Playwright package closure plus browser artifact hashes | CTRL-03, TOOL-05 | New executable and cryptographic supply-chain seam | before offline local-only package install and browser/process implementation |
 | Distinct-Windows-SID DPAPI release receipt | Phase 1 dependency | Requires a genuinely different Windows user identity | before any production adapter enablement |
 | Real Windows child/grandchild cleanup with timeout, cancel, emergency stop and backend shutdown | CTRL-06, TOOL-03 | OS process-tree and residue behavior cannot be proven by mocks | process broker and release gate |
 | Resolver-pinned browser egress and DNS-rebinding drill | TOOL-05 | Browser/OS resolver behavior and actual socket destination require live controlled observation | browser broker and release gate |

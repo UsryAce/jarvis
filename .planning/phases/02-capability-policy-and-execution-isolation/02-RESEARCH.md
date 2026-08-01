@@ -466,22 +466,16 @@ Do not use `INSERT OR REPLACE`; replacement would erase the original intent that
 
 All implementation claims in this research were verified against repository evidence, locked context, local environment probes, registry probes, or cited official documentation. No training-only `[ASSUMED]` claim is used. [VERIFIED: research log]
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Which concrete resolver-pinned browser egress implementation will pass the release suite?**
-   - What we know: Playwright provides isolated contexts and interception, while OWASP requires validating all A/AAAA answers and preventing DNS pinning/rebinding. [CITED: https://playwright.dev/python/docs/api/class-browsercontext; CITED: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html]
-   - What's unclear: the repository has no pinned forward proxy, OS egress sandbox, or custom browser transport today. [VERIFIED: codebase grep]
-   - Recommendation: plan a Wave 0 proof for a run-local egress broker that pins the validated answer to the socket and preserves Host/SNI. Treat failure to demonstrate connected-peer identity as a hard block that leaves live browser networking unavailable. [VERIFIED: synthesis from official OWASP SSRF guidance]
+1. **RESOLVED — Which concrete resolver-pinned browser egress implementation will pass the release suite?**
+   - Resolution: use a broker-owned run-local HTTP/CONNECT egress proxy that validates every A/AAAA answer, connects the selected vetted IP without a second lookup, preserves original Host/SNI/certificate validation, and verifies the connected peer for every request, redirect, subresource, popup, and WebSocket. The implementation remains unavailable to live callers until the real controlled-peer and rebinding drill demonstrates the contract; any direct path, unprovable peer, or failed drill keeps networking closed. [VERIFIED: locked planning resolution; CITED: https://playwright.dev/python/docs/api/class-browsercontext; CITED: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html]
 
-2. **When may production capability routes open?**
-   - What we know: the Phase 1 real cross-SID DPAPI drill is still pending and the dashboard execution route intentionally returns 423. [VERIFIED: STATE.md; VERIFIED: tests/test_dashboard_execution_gate.py]
-   - What's unclear: the external second-Windows-user receipt is not present during this research. [VERIFIED: phase-2-isolation-preflight.md]
-   - Recommendation: implement/test behind fixture-only dependency injection; add an explicit release checkpoint requiring the Phase 1 receipt plus all Phase 2 adversarial suites before changing route posture. [VERIFIED: CONTEXT.md]
+2. **RESOLVED — When may production capability routes open?**
+   - Resolution: the entire capability router stays unregistered in production construction until one atomic release state digest-binds a fresh, complete Phase 1 evidence bundle and the complete Phase 2 evidence bundle. Phase 1 evidence includes route/auth, Origin/CSRF, migrations/restore, canary, DPAPI current-owner and wrong-SID, credential lifecycle, audit tamper detection, and persistent emergency-stop results. Phase 2 evidence includes all hostile suites and real Windows/browser/download drills. Controlled tests may register the router only through explicit test-only dependency injection; `/api/code/execute` remains authenticated, Origin-aware, body-agnostic HTTP 423 permanently. [VERIFIED: locked planning resolution; VERIFIED: CONTEXT.md]
 
-3. **Will the two new packages pass human legitimacy review?**
-   - What we know: official docs/PyPI identify Playwright and cryptography, but the package-legitimacy seam returned SUS because of freshness/download/repository signals. [VERIFIED: package-legitimacy seam; CITED: https://pypi.org/project/playwright/; CITED: https://pypi.org/project/cryptography/]
-   - What's unclear: whether the project accepts those pinned versions after reviewing wheel provenance and hashes. [VERIFIED: environment probe]
-   - Recommendation: planner adds separate `checkpoint:human-verify` tasks before either install and records exact wheel hashes in the handoff/lock decision. [VERIFIED: package-legitimacy protocol]
+3. **RESOLVED — Will the two new packages pass human legitimacy review?**
+   - Resolution: no install is authorized by research alone. The blocking human gate must review and record the exact identity, version, platform tags, source/publisher provenance, filename, size, and SHA-256 for every direct and transitive Python artifact plus the package-declared Chromium artifact and executable. Installation uses only that complete approved local artifact set with `--no-deps` and no network resolution; any missing approval or identity/hash drift blocks installation and every dependent capability. [VERIFIED: locked planning resolution; VERIFIED: package-legitimacy protocol]
 
 ## Environment Availability
 
