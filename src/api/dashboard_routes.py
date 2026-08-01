@@ -6,8 +6,6 @@ import json
 import os
 import platform
 import asyncio
-import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -15,6 +13,7 @@ from urllib.parse import quote, urlparse
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.core.credentials import CredentialMetadata, CredentialService, CredentialState
@@ -446,40 +445,25 @@ async def validate_browser_url(payload: BrowserOpenRequest):
     return {"url": payload.url, "allowed": True}
 
 
-class CodeRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=20_000)
-    language: str = "python"
-    confirm: bool = False
+CODE_EXECUTION_GATE_CODE = "phase_2_execution_gate_closed"
+CODE_EXECUTION_GATE_MESSAGE = (
+    "Direct code execution is locked; execution must flow through the Phase 2 "
+    "governed execution broker when it is available."
+)
 
 
 @router.post("/code/execute")
-async def execute_code(payload: CodeRequest):
-    """Execute user-confirmed Python in isolated mode with a short timeout."""
-    if not payload.confirm:
-        raise HTTPException(status_code=400, detail="Explicit confirmation is required")
-    if payload.language.casefold() != "python":
-        raise HTTPException(status_code=400, detail="Only Python execution is currently supported")
-    with tempfile.TemporaryDirectory(prefix="jarvis-code-") as workdir:
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-I",
-            "-c",
-            payload.code,
-            cwd=workdir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10)
-        except asyncio.TimeoutError as exc:
-            process.kill()
-            await process.wait()
-            raise HTTPException(status_code=408, detail="Code execution timed out") from exc
-    return {
-        "stdout": stdout.decode(errors="replace")[-20_000:],
-        "stderr": stderr.decode(errors="replace")[-20_000:],
-        "exit_code": process.returncode,
-    }
+async def execute_code():
+    """Reject direct execution before decoding or validating any request body."""
+    return JSONResponse(
+        status_code=423,
+        content={
+            "code": CODE_EXECUTION_GATE_CODE,
+            "message": CODE_EXECUTION_GATE_MESSAGE,
+            "retryable": False,
+            "applied": False,
+        },
+    )
 
 
 class PreferencesRequest(BaseModel):
