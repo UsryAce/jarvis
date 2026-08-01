@@ -56,20 +56,41 @@ Jarvis v1.0 is delivered in nine dependency-ordered phases. The roadmap first es
 
 Plans:
 
+**Wave 0**
+
 - [ ] 02-01-PLAN.md - Wave 0 sealed action, policy, and approval hostile contracts
 - [ ] 02-02-PLAN.md - Wave 0 idempotency, gateway, and direct-sink hostile contracts
 - [ ] 02-03-PLAN.md - Wave 0 Windows filesystem and process containment contracts
 - [ ] 02-04-PLAN.md - Wave 0 browser, egress, download, and artifact contracts
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
 - [ ] 02-05-PLAN.md - Executable direct/transitive provenance validation and blocking Python artifact approvals
-- [ ] 02-06-PLAN.md - Offline no-deps Python install, non-executing Chromium byte approval, and post-approval smoke launch
 - [ ] 02-07-PLAN.md - Sealed action manifests and deterministic policy kernel
 - [ ] 02-08-PLAN.md - ControlStore authority, receipts, idempotency, and reconciliation
-- [ ] 02-09-PLAN.md - Separated approval issuer/verifier and atomic consume/reserve
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-06-PLAN.md - Offline no-deps Python install, non-executing Chromium byte approval, and post-approval smoke launch
 - [ ] 02-10-PLAN.md - Handle-verified filesystem and suspended Job Object local adapters
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-09-PLAN.md - Separated approval issuer/verifier and atomic consume/reserve
 - [ ] 02-11-PLAN.md - Resolver-pinned ephemeral browser, quarantine, and artifacts
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 02-12-PLAN.md - Single execution gateway and release-registered capability API
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 02-13-PLAN.md - Legacy sink cutover with exact raw code route closure
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 02-14-PLAN.md - Full hostile/real-host release evidence and typed-capability gate
+
 **Security gate**: The capability router remains unregistered and tool/browser adapters remain default-deny outside explicit test-only fixtures until a complete fresh Phase 1 route/auth, Origin/CSRF, migration/restore, canary, DPAPI owner/wrong-SID, credential-lifecycle, audit-tamper, and persistent-stop bundle plus the Phase 2 injection, path escape, environment leak, process-grandchild cancellation, stale approval, SSRF/redirect, download, idempotency, and artifact-redaction evidence are atomically digest-bound and released. GitHub and autonomous project-write authority remain closed until Phase 3 also passes.
 
 ### Phase 3: Project Isolation, Durable Queue, Scheduling, and Recovery

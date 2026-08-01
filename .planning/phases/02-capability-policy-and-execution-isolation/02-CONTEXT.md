@@ -1,7 +1,7 @@
 # Phase 2: Capability Policy and Execution Isolation - Context
 
 **Gathered:** 2026-08-01
-**Status:** Ready for planning
+**Status:** Planning complete and independently verified
 **Mode:** Autonomous recommended decisions accepted under Ahmed's standing auto-approve direction
 
 <domain>
@@ -15,28 +15,28 @@ This phase converts Jarvis's existing local, browser, and external-effect primit
 ## Implementation Decisions
 
 ### Typed action and policy boundary
-- Resolve and canonicalize tool identity, schema version, actor, authenticated session, request, run, project, workspace/worktree, policy snapshot, manifest version, arguments, and declared effect before policy evaluation; planners and models never supply trusted resolved fields.
-- Evaluate every exact resolved action to one of `allow`, `ask`, or `deny`, with stable reason codes and no callable policy hooks or subclass-dispatched behavior crossing the trust boundary.
-- Reject unknown tools, unknown schema versions, extra arguments, aliases, absolute or escaping paths, invalid encodings, non-finite values, oversized or unbounded collections, and unresolved world preconditions before any adapter runs.
-- Use exact immutable base records and module-owned normalization/verification functions; fail closed on malformed objects without serializing raw arguments or secrets into diagnostics.
+- **D-01:** Resolve and canonicalize tool identity, schema version, actor, authenticated session, request, run, project, workspace/worktree, policy snapshot, manifest version, arguments, and declared effect before policy evaluation; planners and models never supply trusted resolved fields.
+- **D-02:** Evaluate every exact resolved action to one of `allow`, `ask`, or `deny`, with stable reason codes and no callable policy hooks or subclass-dispatched behavior crossing the trust boundary.
+- **D-03:** Reject unknown tools, unknown schema versions, extra arguments, aliases, absolute or escaping paths, invalid encodings, non-finite values, oversized or unbounded collections, and unresolved world preconditions before any adapter runs.
+- **D-04:** Use exact immutable base records and module-owned normalization/verification functions; fail closed on malformed objects without serializing raw arguments or secrets into diagnostics.
 
 ### Approval authority and replay control
-- Separate approval issuance from evaluation. The execution-side verifier receives only verification authority; signing material and issuance methods are not reachable through the evaluator or adapter object graph.
-- Bind an approval to the authenticated actor and session, request and run IDs, policy/manifest versions, exact canonical resolved-action digest, project/worktree boundary, declared effect, expiry, nonce, and world-precondition digest.
-- Consume approval and reserve the action atomically in durable storage before execution. Approvals are single-use, short-lived bearer artifacts; replay, stale versions, argument drift, actor/session changes, and changed preconditions deny deterministically.
-- Use a versioned asymmetric signature envelope or an equivalent OS-protected issuer/verifier separation. Do not treat a symmetric secret held by evaluator code as an authority boundary.
+- **D-05:** Separate approval issuance from evaluation. The execution-side verifier receives only verification authority; signing material and issuance methods are not reachable through the evaluator or adapter object graph.
+- **D-06:** Bind an approval to the authenticated actor and session, request and run IDs, policy/manifest versions, exact canonical resolved-action digest, project/worktree boundary, declared effect, expiry, nonce, and world-precondition digest.
+- **D-07:** Consume approval and reserve the action atomically in durable storage before execution. Approvals are single-use, short-lived bearer artifacts; replay, stale versions, argument drift, actor/session changes, and changed preconditions deny deterministically.
+- **D-08:** Use a versioned asymmetric signature envelope or an equivalent OS-protected issuer/verifier separation. Do not treat a symmetric secret held by evaluator code as an authority boundary.
 
 ### Local execution containment and receipts
-- File, terminal, build, test, and application actions run only through typed adapters with canonical project roots, explicit executable/argument arrays, a minimal allowlisted environment, bounded stdin/stdout/stderr, aggregate deadlines, resource limits, and redacted durable receipts.
-- Never execute raw shell strings as the production contract. Commands resolve to approved executables and argument vectors; shell or script-host invocation is a separately denied-by-default capability.
-- On Windows, each spawned process tree is assigned to a kill-on-close Job Object before meaningful work proceeds. Cancellation, timeout, emergency stop, and backend shutdown terminate and verify descendants; residue is reported honestly as partial or unconfirmed.
-- Mutating filesystem actions use staging, atomic replacement where possible, before/after evidence, and explicit rollback or reconciliation status. Reads and writes cannot traverse reparse points, symlinks, device paths, alternate streams, UNC shares, or casing/normalization escapes beyond the grant.
+- **D-09:** File, terminal, build, test, and application actions run only through typed adapters with canonical project roots, explicit executable/argument arrays, a minimal allowlisted environment, bounded stdin/stdout/stderr, aggregate deadlines, resource limits, and redacted durable receipts.
+- **D-10:** Never execute raw shell strings as the production contract. Commands resolve to approved executables and argument vectors; shell or script-host invocation is a separately denied-by-default capability.
+- **D-11:** On Windows, each spawned process tree is assigned to a kill-on-close Job Object before meaningful work proceeds. Cancellation, timeout, emergency stop, and backend shutdown terminate and verify descendants; residue is reported honestly as partial or unconfirmed.
+- **D-12:** Mutating filesystem actions use staging, atomic replacement where possible, before/after evidence, and explicit rollback or reconciliation status. Reads and writes cannot traverse reparse points, symlinks, device paths, alternate streams, UNC shares, or casing/normalization escapes beyond the grant.
 
 ### Browser, network, downloads, and external effects
-- Browser work uses a fresh ephemeral profile per governed run with no ambient cookies, credentials, extensions, local browser state, service workers, or persistent cache unless an exact capability explicitly grants a scoped state import.
-- Enforce scheme, hostname, effective port, DNS answer, redirect hop, and resolved destination policy on every request. Deny loopback, link-local, private, reserved, metadata, file/custom schemes, DNS rebinding, mixed IPv4/IPv6 escapes, and unapproved subresources.
-- Downloads are quarantined under a bounded artifact directory, streamed with byte/time/type limits, scanned and hashed before promotion, never auto-opened or executed, and represented by redacted provenance receipts. Screenshots, DOM, HAR, console, and accessibility artifacts follow the same bounded redaction policy.
-- Every external write receives a stable action-derived idempotency key before dispatch. Ambiguous timeout/crash outcomes enter `needs_reconciliation`; adapters must query authoritative remote state and may not blindly replay or claim success.
+- **D-13:** Browser work uses a fresh ephemeral profile per governed run with no ambient cookies, credentials, extensions, local browser state, service workers, or persistent cache unless an exact capability explicitly grants a scoped state import.
+- **D-14:** Enforce scheme, hostname, effective port, DNS answer, redirect hop, and resolved destination policy on every request. Deny loopback, link-local, private, reserved, metadata, file/custom schemes, DNS rebinding, mixed IPv4/IPv6 escapes, and unapproved subresources.
+- **D-15:** Downloads are quarantined under a bounded artifact directory, streamed with byte/time/type limits, scanned and hashed before promotion, never auto-opened or executed, and represented by redacted provenance receipts. Screenshots, DOM, HAR, console, and accessibility artifacts follow the same bounded redaction policy.
+- **D-16:** Every external write receives a stable action-derived idempotency key before dispatch. Ambiguous timeout/crash outcomes enter `needs_reconciliation`; adapters must query authoritative remote state and may not blindly replay or claim success.
 
 ### the agent's Discretion
 - Exact module boundaries, database table names, signature library, process helper implementation, browser engine, and receipt projection format, provided the contracts above remain testable and fail closed.
