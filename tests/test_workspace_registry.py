@@ -1,7 +1,9 @@
+import os
 import tempfile
 import unittest
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 from src.core.agent import AgentRuntime
 from src.core.workspaces import WorkspaceRegistry
@@ -47,6 +49,71 @@ class WorkspaceRegistryTests(unittest.IsolatedAsyncioTestCase):
         outside = Path.home().parent
         with self.assertRaises(PermissionError):
             self.registry.register("outside", "Outside", outside)
+
+    def test_canonical_repo_exception_allows_only_exact_root_and_worktree_location(self):
+        restricted_home = self.root / "restricted-home"
+        canonical_root = self.root / "canonical-jarvis"
+        sibling_root = self.root / "other-drive-root"
+        nested_root = canonical_root / "nested-project"
+        for path in (restricted_home, canonical_root / "data", sibling_root, nested_root):
+            path.mkdir(parents=True)
+
+        with (
+            patch("src.core.workspaces._CANONICAL_JARVIS_ROOT", canonical_root.resolve()),
+            patch.object(Path, "home", return_value=restricted_home),
+        ):
+            registry = WorkspaceRegistry(canonical_root / "data" / "workspaces.db", canonical_root)
+
+            self.assertEqual(registry.resolve("jarvis"), canonical_root.resolve())
+            self.assertEqual(
+                registry.worktree_root,
+                (canonical_root / "data" / ".jarvis-worktrees").resolve(),
+            )
+            with self.assertRaises(PermissionError):
+                registry.register("sibling", "Sibling", sibling_root)
+            with self.assertRaises(PermissionError):
+                registry.register("nested", "Nested", nested_root)
+            with self.assertRaises(PermissionError):
+                registry.register("canonical-alias", "Canonical alias", canonical_root)
+            with self.assertRaises(PermissionError):
+                WorkspaceRegistry(canonical_root / "other" / "workspaces.db", canonical_root)
+            with self.assertRaises(PermissionError):
+                WorkspaceRegistry(canonical_root / "data" / "other.db", sibling_root)
+
+        self.assertFalse((canonical_root / "other").exists())
+
+    def test_canonical_worktree_junction_cannot_escape_repository(self):
+        restricted_home = self.root / "restricted-home"
+        canonical_root = self.root / "canonical-jarvis"
+        outside_root = self.root / "junction-target"
+        worktree_link = canonical_root / "data" / ".jarvis-worktrees"
+        for path in (restricted_home, canonical_root / "data", outside_root):
+            path.mkdir(parents=True)
+        try:
+            worktree_link.symlink_to(outside_root, target_is_directory=True)
+        except OSError as exc:
+            if os.name != "nt":
+                self.skipTest(f"Directory symlinks unavailable: {exc}")
+            result = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(worktree_link), str(outside_root)],
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                self.skipTest(f"Directory junctions unavailable: {result.stderr.strip()}")
+
+        try:
+            with (
+                patch("src.core.workspaces._CANONICAL_JARVIS_ROOT", canonical_root.resolve()),
+                patch.object(Path, "home", return_value=restricted_home),
+            ):
+                with self.assertRaises(PermissionError):
+                    WorkspaceRegistry(canonical_root / "data" / "workspaces.db", canonical_root)
+            self.assertFalse((canonical_root / "data" / "workspaces.db").exists())
+        finally:
+            if worktree_link.is_symlink():
+                worktree_link.unlink()
+            elif worktree_link.exists():
+                worktree_link.rmdir()
 
     async def test_agent_tools_are_scoped_to_selected_project(self):
         runtime = AgentRuntime(FakeJarvis(), self.root / "agent.db")

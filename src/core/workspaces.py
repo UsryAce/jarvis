@@ -13,14 +13,19 @@ from pathlib import Path
 from typing import Any
 
 
+_CANONICAL_JARVIS_ROOT = Path(__file__).resolve().parents[2]
+_CANONICAL_WORKTREE_PATH = Path("data") / ".jarvis-worktrees"
+
+
 class WorkspaceRegistry:
     def __init__(self, database: Path, default_root: Path):
         self.database = Path(database)
-        self.database.parent.mkdir(parents=True, exist_ok=True)
         self.default_root = Path(default_root).resolve()
         self.allowed_root = Path.home().resolve()
-        self.worktree_root = (self.database.parent / ".jarvis-worktrees").resolve()
-        self._assert_inside(self.worktree_root, self.allowed_root)
+        worktree_root = self.database.parent / ".jarvis-worktrees"
+        self._assert_allowed_worktree_root(worktree_root)
+        self.worktree_root = worktree_root.resolve()
+        self.database.parent.mkdir(parents=True, exist_ok=True)
         self.worktree_root.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
         self._initialize()
@@ -79,10 +84,7 @@ class WorkspaceRegistry:
         resolved = Path(root).expanduser().resolve()
         if not resolved.exists() or not resolved.is_dir():
             raise ValueError("Project workspace must be an existing directory")
-        try:
-            resolved.relative_to(self.allowed_root)
-        except ValueError as exc:
-            raise PermissionError(f"Project workspace must stay inside {self.allowed_root}") from exc
+        self._assert_allowed_workspace_root(resolved, identifier, protected)
         now = datetime.now().isoformat()
         with self._lock, self._connection() as connection:
             connection.execute(
@@ -427,6 +429,25 @@ class WorkspaceRegistry:
             path.resolve().relative_to(parent.resolve())
         except ValueError as exc:
             raise PermissionError(f"Path must stay inside {parent}") from exc
+
+    def _assert_allowed_workspace_root(
+        self, path: Path, project_id: str, protected: bool,
+    ) -> None:
+        if project_id == "jarvis" and protected and path.resolve() == _CANONICAL_JARVIS_ROOT:
+            return
+        try:
+            path.resolve().relative_to(self.allowed_root)
+        except ValueError as exc:
+            raise PermissionError(f"Project workspace must stay inside {self.allowed_root}") from exc
+
+    def _assert_allowed_worktree_root(self, path: Path) -> None:
+        canonical_worktree_root = _CANONICAL_JARVIS_ROOT / _CANONICAL_WORKTREE_PATH
+        if self.default_root == _CANONICAL_JARVIS_ROOT and path.absolute() == canonical_worktree_root:
+            # Keep the exact canonical location fail-closed if any component is
+            # replaced by a junction/symlink that redirects outside the repository.
+            self._assert_inside(path, _CANONICAL_JARVIS_ROOT)
+            return
+        self._assert_inside(path, self.allowed_root)
 
     def _decorate(self, row: dict[str, Any]) -> dict[str, Any]:
         root = Path(row["root"])
