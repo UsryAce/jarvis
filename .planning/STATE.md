@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready for Plan 01-14
 stopped_at: Completed 01-10 and 01-13 plans
-last_updated: "2026-08-08T17:15:00.7998035+03:00"
-last_activity: 2026-08-08 -- Phase 2 Plans 02-07/02-08 passed 84 integrated tests; Plan 02-05 awaits exact cryptography closure approval; Phase 1 Plan 01-14 remains pending
+last_updated: "2026-08-08T17:31:05.6992050+03:00"
+last_activity: 2026-08-08 -- Approval-checkpoint regression passed 498 tests; downstream readiness audit requires fail-closed plan amendments before Wave 2
 progress:
   total_phases: 9
   completed_phases: 0
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
 Plan: 14 of 14
 Status: Ready for Plan 01-14
-Last activity: 2026-08-08 -- Phase 2 Plans 02-07/02-08 passed 84 integrated tests; Plan 02-05 awaits exact cryptography closure approval; Phase 1 Plan 01-14 remains pending
+Last activity: 2026-08-08 -- Approval-checkpoint regression passed 498 tests; downstream readiness audit requires fail-closed plan amendments before Wave 2
 
 Progress: [█████████░] 93%
 
@@ -118,6 +118,7 @@ None yet.
 
 - Phase 1 is a release and authority gate: later privileged capability expansion remains closed until its authentication, secret, audit, recovery, and emergency-stop tests pass.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
+- Phase 2 Wave 2 plans require amendments recorded in `02-READINESS-AUDIT.md`: exact interpreter binding, Chromium byte validator modes, executable value enforcement, evidence-bound release state, real browser Job containment, and complete legacy sink inventory.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
 ## Deferred Items
