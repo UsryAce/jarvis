@@ -155,6 +155,9 @@ def _fixture(tmp_path: Path) -> tuple[dict[str, object], dict[tuple[str, str], d
                 "project_urls": {"Source": source},
                 "source_repository_url": source,
                 "source_owner": source.split("github.com/", 1)[1].split("/", 1)[0],
+                "source_owner_type": "Organization",
+                "source_repository_archived": False,
+                "source_repository_checked_at_utc": "2026-08-08T00:00:00Z",
             },
             "approval": {
                 "status": "PENDING",
@@ -285,6 +288,7 @@ def test_load_manifest_rejects_duplicate_json_keys(tmp_path: Path) -> None:
         (lambda manifest, directory: manifest["python"]["artifacts"][0].__setitem__("downloaded_sha256", "0" * 64), "downloaded_hash_mismatch"),
         (lambda manifest, directory: manifest["python"]["artifacts"][0]["registry"].__setitem__("sha256", "1" * 64), "registry_record_mismatch"),
         (lambda manifest, directory: manifest["python"]["artifacts"][0]["registry"].__setitem__("source_repository_url", "https://example.invalid/substitute"), "registry_source_mismatch"),
+        (lambda manifest, directory: manifest["python"]["artifacts"][0]["registry"].__setitem__("source_owner", "substitute"), "registry_source_mismatch"),
         (lambda manifest, directory: manifest["roots"][0].__setitem__("version", "48.0.1"), "root_identity_mismatch"),
     ),
 )
