@@ -66,8 +66,8 @@ Plans:
 **Wave 1** *(blocked on Wave 0 completion)*
 
 - [ ] 02-05-PLAN.md - Executable direct/transitive provenance validation and blocking Python artifact approvals
-- [ ] 02-07-PLAN.md - Sealed action manifests and deterministic policy kernel
-- [ ] 02-08-PLAN.md - ControlStore authority, receipts, idempotency, and reconciliation
+- [x] 02-07-PLAN.md - Sealed action manifests and deterministic policy kernel
+- [x] 02-08-PLAN.md - ControlStore authority, receipts, idempotency, and reconciliation
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -218,7 +218,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Trust and Durable Control Foundation | 13/14 | In Progress|  |
-| 2. Capability Policy and Execution Isolation | 4/14 | In Progress|  |
+| 2. Capability Policy and Execution Isolation | 6/14 | In Progress|  |
 | 3. Project Isolation, Durable Queue, Scheduling, and Recovery | 0/TBD | Not started | - |
 | 4. Planner-Executor-Verifier Runtime | 0/TBD | Not started | - |
 | 5. Real Work, GitHub, and Multi-Agent Teams | 0/TBD | Not started | - |

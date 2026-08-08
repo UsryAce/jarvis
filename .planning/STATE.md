@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready for Plan 01-14
 stopped_at: Completed 01-10 and 01-13 plans
-last_updated: "2026-08-08T13:01:00.881Z"
-last_activity: 2026-08-08 -- Phase 2 Wave 0 contracts passed 428 tests; Phase 1 Plan 01-14 release gate remains pending
+last_updated: "2026-08-08T17:15:00.7998035+03:00"
+last_activity: 2026-08-08 -- Phase 2 Plans 02-07/02-08 passed 84 integrated tests; Plan 02-05 awaits exact cryptography closure approval; Phase 1 Plan 01-14 remains pending
 progress:
   total_phases: 9
   completed_phases: 0
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
 Plan: 14 of 14
 Status: Ready for Plan 01-14
-Last activity: 2026-08-08 -- Phase 2 Wave 0 contracts passed 428 tests; Phase 1 Plan 01-14 release gate remains pending
+Last activity: 2026-08-08 -- Phase 2 Plans 02-07/02-08 passed 84 integrated tests; Plan 02-05 awaits exact cryptography closure approval; Phase 1 Plan 01-14 remains pending
 
 Progress: [█████████░] 93%
 
@@ -108,6 +108,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 - [Phase 02 Planning]: Fourteen independently checked plans cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; execution remains closed until complete Phase 1 and Phase 2 release evidence is atomically validated.
 - [Phase 02 Wave 0]: Plans 02-01 through 02-04 added fail-closed hostile contracts; the integrated gate passed 428 tests, 168 intentional future-module skips, one expected distinct-SID xfail, and 36 subtests without installing or launching Chromium.
+- [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 1 validated a seven-wheel PENDING Python closure and stopped at the non-auto-approvable cryptography checkpoint.
 
 ### Pending Todos
 
