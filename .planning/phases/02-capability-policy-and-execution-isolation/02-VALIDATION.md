@@ -5,126 +5,178 @@ status: approved-for-planning
 nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-01
+updated: 2026-08-08
+plan_count: 15
+wave_range: 0-8
 ---
 
 # Phase 2 — Validation Strategy
 
-> Execution-ready validation contract. Approval here assigns every missing hostile contract to a producer plan; it does not authorize live execution or claim runtime evidence.
+> Planning-time Nyquist contract for the final 15-plan graph. No runtime gate is marked complete by this document; execution must produce fresh source-bound evidence.
 
 ## Test Infrastructure
 
 | Property | Value |
-|----------|-------|
-| Framework | pytest 9.1.1 + pytest-asyncio (`asyncio_mode=auto`), FastAPI TestClient/httpx, real Windows probes, and offline Playwright fixtures after package approval |
-| Config | `pytest.ini` |
-| Current focused baseline | `python -m pytest -q tests/test_agent_runtime.py tests/test_api_approval_contract.py tests/test_dashboard_execution_gate.py tests/test_workspace_registry.py` — 65 passed and 25 subtests passed on 2026-08-01 |
-| Quick run | `python -m pytest -q tests/test_policy_kernel.py tests/test_approval_envelope.py tests/test_effect_reconciliation.py -x` |
-| Windows containment run | `python -m pytest -q tests/test_execution_broker_windows.py tests/test_filesystem_broker_windows.py -x` |
-| Browser run | `python -m pytest -q tests/test_browser_broker.py -x` |
-| Full suite | `python -m pytest -q`, then `npm run build:checked` in `frontend/` |
-| Target latency | Under 120 seconds for the automated phase bundle, excluding real package, second-SID, process-residue, and browser-engine drills |
+|---|---|
+| Framework | pytest with Windows integration suites; TypeScript/Vite checked frontend build |
+| Python quick run | `python -m pytest -q tests/test_policy_kernel.py tests/test_approval_envelope.py tests/test_effect_reconciliation.py -x` before the approved runtime exists; manifest-recorded absolute `-I` provenance runner afterward |
+| Windows containment run | `python -m pytest -q tests/test_execution_broker_windows.py tests/test_filesystem_broker_windows.py -x` through the approved runner after Plan 02-06 |
+| Browser run | `python -m pytest -q tests/test_browser_broker.py -x` through the approved runner with exact approved Chromium bytes after Plan 02-06 |
+| Final Python gate | complete current pytest collection with canonical unfiltered `-q`, then `compileall -q src tests scripts`, both through the manifest-recorded absolute `-I` runner |
+| Final frontend gate | literal `npm run build:checked` from the frozen source-bound `frontend/` cwd, with absolute Node/npm and local TypeScript/Vite identities, zero exit, bounded output digest, and deterministic `dist/` manifest bound into `frontend_build_digest` |
+| Final graph gate | `powershell -ExecutionPolicy Bypass -File scripts/brain.ps1 refresh`, then a distinct `powershell -ExecutionPolicy Bypass -File scripts/brain.ps1 status` |
+| Target latency | Under 120 seconds for focused automated feedback; final source replay, real Windows/browser drills, frontend build, and human checkpoints may exceed that sampling target |
 
 ## Sampling Rate
 
-- After every task commit: run the task's mapped test file plus the 65-test focused baseline when a legacy execution seam changes.
-- After every plan wave: run all Phase 2 suites produced so far; run the checked frontend build when route or projection code changes.
-- Before `$gsd-verify-work`: run the full Python suite, checked frontend build, secret-canary scan, Graphify status, real Windows descendant cleanup, package/browser artifact verification, and the Phase 1 second-SID release receipt.
-- No watch-mode command, mocked parent-only kill, or policy-only test can stand in for process-tree, browser-egress, download, or reconciliation evidence.
+- After every task commit: run the task's mapped command; when a legacy execution seam changes, also run the focused policy/approval/reconciliation baseline.
+- After every wave: run every Phase 2 suite produced so far. Run the checked frontend build whenever frontend source/config/lock or API projection code changes.
+- Before `$gsd-verify-work`: Plan 02-14 must freeze and attest the complete Python collection, compile inventory, literal checked frontend build, Phase 1 cross-SID bundle, provenance/browser bytes, real Windows/browser drills, secret-canary scan, and exact corrected-validation digest.
+- After release: Plan 02-15 must prove the exact recorded decision, transactional open, reconstructed production app, raw/Phase 3 closures, snapshot-producing Brain refresh, separate status, and final human inspection.
+- No watch mode, mock-only process kill, policy-only test, historical receipt, ambient Python, or ambient frontend output may satisfy a final release predicate.
+
+## Actual Plan and Wave Graph
+
+| Plan | Wave | Depends On | Tasks | Checkpoint |
+|---|---:|---|---:|---|
+| 02-01 | 0 | — | 2 | no |
+| 02-02 | 0 | — | 2 | no |
+| 02-03 | 0 | — | 2 | no |
+| 02-04 | 0 | — | 2 | no |
+| 02-05 | 1 | 02-01, 02-04 | 3 | Tasks 2-3 package decisions |
+| 02-06 | 2 | 02-05 | 3 | Task 2 exact Chromium-byte decision |
+| 02-07 | 1 | 02-01 | 2 | no |
+| 02-08 | 1 | 02-02 | 2 | no |
+| 02-09 | 3 | 02-06, 02-07, 02-08 | 2 | no |
+| 02-10 | 3 | 02-03, 02-06, 02-07, 02-08 | 3 | no |
+| 02-11 | 4 | 02-04, 02-06, 02-07, 02-08, 02-10 | 3 | no |
+| 02-12 | 5 | 02-09, 02-10, 02-11 | 3 | no |
+| 02-13 | 6 | 02-12 | 3 | no |
+| 02-14 | 7 | 02-13 | 2 | Task 2 final release decision; authority remains closed |
+| 02-15 | 8 | 02-14 | 3 | Task 3 final released-handoff inspection |
+
+Same-wave ownership check: Waves 0, 1, and 3 contain parallel plans with disjoint `files_modified`; Waves 2 and 4-8 are dependency-ordered. Plan 02-15 alone owns the release database transition and generated Graphify snapshot after the Plan 02-14 approval.
 
 ## Per-Task Verification Map
 
-| Task ID | Producer Plan | Wave | Requirements | Threats | Secure Behavior | Automated Command | Contract State |
-|---------|---------------|------|--------------|---------|-----------------|-------------------|----------------|
-| 02-01-01/02 | 02-01 | 0 | CTRL-02, CTRL-03 | T-01..T-05 | strict sealed action corpus; deterministic total decision; exact signed binding; atomic single-use consume | `python -m pytest -q tests/test_policy_kernel.py tests/test_approval_envelope.py -x` | final owner assigned |
-| 02-02-01 | 02-02 | 0 | CTRL-03, TOOL-07 | T-03, T-06, T-07 | stable request identity, conflict rejection, reservation, crash points, fencing, and reconciliation without replay | `python -m pytest -q tests/test_effect_reconciliation.py -x` | final owner assigned |
-| 02-03-01 | 02-03 | 0 | CTRL-06, TOOL-03 | T-08..T-10 | Windows namespaces, ADS, links/reparse points, handle containment, TOCTOU and atomic staging stay within grant | `python -m pytest -q tests/test_filesystem_broker_windows.py -x` | final owner assigned |
-| 02-03-02 | 02-03 | 0 | CTRL-06, TOOL-03 | T-11..T-16 | argv-only execution, minimal env, suspended Job assignment, stream/resource caps and verified descendant termination | `python -m pytest -q tests/test_execution_broker_windows.py -x` | final owner assigned |
-| 02-04-01/02 | 02-04 | 0 | TOOL-05 | T-17..T-23 | ephemeral state, every-hop/subresource/popup/WebSocket egress policy, resolver pinning, download quarantine and artifact redaction | `python -m pytest -q tests/test_browser_broker.py -x` | final owner assigned |
-| 02-02-02 | 02-02 | 0 | CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, TOOL-07 | T-01..T-25 | authenticated callers reach one broker; aliases and legacy sinks cannot bypass; receipts/audit stay safe | `python -m pytest -q tests/test_execution_gateway_integration.py tests/test_execution_sink_inventory.py -x` | final owner assigned |
-| 02-05-01 | 02-05 | 1 | CTRL-03, TOOL-05 | T-02-SC | executable validator proves complete direct/transitive wheel closure, exact dependency edges/tags/filenames/sizes, and registry/download/approval SHA-256 equality without installation | `python -m pytest -q tests/test_phase2_package_provenance.py -x && python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status pending` | final owner assigned |
-| 02-05-02/03 | 02-05 | 1 | CTRL-03, TOOL-05 | T-02-SC | blocking human approvals name both exact Python closures and hashes while Chromium exact-byte approval remains pending | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --require-chromium-status absent-or-pending` | final owner assigned; non-auto-approvable |
-| 02-06-01 | 02-06 | 2 | CTRL-03, TOOL-05 | T-02-SC | Python wheels install offline with no dependency resolution; exact Chromium archive/executable bytes are collected, hashed, and extracted without any browser helper or process execution | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope chromium --require-status pending --verify-current-bytes --no-execute` | final owner assigned |
-| 02-06-02 | 02-06 | 2 | CTRL-03, TOOL-05 | T-02-SC | blocking human gate approves exact Chromium source/revision, archive/executable filenames, sizes, and SHA-256 before first process start | `python scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope chromium --require-status approved --verify-current-bytes --no-execute` | final owner assigned; non-auto-approvable |
-| 02-06-03 | 02-06 | 2 | TOOL-05 | T-02-SC, T-17, T-23 | approved executable is rehashed, offline-staged, then and only then smoke-launched in a no-network ephemeral context with no ambient fallback | provenance validator command followed by the explicit approved-executable smoke command in 02-06 Task 3 | final owner assigned |
-| 02-14-01/02/03 | 02-14 | 6 | all Phase 2 | T-01..T-25, T-02-SC | complete fresh Phase 1 and Phase 2 bundles, approved package/Chromium rehash and approval-before-launch proof, hostile suites, and real drills pass before the capability router or any production adapter opens; code route remains 423 | `python -m pytest -q tests/test_phase2_release_verifier.py -x` before evidence, then full suite/checked frontend, provenance validator, and documented Windows/browser drills at the blocking release checkpoint | final release owner assigned |
+| Task ID | Plan | Wave | Requirements | Automated Gate | Human Gate / State |
+|---|---|---:|---|---|---|
+| 02-01-01 | 02-01 | 0 | CTRL-02 | `python -m pytest -q tests/test_policy_kernel.py -x` | planned; pending execution |
+| 02-01-02 | 02-01 | 0 | CTRL-03 | `python -m pytest -q tests/test_approval_envelope.py -x` | planned; pending execution |
+| 02-02-01 | 02-02 | 0 | CTRL-03, TOOL-07 | `python -m pytest -q tests/test_effect_reconciliation.py -x` | planned; pending execution |
+| 02-02-02 | 02-02 | 0 | CTRL-02, CTRL-03, TOOL-03, TOOL-05, TOOL-07 | `python -m pytest -q tests/test_execution_gateway_integration.py tests/test_execution_sink_inventory.py tests/test_dashboard_execution_gate.py -x` | planned; pending execution |
+| 02-03-01 | 02-03 | 0 | CTRL-06, TOOL-03 | `python -m pytest -q tests/test_filesystem_broker_windows.py -x` | planned; pending execution |
+| 02-03-02 | 02-03 | 0 | CTRL-06, TOOL-03 | `python -m pytest -q tests/test_execution_broker_windows.py -x` | planned; pending execution |
+| 02-04-01 | 02-04 | 0 | TOOL-05 | `python -m pytest -q tests/test_browser_broker.py -x -k "context or egress or redirect or subresource or websocket"` | planned; pending execution |
+| 02-04-02 | 02-04 | 0 | TOOL-05 | `python -m pytest -q tests/test_browser_broker.py -x -k "download or artifact or cleanup"` | planned; pending execution |
+| 02-05-01 | 02-05 | 1 | CTRL-03, TOOL-05 | provenance hostile tests, then exact pending Python closure validation without installation | planned; pending execution |
+| 02-05-02 | 02-05 | 1 | CTRL-03 | exact cryptography closure validator with `--require-status approved` | blocking non-auto package approval |
+| 02-05-03 | 02-05 | 1 | TOOL-05 | exact Playwright closure validator with Chromium `absent-or-pending` | blocking non-auto package approval |
+| 02-06-01 | 02-06 | 2 | CTRL-03, TOOL-05 | runtime-binding self-test/check, guarded provenance tests, exact pending Chromium bytes with `--no-execute` | planned; no browser start |
+| 02-06-02 | 02-06 | 2 | CTRL-03, TOOL-05 | guarded exact Chromium `approved --verify-current-bytes --no-execute` | blocking non-auto exact-byte approval |
+| 02-06-03 | 02-06 | 2 | TOOL-05 | guarded approved-byte rehash followed by named real approved-Chromium smoke test | planned; only after Task 2 approval |
+| 02-07-01 | 02-07 | 1 | CTRL-02, CTRL-06, TOOL-03, TOOL-05 | `python -m pytest -q tests/test_policy_kernel.py -x -k "canonical or manifest or malformed"` | planned; pending execution |
+| 02-07-02 | 02-07 | 1 | CTRL-02, CTRL-06, TOOL-03, TOOL-05 | `python -m pytest -q tests/test_policy_kernel.py -x` | planned; pending execution |
+| 02-08-01 | 02-08 | 1 | CTRL-03, TOOL-03, TOOL-05, TOOL-07 | `python -m pytest -q tests/test_effect_reconciliation.py tests/test_control_migrations_backup.py -x` | planned; pending execution |
+| 02-08-02 | 02-08 | 1 | CTRL-03, TOOL-03, TOOL-05, TOOL-07 | `python -m pytest -q tests/test_effect_reconciliation.py tests/test_execution_gateway_integration.py -x` | planned; pending execution |
+| 02-09-01 | 02-09 | 3 | CTRL-03 | guarded `tests/test_approval_envelope.py` signature/issuer/verifier/drift/expiry/import-origin selector | planned; pending execution |
+| 02-09-02 | 02-09 | 3 | CTRL-03, TOOL-07 | guarded `tests/test_approval_envelope.py tests/test_effect_reconciliation.py -x` | planned; pending execution |
+| 02-10-01 | 02-10 | 3 | CTRL-06, TOOL-03 | guarded `tests/test_policy_kernel.py -x` | planned; pending execution |
+| 02-10-02 | 02-10 | 3 | CTRL-06, TOOL-03 | guarded `tests/test_filesystem_broker_windows.py tests/test_workspace_registry.py -x` | planned; pending execution |
+| 02-10-03 | 02-10 | 3 | CTRL-06, TOOL-03 | guarded `tests/test_execution_broker_windows.py tests/test_filesystem_broker_windows.py -x` | planned; pending execution |
+| 02-11-01 | 02-11 | 4 | TOOL-05, TOOL-07 | guarded browser egress/redirect/subresource/WebSocket/rebinding selector | planned plus real controlled drill at release |
+| 02-11-02 | 02-11 | 4 | TOOL-05, TOOL-07 | guarded browser download/artifact/cleanup selector | planned plus real quarantine/canary drill at release |
+| 02-11-03 | 02-11 | 4 | TOOL-05, TOOL-07 | exact approved Chromium byte check, then named real Playwright descendant/job/cleanup tests | planned; pending execution |
+| 02-12-01 | 02-12 | 5 | all Phase 2 | guarded `tests/test_control_migrations_backup.py -x` | planned; pending execution |
+| 02-12-02 | 02-12 | 5 | all Phase 2 | guarded `tests/test_execution_gateway_integration.py tests/test_effect_reconciliation.py -x` | planned; pending execution |
+| 02-12-03 | 02-12 | 5 | all Phase 2 | guarded gateway/auth/Origin-CSRF/dashboard suites | planned; pending execution |
+| 02-13-01 | 02-13 | 6 | all Phase 2 | guarded agent-runtime/gateway/sink-inventory suites | planned; pending execution |
+| 02-13-02 | 02-13 | 6 | all Phase 2 | guarded sink-inventory/dashboard/agent-runtime suites | planned; pending execution |
+| 02-13-03 | 02-13 | 6 | all Phase 2 | guarded sink-inventory/dashboard/gateway suites | planned; pending execution |
+| 02-14-01 | 02-14 | 7 | all Phase 2 | exact guarded hostile verifier followed by exact guarded `scripts.verify_phase2_release -- --check-only`; receipt assertion requires literal `npm run build:checked`, exit 0, and nonempty `frontend_build_digest` | planned; authority remains closed |
+| 02-14-02 | 02-14 | 7 | all Phase 2 | exact guarded `scripts.verify_phase2_release -- --check-only` | blocking human decision must bind every printed digest including `frontend_build_digest`; authority remains closed |
+| 02-15-01 | 02-15 | 8 | all Phase 2 | exact guarded `scripts.verify_phase2_release -- --release`, then named production gateway/auth/Origin-CSRF/dashboard/sink suites | exact recorded 02-14 approval only; no reconstructed decision |
+| 02-15-02 | 02-15 | 8 | all Phase 2 | ignored/untracked intermediate preflight, exact Brain `refresh`, snapshot rewrite assertion, then separate `status` | planned; no approved-source modification |
+| 02-15-03 | 02-15 | 8 | all Phase 2 | exact Brain `status` | blocking human verification of release, immutable checked-build receipt, snapshot, graph freshness, and residual closures |
+
+## Exact Final Split Gates
+
+These commands are normative and match the `<automated>` blocks in Plans 02-14 and 02-15.
+
+### 02-14 Task 1 — hostile verifier plus frozen check-only receipt
+
+`powershell -NoProfile -Command "$m = Get-Content -LiteralPath 'docs/security/phase-2-package-provenance.json' -Raw | ConvertFrom-Json; $p = [string]$m.python.runtime_binding.executable; &$p -I scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --verify-installed --activate-approved-target --require-import cryptography --require-import playwright.sync_api --run-module pytest -- -q tests/test_phase2_release_verifier.py -x; if ($LASTEXITCODE) { exit $LASTEXITCODE }; &$p -I scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --verify-installed --activate-approved-target --require-import cryptography --require-import playwright.sync_api --run-module scripts.verify_phase2_release -- --check-only; if ($LASTEXITCODE) { exit $LASTEXITCODE }; $e = Get-Content -LiteralPath 'docs/security/phase-2-release-evidence.json' -Raw | ConvertFrom-Json; if ([string]$e.frontend_build.command -cne 'npm run build:checked' -or [int]$e.frontend_build.exit_status -ne 0 -or [string]::IsNullOrWhiteSpace([string]$e.frontend_build.frontend_build_digest)) { exit 1 }; exit 0"`
+
+The check-only verifier itself must run the literal `npm run build:checked` from the frozen source's exact `frontend/` cwd and digest-bind: absolute Node/npm paths and file hashes; Node/npm versions; local TypeScript/Vite versions and entry hashes; `package.json`, lockfile, Vite/TypeScript config hashes; sanitized environment; command/cwd/source identity; timestamps; exit status; bounded stdout/stderr digest; deterministic `dist/` path/size/SHA-256 manifest. Hostile tests reject missing, stale, nonzero, different-cwd, different-source, different-toolchain, or substituted frontend evidence. This separate npm subprocess cannot invoke, replace, or attest Python evidence; Python pytest/compile/release execution remains exclusively behind the manifest-recorded absolute `-I` provenance runner.
+
+### 02-14 Task 2 — final decision while authority stays closed
+
+Automated: `powershell -NoProfile -Command "$m = Get-Content -LiteralPath 'docs/security/phase-2-package-provenance.json' -Raw | ConvertFrom-Json; $p = [string]$m.python.runtime_binding.executable; &$p -I scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --verify-installed --activate-approved-target --require-import cryptography --require-import playwright.sync_api --run-module scripts.verify_phase2_release -- --check-only; exit $LASTEXITCODE"`
+
+Human gate: inspect exact corrected-validation digest/15-plan map, frozen source, Python replay/compile, package/browser evidence, and the checked frontend command/cwd/source/toolchain/zero-exit/output manifest. Reply exactly `APPROVE_PHASE_2_RELEASE evidence_digest=<sha256> source_commit=<full-sha> source_tree=<sha256> source_inventory_digest=<sha256> replay_digest=<sha256> validation_digest=<sha256> runtime_digest=<sha256> package_digest=<sha256> chromium_digest=<sha256> frontend_build_digest=<sha256> release_version=<value> expected_closed_revision=<integer>`, or reject with an exact reason. The response is copied verbatim to genuine `02-14-SUMMARY.md`; a final read must still show release state closed.
+
+### 02-15 Task 1 — consume exact decision and release
+
+`powershell -NoProfile -Command "$m = Get-Content -LiteralPath 'docs/security/phase-2-package-provenance.json' -Raw | ConvertFrom-Json; $p = [string]$m.python.runtime_binding.executable; &$p -I scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --verify-installed --activate-approved-target --require-import cryptography --require-import playwright.sync_api --run-module scripts.verify_phase2_release -- --release; if ($LASTEXITCODE) { exit $LASTEXITCODE }; &$p -I scripts/verify_phase2_package_provenance.py --manifest docs/security/phase-2-package-provenance.json --scope python --require-status approved --verify-installed --activate-approved-target --require-import cryptography --require-import playwright.sync_api --run-module pytest -- -q tests/test_execution_gateway_integration.py::test_production_create_app_capabilities_absent_for_closed_unbound_or_mismatched_release tests/test_execution_gateway_integration.py::test_production_create_app_requires_reconstruction_after_matching_release_opens tests/test_execution_gateway_integration.py::test_production_create_app_serves_matching_release_execute_query_and_reconcile tests/test_execution_gateway_integration.py::test_production_create_app_keeps_issuer_approval_only_and_has_zero_fixture_adapters tests/test_api_auth_matrix.py::test_released_capability_routes_have_exact_scopes_and_auth_matrix tests/test_origin_csrf.py::test_released_capability_mutations_require_exact_origin_and_csrf tests/test_dashboard_execution_gate.py tests/test_execution_sink_inventory.py -x; exit $LASTEXITCODE"`
+
+Release aborts before mutation unless the genuine summary record matches every immutable receipt field, including `frontend_build_digest`.
+
+### 02-15 Task 2 — Graphify refresh and snapshot
+
+`powershell -NoProfile -Command "$g = @('graphify-out/graph.json','graphify-out/graph.html','graphify-out/GRAPH_REPORT.md'); foreach ($x in $g) { git check-ignore -q -- $x; if ($LASTEXITCODE) { exit $LASTEXITCODE }; git ls-files --error-unmatch -- $x 2>$null; if (-not $LASTEXITCODE) { exit 1 } }; $started = [DateTime]::UtcNow; powershell -ExecutionPolicy Bypass -File scripts/brain.ps1 refresh; if ($LASTEXITCODE) { exit $LASTEXITCODE }; $snapshot = Get-Item -LiteralPath '.planning/graphs/.last-build-snapshot.json' -ErrorAction Stop; if ($snapshot.LastWriteTimeUtc -lt $started -or $snapshot.Length -le 0) { exit 1 }; powershell -ExecutionPolicy Bypass -File scripts/brain.ps1 status; exit $LASTEXITCODE"`
+
+Source-grounded classification: `brain.ps1 refresh` runs Graphify update, copies `graphify-out/graph.json`, `graphify-out/graph.html`, and `graphify-out/GRAPH_REPORT.md` to canonical `.planning/graphs/` paths, runs `node gsd-tools graphify build snapshot` to rewrite `.planning/graphs/.last-build-snapshot.json`, then syncs vault projections. The three `graphify-out/` paths are ignored/untracked intermediates and are not canonical ownership. `graphify-out/graph.html` may be absent when the node limit skips explorer generation; current `brain.ps1` then fails rather than accepting stale canonical HTML. No approved source may be edited to work around this.
+
+### 02-15 Task 3 — final durable handoff inspection
+
+Automated: `powershell -NoProfile -Command "powershell -ExecutionPolicy Bypass -File scripts/brain.ps1 status; exit $LASTEXITCODE"`
+
+Human gate: approve only when the exact durable release/audit including `frontend_build_digest`, reconstructed production HTTP proof, raw-code 423, Phase 3 mutation closure, frozen receipt bytes, redacted Brain session, canonical Graphify outputs, rewritten `.last-build-snapshot.json`, ignored-intermediate classification, and separate status output agree.
 
 ## Threat References
 
-- T-01: Unknown, aliased, malformed, oversized, subclassed, or callable-bearing input reaches policy or an adapter.
-- T-02: Canonicalization changes meaning through field order, Unicode, bool/int coercion, path spelling, non-finite numbers, or unbounded iteration.
-- T-03: Approval omits actor, session, request, run, project/worktree, policy, manifest, effect, limits, expiry, nonce, or world precondition.
-- T-04: Evaluator code can mint approvals, access signing material, choose a verifier key, or forge a self-consistent envelope.
-- T-05: Replay, concurrent consumption, stale policy/session/precondition, or crash windows execute more than once.
-- T-06: Same idempotency key with changed intent is accepted or produces a second effect.
-- T-07: Timeout/crash ambiguity triggers blind retry or an unsupported success claim.
-- T-08: `..`, absolute, drive-relative, UNC, device, extended-length, or native namespace path escapes the project.
-- T-09: ADS, reserved DOS names, case/Unicode/trailing-dot/space normalization, symlink, junction, mount, reparse point, or hard link crosses the boundary.
-- T-10: Path validation and file mutation observe different objects because of TOCTOU or cross-volume replacement.
-- T-11: Raw shell strings, metacharacters, PATH search, script hosts, proxy executables, or mutable executable identity widen the approved action.
-- T-12: Child inherits API keys, tokens, passwords, cookies, provider state, shell startup files, or ambient working-directory authority.
-- T-13: Infinite stdout/stderr/stdin, invalid bytes, CPU, memory, process, handle, or wall-time pressure deadlocks or exhausts the broker.
-- T-14: Child or grandchild escapes Job Object membership, survives cancellation/timeout/stop/shutdown, or retains a port/lock/handle.
-- T-15: Assignment or limit setup fails after process creation and the child resumes anyway.
-- T-16: Residue is unproven but the receipt claims terminal success or complete stop.
-- T-17: Browser context inherits cookies, credentials, extensions, cache, service workers, local state, or downloads from the operator profile.
-- T-18: URL or DNS normalization permits credentials, custom schemes, encoded IPs, IPv4-in-IPv6, private/link-local/reserved/metadata targets, or mixed A/AAAA answers.
-- T-19: Redirects, iframes, popups, scripts, images, fetches, service workers, or WebSockets bypass top-level domain policy.
-- T-20: DNS rebinding or browser-side resolution reaches a different address from the one policy approved.
-- T-21: Oversized, compressed, partial, mislabeled, malicious, or traversal-named download reaches an executable/openable location.
-- T-22: DOM, screenshot, HAR, console, accessibility, or download artifact leaks a secret canary or exceeds bounds.
-- T-23: Browser context closes incompletely and retains credentials, processes, profiles, files, ports, or state.
-- T-24: Direct `subprocess`, `os.startfile`, legacy file/code skill, Git/GitHub CLI, or browser launch remains reachable outside the broker.
-- T-25: Decision, approval, reservation, start, result, cancellation, ambiguity, or reconciliation truth is missing from the tamper-evident audit or durable receipt.
-- T-02-SC: The Python dependency closure is incomplete/substituted, Chromium archive or executable bytes drift, or a Chromium process starts before exact-byte human approval.
+- T-01 through T-25 retain the hostile input/canonicalization, approval/replay, Windows containment, egress/browser/quarantine/cleanup, direct-sink, and durable-audit definitions in Phase 2 RESEARCH.md and Plans 02-01 through 02-15.
+- T-02-SC: Python closure or Chromium bytes drift, or execution occurs before exact human approval.
+- T-02-FE: checked frontend evidence is absent, stale, nonzero, from another source/cwd/toolchain, lacks a deterministic output manifest, or is allowed to substitute for the guarded Python runner.
+- T-02-GRAPH: Brain refresh leaves stale canonical graph/snapshot output or treats ignored `graphify-out/` intermediates as approved/canonical source.
 
 ## Wave 0 Producer/Consumer Map
 
 | Producer | Contract | Consumers |
-|----------|----------|-----------|
-| 02-01 Tasks 1-2 | `tests/test_policy_kernel.py`, `tests/test_approval_envelope.py`, bounded hostile corpus, signature/consume fixtures | 02-07, 02-09, 02-12 and all adapters |
-| 02-02 Tasks 1-2 | `tests/test_effect_reconciliation.py`, gateway integration/sink inventory, SQLite contention/crash/fencing fixtures | 02-08 through 02-14 |
-| 02-03 Tasks 1-2 and 02-04 Tasks 1-2 | safe child/grandchild, output, resource, Windows path/reparse, offline browser/DNS/download helpers | 02-10, 02-11 and 02-14 |
-
-- [x] Every missing test family has a required producer before implementation consumers.
-- [x] Every Phase 2 requirement maps to at least one executable contract and one release-gate assertion.
-- [x] The live code-execution route remains closed independently of fixture progress.
-- [x] Package installation is separated into a human legitimacy gate for the exact direct/transitive versions, dependency edges, artifact hashes, and browser identities; install is offline local-only with `--no-deps`.
-- [x] Chromium collection is non-executing and separated from a second non-auto-approvable exact archive/executable byte gate; first launch and release both rehash the approved bytes.
-- [x] Planner replaced producer labels above with final plan/task IDs without reducing coverage.
+|---|---|---|
+| 02-01 Tasks 1-2 | policy and approval hostile corpora | 02-05, 02-07, 02-09, 02-12 through 02-15 |
+| 02-02 Tasks 1-2 | reconciliation, gateway, sink, and dashboard contracts | 02-08 through 02-15 |
+| 02-03 Tasks 1-2 | Windows filesystem and process containment contracts | 02-10 through 02-15 |
+| 02-04 Tasks 1-2 | browser egress/quarantine/cleanup contracts | 02-05, 02-11 through 02-15 |
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_policy_kernel.py` and `tests/fixtures/capability_policy/` — CTRL-02 hostile totality/canonicalization contracts.
-- [ ] `tests/test_approval_envelope.py` — CTRL-03 signature, exact binding, expiry, replay, concurrent consume, and fault points.
-- [ ] `tests/test_effect_reconciliation.py` — TOOL-07 stable key, conflict, ambiguity, fencing, and no-duplicate contracts.
-- [ ] `tests/test_execution_broker_windows.py` and a safe descendant/resource/output helper — CTRL-06/TOOL-03.
-- [ ] `tests/test_filesystem_broker_windows.py` and safe namespace/reparse/ADS fixtures — CTRL-06/TOOL-03.
-- [ ] `tests/test_browser_broker.py` with offline pages and injected resolver/egress/download fakes — TOOL-05.
-- [ ] `tests/test_execution_gateway_integration.py` — authenticated resolved request through one durable receipt.
-- [ ] `tests/test_execution_sink_inventory.py` — direct-sink inventory and monkeypatch/AST guards.
-- [ ] Executable provenance validator and hostile fixtures for complete direct/transitive `cryptography==49.0.0` and `playwright==1.61.0` closure, dependency edges, tags, filenames, sizes, and registry/download/approval hash equality.
-- [ ] Human Python package checkpoints before offline `--no-index --no-deps` installation, followed by non-executing Chromium archive/executable collection and a separate exact-byte human checkpoint before first launch.
-- [ ] Complete fresh Phase 1 evidence bundle for route/auth, Origin/CSRF, migrations/restore, canary, DPAPI current-owner/wrong-SID, credential lifecycle, audit tamper, and persistent emergency stop before production enablement.
+- [ ] Test modules and hostile fixtures named by Plans 02-01 through 02-04 exist and initially fail for the intended missing behavior.
+- [ ] Package-provenance validator and fixtures prove direct/transitive Python closure, artifact hashes, Chromium source/byte split, and approval-before-launch.
+- [ ] Complete genuine Phase 1 Plan 01-14 evidence exists, including different-SID DPAPI release proof, before Plan 02-14 may generate a candidate.
+
+`wave_0_complete` remains false until execution creates and runs these contracts. This is truthful planning approval, not runtime completion.
 
 ## Manual-Only Verifications
 
 | Behavior | Requirement | Why Manual | Gate |
-|----------|-------------|------------|------|
-| Verify exact direct/transitive cryptography and Playwright package closure | CTRL-03, TOOL-05 | New executable and cryptographic supply-chain seam | before offline local-only `--no-index --no-deps` Python install |
-| Verify exact Chromium source/revision, archive/executable filenames, sizes, and SHA-256 | TOOL-05 | Exact executable bytes exist only after non-executing collection and extraction | blocking non-auto-approvable gate after collection and before first Chromium process start |
-| Distinct-Windows-SID DPAPI release receipt | Phase 1 dependency | Requires a genuinely different Windows user identity | before any production adapter enablement |
-| Real Windows child/grandchild cleanup with timeout, cancel, emergency stop and backend shutdown | CTRL-06, TOOL-03 | OS process-tree and residue behavior cannot be proven by mocks | process broker and release gate |
-| Resolver-pinned browser egress and DNS-rebinding drill | TOOL-05 | Browser/OS resolver behavior and actual socket destination require live controlled observation | browser broker and release gate |
-| Download quarantine, scanner, promotion, context cleanup and secret-canary inspection | TOOL-05 | Requires real browser binary/filesystem behavior | browser broker and release gate |
+|---|---|---|---|
+| Exact cryptography and Playwright closures | CTRL-03, TOOL-05 | executable/cryptographic supply-chain decision | Plan 02-05 Tasks 2-3 before install |
+| Exact Chromium archive/executable bytes | TOOL-05 | executable bytes exist only after non-executing collection | Plan 02-06 Task 2 before first browser process |
+| Different-Windows-SID DPAPI receipt | Phase 1 dependency | requires a genuinely different identity | before Plan 02-14 candidate |
+| Real Windows descendant cleanup and controlled browser drills | CTRL-06, TOOL-03, TOOL-05 | OS/process/socket/filesystem observations cannot be replaced by mocks | bound into Plan 02-14 check-only receipt |
+| Exact frozen Phase 2 release decision | all Phase 2 | consequential authority needs exact human digest approval | Plan 02-14 Task 2; release remains closed |
+| Released authority and durable Brain/Graphify handoff | all Phase 2 | final live behavior and generated projection inspection | Plan 02-15 Task 3 |
 
 ## Validation Sign-Off
 
-- [x] Every requirement has automated hostile-contract coverage and a release-gate assertion.
-- [x] Sampling continuity forbids three consecutive tasks without automated feedback.
-- [x] Wave 0 owns every missing test module and fixture family.
-- [x] No watch-mode flags are used.
-- [x] Policy-only or mocked evidence cannot open production execution.
-- [x] Feedback targets are explicit; execution records actual runtime and flaky/manual exceptions.
-- [x] `nyquist_compliant: true` is set for planning; `wave_0_complete` remains false until the named tests exist and pass.
+- [x] Actual graph contains 15 plans over Waves 0-8; 02-14 is Wave 7 with two tasks and 02-15 is Wave 8 with three tasks.
+- [x] Every task has an automated gate or a Wave 0 producer dependency; blocking human gates follow automation.
+- [x] Every Phase 2 requirement maps to hostile contracts and the final source-bound release assertion.
+- [x] Final release evidence includes exact checked frontend command/cwd/toolchain/source/exit/output-manifest binding and hostile stale/substitution rejection.
+- [x] Plan 02-14 hashes the exact bytes of this corrected validation map and rejects stale/different plan/task/command attestations.
+- [x] Plan 02-15 owns `.planning/graphs/.last-build-snapshot.json`; `graphify-out` intermediates are explicitly non-canonical and excluded.
+- [x] No watch-mode command, ambient Python, ambient frontend receipt, or historical result can satisfy release.
+- [x] `nyquist_compliant: true` is planning coverage only; `wave_0_complete: false` and all runtime gates remain pending.
 
-**Approval:** approved 2026-08-01 for execution planning. Runtime evidence, package approvals, real Windows containment/browser drills, and the Phase 1 second-SID receipt remain required before production enablement.
+**Approval:** corrected and approved for execution planning on 2026-08-08. Runtime tests, package/Chromium approvals, checked frontend evidence, real Windows/browser drills, exact release decision, transactional opening, snapshot refresh, and final human handoff remain pending and mandatory.

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready for Plan 01-14
-stopped_at: Completed 01-10 and 01-13 plans
-last_updated: "2026-08-08T17:31:05.6992050+03:00"
-last_activity: 2026-08-08 -- Approval-checkpoint regression passed 498 tests; downstream readiness audit requires fail-closed plan amendments before Wave 2
+status: Phase 1 release gate pending; Phase 2 Wave 1 executing
+stopped_at: Phase 02 Plan 05 Task 1 complete; resume exact cryptography approval recording in Task 2
+last_updated: "2026-08-09T01:04:15.6819499+03:00"
+last_activity: 2026-08-09 -- Canonical standalone repository established at C:\Jarvis; Phase 2 expanded to 15 checker-validated plans over Waves 0-8
 progress:
   total_phases: 9
   completed_phases: 0
@@ -21,15 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-22)
 
 **Core value:** Jarvis must reliably turn Ahmed's requests into verified real-world results while preserving control, security, and recoverability.
-**Current focus:** Phase 1 — Trust and Durable Control Foundation
+**Canonical repository:** `C:\Jarvis` (the former OneDrive repository remains rollback-only until the live runtime cutover is verified)
+**Current focus:** Close the Phase 1 distinct-SID release gate while continuing safe, pre-release Phase 2 implementation and supply-chain approvals
 **Milestone scope:** v1.0, 9 phases, 63 requirements; 0 phases and 9 requirements complete
 
 ## Current Position
 
-Phase: 1 (Trust and Durable Control Foundation) — EXECUTING
-Plan: 14 of 14
-Status: Ready for Plan 01-14
-Last activity: 2026-08-08 -- Approval-checkpoint regression passed 498 tests; downstream readiness audit requires fail-closed plan amendments before Wave 2
+Phase: 1 release closure with Phase 2 controlled pre-release execution
+Plan: 01-14 release gate pending; 02-05 Task 2 is the next executable step
+Status: Phase 1 release gate pending; Phase 2 Wave 1 executing
+Last activity: 2026-08-09 -- Canonical standalone repository established at `C:\Jarvis`; all 15 Phase 2 plans and the Waves 0-8 validation map pass structural checks
 
 Progress: [█████████░] 93%
 
@@ -106,7 +107,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Treat cancel responses as transitional evidence rather than terminal runtime proof. — Only later authoritative backend reads may replace displayed agent and swarm state.
 - [Phase 01]: Scope trust layout rules to protected dashboard and voice roots. — Unrelated routes retain their established visual system.
 
-- [Phase 02 Planning]: Fourteen independently checked plans cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; execution remains closed until complete Phase 1 and Phase 2 release evidence is atomically validated.
+- [Repository]: `C:\Jarvis` is the canonical standalone Git repository. The former OneDrive copy is retained only as a rollback source until service launch, runtime state, mobile access, and health checks pass from the canonical path.
+- [Phase 02 Planning]: Fifteen independently checked plans over Waves 0-8 cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; Plan 02-14 freezes evidence while authority stays closed, and Plan 02-15 alone consumes the exact approval and opens authority transactionally.
 - [Phase 02 Wave 0]: Plans 02-01 through 02-04 added fail-closed hostile contracts; the integrated gate passed 428 tests, 168 intentional future-module skips, one expected distinct-SID xfail, and 36 subtests without installing or launching Chromium.
 - [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 1 validated a seven-wheel PENDING Python closure and stopped at the non-auto-approvable cryptography checkpoint.
 
@@ -118,7 +120,7 @@ None yet.
 
 - Phase 1 is a release and authority gate: later privileged capability expansion remains closed until its authentication, secret, audit, recovery, and emergency-stop tests pass.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
-- Phase 2 Wave 2 plans require amendments recorded in `02-READINESS-AUDIT.md`: exact interpreter binding, Chromium byte validator modes, executable value enforcement, evidence-bound release state, real browser Job containment, and complete legacy sink inventory.
+- Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
 ## Deferred Items
@@ -129,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-26T02:55:29.035Z
-Stopped at: Completed 01-10 and 01-13 plans
+Last session: 2026-08-09T01:04:15.6819499+03:00
+Stopped at: Standalone repository migration verified; resume Phase 02 Plan 05 Task 2 after committing the validated 15-plan revision
 Resume file: None

@@ -52,7 +52,7 @@ Jarvis v1.0 is delivered in nine dependency-ordered phases. The roadmap first es
   3. Approved browser work runs in an ephemeral context whose domains, redirects, private-network access, downloads, and captured artifacts are controlled and recorded.
   4. Retried or ambiguously timed-out external writes use stable idempotency keys and reconciliation evidence so the same request cannot silently duplicate an effect.
 
-**Plans**: 14 plans
+**Plans**: 15 plans
 
 Plans:
 
@@ -72,24 +72,31 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 02-06-PLAN.md - Offline no-deps Python install, non-executing Chromium byte approval, and post-approval smoke launch
-- [ ] 02-10-PLAN.md - Handle-verified filesystem and suspended Job Object local adapters
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [ ] 02-09-PLAN.md - Separated approval issuer/verifier and atomic consume/reserve
-- [ ] 02-11-PLAN.md - Resolver-pinned ephemeral browser, quarantine, and artifacts
+- [ ] 02-10-PLAN.md - Handle-verified filesystem and suspended Job Object local adapters
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-12-PLAN.md - Single execution gateway and release-registered capability API
+- [ ] 02-11-PLAN.md - Resolver-pinned ephemeral browser, quarantine, and artifacts
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-13-PLAN.md - Legacy sink cutover with exact raw code route closure
+- [ ] 02-12-PLAN.md - Single execution gateway and release-registered capability API
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 02-14-PLAN.md - Full hostile/real-host release evidence and typed-capability gate
+- [ ] 02-13-PLAN.md - Legacy sink cutover with exact raw code route closure
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 02-14-PLAN.md - Freeze full hostile, real-host, and checked-frontend evidence for Ahmed's exact release decision while capability authority remains closed
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 02-15-PLAN.md - Consume the exact recorded approval, open capability authority transactionally, prove the reconstructed production app, and refresh the durable Brain handoff
 
 **Security gate**: The capability router remains unregistered and tool/browser adapters remain default-deny outside explicit test-only fixtures until a complete fresh Phase 1 route/auth, Origin/CSRF, migration/restore, canary, DPAPI owner/wrong-SID, credential-lifecycle, audit-tamper, and persistent-stop bundle plus the Phase 2 injection, path escape, environment leak, process-grandchild cancellation, stale approval, SSRF/redirect, download, idempotency, and artifact-redaction evidence are atomically digest-bound and released. GitHub and autonomous project-write authority remain closed until Phase 3 also passes.
 
@@ -218,7 +225,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Trust and Durable Control Foundation | 13/14 | In Progress|  |
-| 2. Capability Policy and Execution Isolation | 6/14 | In Progress|  |
+| 2. Capability Policy and Execution Isolation | 6/15 | In Progress|  |
 | 3. Project Isolation, Durable Queue, Scheduling, and Recovery | 0/TBD | Not started | - |
 | 4. Planner-Executor-Verifier Runtime | 0/TBD | Not started | - |
 | 5. Real Work, GitHub, and Multi-Agent Teams | 0/TBD | Not started | - |
