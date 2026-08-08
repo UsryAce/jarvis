@@ -1,6 +1,6 @@
 {
   "schema_version": "jarvis.phase2.package-provenance.v1",
-  "generated_at_utc": "2026-08-08T14:07:13Z",
+  "generated_at_utc": "2026-08-08T22:13:48Z",
   "status": "PENDING_HUMAN_APPROVAL",
   "artifact_directory": "C:\\Users\\Usry\\AppData\\Local\\Temp\\jarvis-phase2-plan05-20260808T164151",
   "download": {
@@ -90,10 +90,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-08T22:13:48Z"
         }
       },
       {
@@ -142,10 +142,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "e5dfc1e64de5677cec922ffa8da89c546d0415bf6efdf081842e5d44c84e1f0e",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-08T22:13:48Z"
         }
       },
       {
@@ -288,10 +288,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-08T22:13:48Z"
         }
       },
       {

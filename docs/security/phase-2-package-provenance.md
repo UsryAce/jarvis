@@ -1,10 +1,10 @@
 # Phase 2 Package Provenance Receipt
 
 Status: **PENDING HUMAN APPROVAL**  
-Generated: `2026-08-08T14:07:13Z`  
+Generated: `2026-08-08T22:13:48Z`
 Canonical machine record: [`phase-2-package-provenance.json`](phase-2-package-provenance.json)
 
-This receipt is evidence for a blocking supply-chain decision. It is not approval and does not authorize installation or execution.
+This receipt records the completed blocking approval for the exact cryptography closure. The Playwright closure and Chromium source contract remain pending, so this receipt does not authorize installation or execution.
 
 ## Download-only target
 
@@ -25,9 +25,9 @@ All registry links below are official PyPI release records. Each source URL is t
 
 | Closure | Identity | Exact wheel | Filename tag | WHEEL tag | Bytes | PyPI SHA-256 / local SHA-256 | Official project and source | Approval |
 |---|---|---|---|---|---:|---|---|---|
-| cryptography | `cryptography==49.0.0` | `cryptography-49.0.0-cp311-abi3-win_amd64.whl` | `cp311-abi3-win_amd64` | `cp311-abi3-win_amd64` | 3,810,026 | `e5dfc1e64de5677cec922ffa8da89c546d0415bf6efdf081842e5d44c84e1f0e` | [PyPI](https://pypi.org/project/cryptography/) · [PyCA source](https://github.com/pyca/cryptography/) | **PENDING** |
-| cryptography | `cffi==2.1.1` | `cffi-2.1.1-cp311-cp311-win_amd64.whl` | `cp311-cp311-win_amd64` | `cp311-cp311-win_amd64` | 185,096 | `42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0` | [PyPI](https://pypi.org/project/cffi/) · [python-cffi source](https://github.com/python-cffi/cffi) | **PENDING** |
-| cryptography | `pycparser==3.0` | `pycparser-3.0-py3-none-any.whl` | `py3-none-any` | `py3-none-any` | 48,172 | `b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992` | [PyPI](https://pypi.org/project/pycparser/) · [eliben source](https://github.com/eliben/pycparser) | **PENDING** |
+| cryptography | `cryptography==49.0.0` | `cryptography-49.0.0-cp311-abi3-win_amd64.whl` | `cp311-abi3-win_amd64` | `cp311-abi3-win_amd64` | 3,810,026 | `e5dfc1e64de5677cec922ffa8da89c546d0415bf6efdf081842e5d44c84e1f0e` | [PyPI](https://pypi.org/project/cryptography/) · [PyCA source](https://github.com/pyca/cryptography/) | **APPROVED** |
+| cryptography | `cffi==2.1.1` | `cffi-2.1.1-cp311-cp311-win_amd64.whl` | `cp311-cp311-win_amd64` | `cp311-cp311-win_amd64` | 185,096 | `42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0` | [PyPI](https://pypi.org/project/cffi/) · [python-cffi source](https://github.com/python-cffi/cffi) | **APPROVED** |
+| cryptography | `pycparser==3.0` | `pycparser-3.0-py3-none-any.whl` | `py3-none-any` | `py3-none-any` | 48,172 | `b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992` | [PyPI](https://pypi.org/project/pycparser/) · [eliben source](https://github.com/eliben/pycparser) | **APPROVED** |
 | Playwright | `playwright==1.61.0` | `playwright-1.61.0-py3-none-win_amd64.whl` | `py3-none-win_amd64` | `py3-none-any` | 37,844,846 | `35c6cc4589a5d00964a59d7b3e59641e0aac0c02f15479a7af77d20f6bc79597` | [PyPI](https://pypi.org/project/playwright/) · [Microsoft source](https://github.com/Microsoft/playwright-python) | **PENDING** |
 | Playwright | `greenlet==3.5.4` | `greenlet-3.5.4-cp311-cp311-win_amd64.whl` | `cp311-cp311-win_amd64` | `cp311-cp311-win_amd64` | 246,434 | `dc418cf4c873357964d6624445ed09472e50def990c65dd4e76fc3ba8cd9cef6` | [PyPI](https://pypi.org/project/greenlet/) · [python-greenlet source](https://github.com/python-greenlet/greenlet) | **PENDING** |
 | Playwright | `pyee==13.0.1` | `pyee-13.0.1-py3-none-any.whl` | `py3-none-any` | `py3-none-any` | 15,659 | `af2f8fede4171ef667dfded53f96e2ed0d6e6bd7ee3bb46437f77e3b57689228` | [PyPI](https://pypi.org/project/pyee/) · [jfhbrook source](https://github.com/jfhbrook/pyee) | **PENDING** |
@@ -94,15 +94,17 @@ Current result:
 
 ```text
 21 hostile/positive tests passed
-python closure: PASS (7 artifacts, 5 active edges, required status PENDING)
+cryptography scope: PASS (complete 7-artifact closure, 5 active edges; 3 scoped artifacts APPROVED)
 ```
 
-## Blocking human decision 1: cryptography closure
+## Blocking human decision 1: cryptography closure — APPROVED
 
-Review all three exact `cryptography` closure rows, their official PyPI/source identities, active edges, target tags, sizes, and hashes. To approve precisely those retained artifacts, reply with the exact phrase:
+The human operator replied with the exact phrase `approved`. That decision is recorded only for the complete exact cryptography closure:
 
-`approved`
+- `cryptography==49.0.0`: `e5dfc1e64de5677cec922ffa8da89c546d0415bf6efdf081842e5d44c84e1f0e`
+- `cffi==2.1.1`: `42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0`
+- `pycparser==3.0`: `b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992`
 
-That phrase authorizes recording approval only for the exact `cryptography==49.0.0`, `cffi==2.1.1`, and `pycparser==3.0` wheel identities and SHA-256 values listed above. Any concern, omission, or mismatch leaves the plan blocked and the canonical status PENDING.
+Approval was recorded by `human_operator` at `2026-08-08T22:13:48Z`. The canonical manifest requires each approved SHA-256 to equal both the official PyPI registry SHA-256 and the independently calculated downloaded-byte SHA-256.
 
-The Playwright package closure and package-declared Chromium source contract have a separate later blocking decision. Approval at this checkpoint must not approve Playwright or any Chromium bytes.
+The Playwright package closure and package-declared Chromium source contract have a separate later blocking decision and remain **PENDING**. Chromium archive and executable bytes remain **ABSENT**. This approval does not approve Playwright or any Chromium source or bytes.
