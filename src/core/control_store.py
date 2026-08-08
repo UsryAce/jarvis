@@ -225,6 +225,164 @@ _MIGRATIONS = (
             )""",
         ),
     ),
+    _Migration(
+        4,
+        "capability_authority",
+        (
+            """CREATE TABLE capability_manifests (
+                manifest_digest TEXT PRIMARY KEY,
+                tool_id TEXT NOT NULL,
+                manifest_version INTEGER NOT NULL CHECK(manifest_version >= 1),
+                schema_version TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('active','disabled','retired')),
+                safe_payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            "CREATE INDEX idx_capability_manifests_tool ON capability_manifests(tool_id, state, manifest_version DESC)",
+            """CREATE TABLE policy_snapshots (
+                policy_digest TEXT PRIMARY KEY,
+                policy_version INTEGER NOT NULL CHECK(policy_version >= 1),
+                state TEXT NOT NULL CHECK(state IN ('active','superseded','revoked')),
+                safe_payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE resolved_actions (
+                action_digest TEXT PRIMARY KEY,
+                actor_id TEXT NOT NULL,
+                session_digest TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                workspace_id TEXT NOT NULL,
+                worktree_id TEXT NOT NULL,
+                policy_digest TEXT NOT NULL,
+                manifest_digest TEXT NOT NULL,
+                declared_effect TEXT NOT NULL,
+                limits_json TEXT NOT NULL,
+                precondition_digest TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(policy_digest) REFERENCES policy_snapshots(policy_digest),
+                FOREIGN KEY(manifest_digest) REFERENCES capability_manifests(manifest_digest)
+            )""",
+            "CREATE UNIQUE INDEX idx_resolved_actions_request ON resolved_actions(request_id, action_digest)",
+            """CREATE TABLE approval_keys (
+                key_id TEXT PRIMARY KEY,
+                public_key BLOB NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('active','retired','revoked')),
+                created_at TEXT NOT NULL,
+                retired_at TEXT
+            )""",
+            """CREATE TABLE action_reservations (
+                reservation_id TEXT PRIMARY KEY,
+                action_digest TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                request_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                declared_effect TEXT NOT NULL,
+                fence_token TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL CHECK(state IN
+                    ('reserved','dispatching','applied','not_applied',
+                     'needs_reconciliation','reconciled_applied',
+                     'reconciled_not_applied','reconciliation_failed')),
+                revision INTEGER NOT NULL DEFAULT 1 CHECK(revision >= 1),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            "CREATE INDEX idx_action_reservations_digest ON action_reservations(action_digest)",
+            """CREATE TABLE approval_consumptions (
+                nonce TEXT PRIMARY KEY,
+                key_id TEXT NOT NULL,
+                action_digest TEXT NOT NULL,
+                reservation_id TEXT NOT NULL UNIQUE,
+                consumer_id TEXT NOT NULL,
+                consumed_at TEXT NOT NULL,
+                FOREIGN KEY(key_id) REFERENCES approval_keys(key_id),
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            """CREATE TABLE idempotency_records (
+                idempotency_key TEXT PRIMARY KEY,
+                action_digest TEXT NOT NULL,
+                reservation_id TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL CHECK(state IN
+                    ('reserved','dispatching','applied','not_applied',
+                     'needs_reconciliation','reconciled_applied',
+                     'reconciled_not_applied','reconciliation_failed')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            """CREATE TABLE effect_attempts (
+                attempt_id TEXT PRIMARY KEY,
+                reservation_id TEXT NOT NULL,
+                fence_token TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN
+                    ('dispatching','applied','not_applied','needs_reconciliation')),
+                safe_evidence_json TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            "CREATE INDEX idx_effect_attempts_reservation ON effect_attempts(reservation_id, started_at)",
+            """CREATE TABLE effect_receipts (
+                receipt_id TEXT PRIMARY KEY,
+                reservation_id TEXT NOT NULL UNIQUE,
+                idempotency_key TEXT NOT NULL,
+                action_digest TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN
+                    ('reserved','dispatching','applied','not_applied',
+                     'needs_reconciliation','reconciled_applied',
+                     'reconciled_not_applied','reconciliation_failed')),
+                applied_truth TEXT NOT NULL CHECK(applied_truth IN ('applied','not_applied','unknown')),
+                cleanup_truth TEXT NOT NULL CHECK(cleanup_truth IN ('not_required','confirmed','partial','unconfirmed')),
+                reconciliation_truth TEXT NOT NULL CHECK(reconciliation_truth IN
+                    ('not_required','pending','applied','not_applied','failed')),
+                reason_code TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                safe_evidence_json TEXT NOT NULL,
+                artifact_references_json TEXT NOT NULL,
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            """CREATE TABLE reconciliation_attempts (
+                reconciliation_id TEXT PRIMARY KEY,
+                reservation_id TEXT NOT NULL,
+                probe_kind TEXT NOT NULL,
+                read_only INTEGER NOT NULL CHECK(read_only = 1),
+                state TEXT NOT NULL CHECK(state IN ('pending','applied','not_applied','unknown','failed')),
+                authoritative_truth TEXT CHECK(authoritative_truth IN ('applied','not_applied','unknown')),
+                safe_evidence_json TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            "CREATE INDEX idx_reconciliation_reservation ON reconciliation_attempts(reservation_id, started_at)",
+            """CREATE TABLE artifact_records (
+                artifact_id TEXT PRIMARY KEY,
+                reservation_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0),
+                media_type TEXT NOT NULL,
+                sensitivity TEXT NOT NULL,
+                canonical_remote_id TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(reservation_id) REFERENCES action_reservations(reservation_id)
+            )""",
+            "CREATE INDEX idx_artifact_records_reservation ON artifact_records(reservation_id, created_at)",
+            """CREATE TABLE capability_release_state (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                state TEXT NOT NULL CHECK(state IN ('closed','pending_validation','open')),
+                revision INTEGER NOT NULL CHECK(revision >= 1),
+                reason_code TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """INSERT INTO capability_release_state(singleton, state, revision, reason_code, updated_at)
+               VALUES(1, 'closed', 1, 'phase_2_release_gate_closed', '1970-01-01T00:00:00Z')""",
+        ),
+    ),
 )
 
 
@@ -579,7 +737,11 @@ class ControlStore:
                     "schema_migrations", "operator_sessions", "control_states",
                     "credentials", "provider_generations", "audit_keyring",
                     "audit_events", "audit_checkpoints", "operator_bootstrap",
-                    "provider_cutovers",
+                    "provider_cutovers", "capability_manifests", "policy_snapshots",
+                    "resolved_actions", "approval_keys", "approval_consumptions",
+                    "action_reservations", "idempotency_records", "effect_attempts",
+                    "effect_receipts", "reconciliation_attempts", "artifact_records",
+                    "capability_release_state",
                 }
                 if not required.issubset(names):
                     raise RestoreVerificationError("restore_schema_invalid")
