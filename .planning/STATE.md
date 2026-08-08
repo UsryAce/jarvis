@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 1 release gate pending; Phase 2 Wave 1 executing
-stopped_at: Phase 02 Plan 05 Task 1 complete; resume exact cryptography approval recording in Task 2
-last_updated: "2026-08-09T01:04:15.6819499+03:00"
-last_activity: 2026-08-09 -- Canonical standalone repository established at C:\Jarvis; Phase 2 expanded to 15 checker-validated plans over Waves 0-8
+status: Paused by Ahmed; canonical standalone runtime stopped cleanly; Phase 1 release gate pending; Phase 2 Wave 1 paused
+stopped_at: Fix the Graphify optional-HTML refresh contract, complete Brain refresh/status, then resume Phase 02 Plan 05 Task 3 exact approval
+last_updated: "2026-08-09T01:53:28.5748970+03:00"
+last_activity: 2026-08-09 -- Saved the verified standalone cutover checkpoint and stopped JarvisAutonomous plus all validated runtime descendants
 progress:
   total_phases: 9
   completed_phases: 0
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-22)
 
 **Core value:** Jarvis must reliably turn Ahmed's requests into verified real-world results while preserving control, security, and recoverability.
-**Canonical repository:** `C:\Jarvis` (the former OneDrive repository remains rollback-only until the live runtime cutover is verified)
+**Canonical repository and live runtime:** `C:\Jarvis`; the former OneDrive repository is rollback-only
 **Current focus:** Close the Phase 1 distinct-SID release gate while continuing safe, pre-release Phase 2 implementation and supply-chain approvals
 **Milestone scope:** v1.0, 9 phases, 63 requirements; 0 phases and 9 requirements complete
 
 ## Current Position
 
 Phase: 1 release closure with Phase 2 controlled pre-release execution
-Plan: 01-14 release gate pending; 02-05 Task 2 is the next executable step
-Status: Phase 1 release gate pending; Phase 2 Wave 1 executing
-Last activity: 2026-08-09 -- Canonical standalone repository established at `C:\Jarvis`; all 15 Phase 2 plans and the Waves 0-8 validation map pass structural checks
+Plan: 01-14 release gate pending; 02-05 Task 2 complete; Task 3 awaits a separate exact human approval
+Status: Paused by Ahmed; canonical standalone runtime stopped cleanly; Phase 1 release gate pending; Phase 2 Wave 1 paused
+Last activity: 2026-08-09 -- Canonical cutover evidence was saved, `JarvisAutonomous` entered `Ready`, ports 4173/8000/20242 cleared, trust verification passed, and the owner lock was released
 
 Progress: [█████████░] 93%
 
@@ -107,10 +107,18 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 01]: Treat cancel responses as transitional evidence rather than terminal runtime proof. — Only later authoritative backend reads may replace displayed agent and swarm state.
 - [Phase 01]: Scope trust layout rules to protected dashboard and voice roots. — Unrelated routes retain their established visual system.
 
-- [Repository]: `C:\Jarvis` is the canonical standalone Git repository. The former OneDrive copy is retained only as a rollback source until service launch, runtime state, mobile access, and health checks pass from the canonical path.
+- [Repository]: `C:\Jarvis` is the canonical standalone Git repository and live runtime root. The former OneDrive copy is rollback-only, and the unrelated prior prototype remains preserved at `C:\Jarvis-Legacy-20250827`.
+- [Repository]: The `JarvisAutonomous` scheduled task targets only `C:\Jarvis\scripts\jarvis-supervisor.ps1`. Its backend, frontend, and tunnel listeners passed canonical-ancestry checks during cutover; Ahmed then paused the system, leaving the task `Ready`, those ports clear, and no canonical supervisor running.
+- [Repository]: Trust state moved through supported verified backup/restore, while agent, swarm, workspace, and Chroma state used coherent SQLite/file migration with rollback copies retained under `C:\Jarvis\data-pre-cutover-20260809T012423`.
+- [Repository]: The standalone cutover backup is `standalone-cutover-20260809T012316.sqlite3` with SHA-256 `5D01286F8D77A83C2C0CFC140E6589849A52C611574977703C828A947F60D496`; no secret or public tunnel address is recorded in planning artifacts.
+- [Repository]: Local desktop/mobile, public backend readiness, worker/scheduler/swarm readiness, fresh HTTPS mobile projection, remote mobile delivery, protected remote API rejection, canonical owner lock, and a stability window all passed after one expected first-tunnel backend restart.
+- [Memory]: The migrated Chroma inventory is byte-identical to the prior live store. Both copies inherit six legacy `segments` foreign-key reports caused by the historical singular `collection` reference; this is not a migration regression, so runtime initialization plus a future maintenance-disabled local retrieval probe—not a false FK-clean claim—is the acceptance boundary.
+- [Brain]: The authenticated dashboard projected 5,121 Graphify nodes, 12,426 edges, and 281 vault notes from the migrated canonical runtime.
+- [Brain]: The final refresh rebuilt ignored graph JSON to 5,375 nodes and 13,673 edges, then stopped before report/snapshot/vault synchronization because Graphify skipped optional `graph.html` above its 5,000-node visualization limit while `brain.ps1` still required that file. The partial refresh is recorded, not claimed complete.
+- [Models]: The authenticated dashboard projects 38 configured NVIDIA catalog entries and an AUTO route to Nemotron 3 Ultra, but its current `0/38 SELECTABLE · HEALTH UNVERIFIED` state means catalog rendering must not be reported as successful inference.
 - [Phase 02 Planning]: Fifteen independently checked plans over Waves 0-8 cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; Plan 02-14 freezes evidence while authority stays closed, and Plan 02-15 alone consumes the exact approval and opens authority transactionally.
 - [Phase 02 Wave 0]: Plans 02-01 through 02-04 added fail-closed hostile contracts; the integrated gate passed 428 tests, 168 intentional future-module skips, one expected distinct-SID xfail, and 36 subtests without installing or launching Chromium.
-- [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 1 validated a seven-wheel PENDING Python closure and stopped at the non-auto-approvable cryptography checkpoint.
+- [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 2 recorded and validator-checked cryptography 49.0.0, cffi 2.1.1, and pycparser 3.0 as APPROVED; Playwright 1.61.0, greenlet 3.5.4, pyee 13.0.1, typing-extensions 4.16.0, and Chromium remain PENDING/ABSENT under separate non-auto-approvable gates.
 
 ### Pending Todos
 
@@ -121,6 +129,9 @@ None yet.
 - Phase 1 is a release and authority gate: later privileged capability expansion remains closed until its authentication, secret, audit, recovery, and emergency-stop tests pass.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
 - Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
+- Plan 02-05 Task 3 cannot be inferred from prior approval: Ahmed must separately approve the exact Playwright 1.61.0 Python closure and package-declared Chromium source/revision contract while Chromium archive/executable bytes remain pending.
+- Brain refresh remains incomplete: make the optional-HTML path fail closed without requiring a skipped artifact, then run `scripts\brain.ps1 refresh` followed by a separate `status` before claiming Graphify/Obsidian synchronization.
+- The migrated memory store needs a future local-only, maintenance-disabled semantic retrieval acceptance probe; the existing recall route can request NVIDIA embeddings and mutate/promote vector state, so it is not a safe no-effect health check.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
 ## Deferred Items
@@ -131,6 +142,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09T01:04:15.6819499+03:00
-Stopped at: Standalone repository migration verified; resume Phase 02 Plan 05 Task 2 after committing the validated 15-plan revision
+Last session: 2026-08-09T01:53:28.5748970+03:00
+Stopped at: Jarvis runtime fully stopped and trust state released; resume with the Graphify optional-HTML fix and Brain refresh/status, then the separate Phase 02 Plan 05 Task 3 Playwright/source-contract approval
 Resume file: None
