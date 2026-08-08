@@ -58,10 +58,10 @@ Plans:
 
 **Wave 0**
 
-- [ ] 02-01-PLAN.md - Wave 0 sealed action, policy, and approval hostile contracts
-- [ ] 02-02-PLAN.md - Wave 0 idempotency, gateway, and direct-sink hostile contracts
-- [ ] 02-03-PLAN.md - Wave 0 Windows filesystem and process containment contracts
-- [ ] 02-04-PLAN.md - Wave 0 browser, egress, download, and artifact contracts
+- [x] 02-01-PLAN.md - Wave 0 sealed action, policy, and approval hostile contracts
+- [x] 02-02-PLAN.md - Wave 0 idempotency, gateway, and direct-sink hostile contracts
+- [x] 02-03-PLAN.md - Wave 0 Windows filesystem and process containment contracts
+- [x] 02-04-PLAN.md - Wave 0 browser, egress, download, and artifact contracts
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -218,7 +218,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Trust and Durable Control Foundation | 13/14 | In Progress|  |
-| 2. Capability Policy and Execution Isolation | 0/TBD | Not started | - |
+| 2. Capability Policy and Execution Isolation | 4/14 | In Progress|  |
 | 3. Project Isolation, Durable Queue, Scheduling, and Recovery | 0/TBD | Not started | - |
 | 4. Planner-Executor-Verifier Runtime | 0/TBD | Not started | - |
 | 5. Real Work, GitHub, and Multi-Agent Teams | 0/TBD | Not started | - |
