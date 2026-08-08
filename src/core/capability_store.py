@@ -14,7 +14,6 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
 
 from src.core.audit import AuditService
@@ -44,7 +43,7 @@ _TERMINAL_STATES = frozenset(
         "reconciliation_failed",
     }
 )
-_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$")
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+/-]{0,127}$")
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_EVIDENCE_FIELDS = frozenset(
     {
@@ -331,6 +330,8 @@ class CapabilityStore:
         run_id: str,
         project_id: str,
         declared_effect: str,
+        tool_id: str | None = None,
+        policy_outcome: str = "allow",
     ) -> ReservationRecord:
         self._require_tx(tx)
         action = _require_digest(action_digest)
@@ -354,6 +355,9 @@ class CapabilityStore:
         run = _safe_id(run_id)
         project = _safe_id(project_id)
         effect = _safe_id(declared_effect)
+        receipt_tool = effect if tool_id is None else _safe_id(tool_id)
+        if policy_outcome not in {"allow", "ask"}:
+            raise CapabilityStoreError("invalid_reservation_policy_outcome")
         tx.execute(
             """INSERT INTO action_reservations(
                    reservation_id, action_digest, idempotency_key, request_id,
@@ -383,12 +387,21 @@ class CapabilityStore:
         tx.execute(
             """INSERT INTO effect_receipts(
                    receipt_id, reservation_id, idempotency_key, action_digest,
-                   request_id, state, applied_truth, cleanup_truth,
+                   request_id, tool_id, policy_outcome, state, applied_truth, cleanup_truth,
                    reconciliation_truth, reason_code, started_at, completed_at,
                    safe_evidence_json, artifact_references_json
-               ) VALUES(?, ?, ?, ?, ?, 'reserved', 'unknown', 'not_required',
+               ) VALUES(?, ?, ?, ?, ?, ?, ?, 'reserved', 'unknown', 'not_required',
                         'not_required', 'reserved', ?, NULL, '{}', '[]')""",
-            (f"receipt:{uuid.uuid4().hex}", reservation_id, key, action, request, timestamp),
+            (
+                f"receipt:{uuid.uuid4().hex}",
+                reservation_id,
+                key,
+                action,
+                request,
+                receipt_tool,
+                policy_outcome,
+                timestamp,
+            ),
         )
         self._append_audit(tx, "execution.effect_reserved", "accepted", reservation_id, 1, run_id=run)
         row = self._reservation_row(tx, reservation_id)
@@ -440,6 +453,21 @@ class CapabilityStore:
         self._append_audit(tx, "execution.dispatch_started", "accepted", str(row["reservation_id"]), revision)
         updated = self._require_reservation(tx, str(row["reservation_id"]))
         return _effect_record(updated)
+
+    def mark_dispatching(
+        self,
+        tx: ControlStoreTransaction,
+        reservation_id: str,
+        *,
+        fence_token: str,
+    ) -> EffectRecord:
+        """Compatibility name for the explicit durable dispatch transition."""
+
+        return self.record_dispatching(
+            tx,
+            reservation_id,
+            fence_token=fence_token,
+        )
 
     def record_effect_result(
         self,
@@ -518,6 +546,54 @@ class CapabilityStore:
         )
         updated = self._require_reservation(tx, str(row["reservation_id"]))
         return _effect_record(updated)
+
+    def record_applied(
+        self,
+        tx: ControlStoreTransaction,
+        reservation_id: str,
+        *,
+        fence_token: str,
+        safe_evidence: Mapping[str, Any],
+    ) -> EffectRecord:
+        return self.record_effect_result(
+            tx,
+            reservation_id,
+            fence_token=fence_token,
+            outcome="applied",
+            safe_evidence=safe_evidence,
+        )
+
+    def record_not_applied(
+        self,
+        tx: ControlStoreTransaction,
+        reservation_id: str,
+        *,
+        fence_token: str,
+        safe_evidence: Mapping[str, Any],
+    ) -> EffectRecord:
+        return self.record_effect_result(
+            tx,
+            reservation_id,
+            fence_token=fence_token,
+            outcome="not_applied",
+            safe_evidence=safe_evidence,
+        )
+
+    def record_ambiguous(
+        self,
+        tx: ControlStoreTransaction,
+        reservation_id: str,
+        *,
+        fence_token: str,
+        safe_evidence: Mapping[str, Any],
+    ) -> EffectRecord:
+        return self.record_effect_result(
+            tx,
+            reservation_id,
+            fence_token=fence_token,
+            outcome="needs_reconciliation",
+            safe_evidence=safe_evidence,
+        )
 
     def begin_reconciliation(
         self,
@@ -725,9 +801,21 @@ class CapabilityStore:
                    WHERE receipt.reservation_id = ?""",
                 (identifier,),
             ).fetchone()
+            artifacts = list(
+                connection.execute(
+                    """SELECT artifact_id, kind, sha256, size_bytes, media_type,
+                              sensitivity, canonical_remote_id
+                       FROM artifact_records
+                       WHERE reservation_id = ? ORDER BY created_at, artifact_id""",
+                    (identifier,),
+                )
+            )
         if row is None:
             raise CapabilityStoreError("receipt_not_found")
-        return _receipt_from_row(row)
+        return _receipt_from_row(row, artifact_rows=artifacts)
+
+    def load_authoritative_receipt(self, reservation_id: str) -> Any:
+        return self.load_receipt(reservation_id)
 
     def _require_tx(self, tx: ControlStoreTransaction) -> None:
         if type(tx) is not ControlStoreTransaction or tx.store is not self._control_store:
@@ -860,7 +948,11 @@ def _safe_json_value(value: Any, *, depth: int) -> Any:
         for key, item in value.items():
             safe_key = _safe_id(key)
             lower = safe_key.casefold()
-            if any(marker in lower for marker in ("argument", "environment", "content", "command_output", "secret", "exception", "stdout", "stderr")):
+            if lower in {
+                "argument", "arguments", "environment", "browser_content",
+                "command_output", "secret", "secrets", "exception",
+                "exception_text", "stdout", "stderr", "raw_bytes", "output",
+            }:
                 raise CapabilityStoreError("unsafe_effect_evidence")
             result[safe_key] = _safe_json_value(item, depth=depth + 1)
         return result
@@ -906,7 +998,7 @@ def _reconciliation_attempt(row: Any) -> ReconciliationAttempt:
     )
 
 
-def _receipt_from_row(row: Any) -> Any:
+def _receipt_from_row(row: Any, *, artifact_rows: Sequence[Any] = ()) -> Any:
     """Return a typed receipt when Plan 02-08's receipt module is available."""
 
     try:
@@ -918,7 +1010,7 @@ def _receipt_from_row(row: Any) -> Any:
             fence_token=str(row["fence_token"]),
             revision=int(row["revision"]),
         )
-    return receipt_from_authority_row(row)
+    return receipt_from_authority_row(row, artifact_rows=artifact_rows)
 
 
 __all__ = [

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import inspect
+import json
 from dataclasses import fields, is_dataclass
 from typing import Any
 
@@ -67,7 +68,9 @@ if capability_store_module is not None:
 if receipts_module is not None:
     ActionReceipt = receipts_module.ActionReceipt
     AppliedTruth = receipts_module.AppliedTruth
+    ReceiptProjectionError = receipts_module.ReceiptProjectionError
     ReconciliationTruth = receipts_module.ReconciliationTruth
+    project_safe_receipt = receipts_module.project_safe_receipt
 
 
 requires_capability_store = pytest.mark.skipif(
@@ -442,3 +445,82 @@ def test_receipt_contract_is_exact_and_capability_store_owns_no_phase3_runtime()
     for forbidden in _FORBIDDEN_PHASE_3_AUTHORITY:
         _safe(f"def {forbidden}" not in module_source,
               "capability store absorbed deferred Phase 3 runtime authority")
+
+
+@requires_effect_receipts
+def test_unsafe_effect_evidence_is_rejected_before_receipt_or_audit_persistence(
+    isolated_control_path, fake_clock, crash_point
+) -> None:
+    control, store = _open_store(isolated_control_path, fake_clock, crash_point)
+    canary = "receipt-secret-canary"
+    try:
+        reservation = _reserve(control, store)
+        _transition(
+            control,
+            store.record_dispatching,
+            reservation.reservation_id,
+            fence_token=reservation.fence_token,
+        )
+        audit_count = control.query_value("SELECT COUNT(*) FROM audit_events")
+        with pytest.raises(CapabilityStoreError) as rejected:
+            _transition(
+                control,
+                store.record_effect_result,
+                reservation.reservation_id,
+                fence_token=reservation.fence_token,
+                outcome="applied",
+                safe_evidence={"command_output": canary},
+            )
+        _assert_store_error(rejected.value, "unsafe_effect_evidence")
+        _safe(canary not in str(rejected.value) and canary not in repr(rejected.value),
+              "unsafe evidence reached rejection diagnostics")
+        _safe(_receipt_state(store, reservation.reservation_id) == "dispatching",
+              "unsafe evidence changed durable effect truth")
+        _safe(control.query_value("SELECT COUNT(*) FROM audit_events") == audit_count,
+              "unsafe evidence appended audit before rejection")
+        durable = control.query_value(
+            "SELECT safe_evidence_json FROM effect_receipts WHERE reservation_id = ?",
+            (reservation.reservation_id,),
+        )
+        _safe(canary not in str(durable), "unsafe evidence reached receipt storage")
+    finally:
+        control.close()
+
+
+@requires_effect_receipts
+def test_public_receipt_projection_is_exact_and_rejects_untyped_hostile_input(
+    isolated_control_path, fake_clock, crash_point
+) -> None:
+    control, store = _open_store(isolated_control_path, fake_clock, crash_point)
+    canary = "projection-secret-canary"
+    try:
+        reservation = _reserve(control, store)
+        _transition(
+            control,
+            store.record_dispatching,
+            reservation.reservation_id,
+            fence_token=reservation.fence_token,
+        )
+        _transition(
+            control,
+            store.record_effect_result,
+            reservation.reservation_id,
+            fence_token=reservation.fence_token,
+            outcome="applied",
+            safe_evidence={"remote_reference": "fixture-remote-1"},
+        )
+        receipt = store.load_receipt(reservation.reservation_id)
+        projected = project_safe_receipt(receipt)
+        _safe(set(projected) == {
+            "receipt_id", "request_id", "tool_id", "action_digest",
+            "effect_idempotency_key", "policy_outcome", "effect_state",
+            "applied", "reason_code",
+        }, "receipt projection field allowlist changed")
+        _safe(json.dumps(projected, sort_keys=True).find(canary) == -1,
+              "receipt projection exposed hostile input")
+        with pytest.raises(ReceiptProjectionError) as rejected:
+            project_safe_receipt({"arguments": canary})
+        _safe(canary not in str(rejected.value) and canary not in repr(rejected.value),
+              "projection rejection exposed hostile input")
+    finally:
+        control.close()

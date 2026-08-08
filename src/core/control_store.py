@@ -331,6 +331,8 @@ _MIGRATIONS = (
                 idempotency_key TEXT NOT NULL,
                 action_digest TEXT NOT NULL,
                 request_id TEXT NOT NULL,
+                tool_id TEXT NOT NULL,
+                policy_outcome TEXT NOT NULL CHECK(policy_outcome IN ('allow','ask','deny')),
                 state TEXT NOT NULL CHECK(state IN
                     ('reserved','dispatching','applied','not_applied',
                      'needs_reconciliation','reconciled_applied',
