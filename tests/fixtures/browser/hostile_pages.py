@@ -18,6 +18,22 @@ class HostilePage:
     channels: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class HostileDownload:
+    """One bounded offline stream and the checks it is meant to exercise."""
+
+    safe_id: str
+    filename: str
+    chunks: tuple[bytes, ...]
+    declared_type: str
+    detected_type: str
+    decompressed_size: int
+    elapsed_ms: int
+    complete: bool
+    scanner_verdict: str
+    should_promote: bool = False
+
+
 REDIRECT_CHAIN = (
     "https://allowed.example/start",
     "https://redirect.example/next",
@@ -76,6 +92,121 @@ self.addEventListener('fetch', event => {
 """.strip()
 
 
+DOWNLOAD_CASES = (
+    HostileDownload(
+        safe_id="oversized",
+        filename="large.bin",
+        chunks=(b"x" * 65,),
+        declared_type="application/octet-stream",
+        detected_type="application/octet-stream",
+        decompressed_size=65,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="chunked-over-limit",
+        filename="chunks.bin",
+        chunks=(b"a" * 24, b"b" * 24, b"c" * 24),
+        declared_type="application/octet-stream",
+        detected_type="application/octet-stream",
+        decompressed_size=72,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="compressed-bomb",
+        filename="archive.txt.gz",
+        chunks=(b"bounded-compressed-fixture",),
+        declared_type="application/gzip",
+        detected_type="application/gzip",
+        decompressed_size=4096,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="partial-response",
+        filename="partial.txt",
+        chunks=(b"partial",),
+        declared_type="text/plain",
+        detected_type="text/plain",
+        decompressed_size=7,
+        elapsed_ms=10,
+        complete=False,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="mime-mismatch",
+        filename="report.pdf",
+        chunks=(b"not-a-pdf",),
+        declared_type="application/pdf",
+        detected_type="text/plain",
+        decompressed_size=9,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="traversal-name",
+        filename="..\\outside.exe",
+        chunks=(b"bounded",),
+        declared_type="application/octet-stream",
+        detected_type="application/octet-stream",
+        decompressed_size=7,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="device-name",
+        filename="CON.txt",
+        chunks=(b"bounded",),
+        declared_type="text/plain",
+        detected_type="text/plain",
+        decompressed_size=7,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="timeout",
+        filename="slow.txt",
+        chunks=(b"bounded",),
+        declared_type="text/plain",
+        detected_type="text/plain",
+        decompressed_size=7,
+        elapsed_ms=1001,
+        complete=True,
+        scanner_verdict="clean",
+    ),
+    HostileDownload(
+        safe_id="malicious-scan",
+        filename="payload.bin",
+        chunks=(b"bounded-malicious-fixture",),
+        declared_type="application/octet-stream",
+        detected_type="application/octet-stream",
+        decompressed_size=25,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="malicious",
+    ),
+    HostileDownload(
+        safe_id="clean-promotion",
+        filename="report.txt",
+        chunks=(b"bounded ", b"clean fixture"),
+        declared_type="text/plain",
+        detected_type="text/plain",
+        decompressed_size=21,
+        elapsed_ms=10,
+        complete=True,
+        scanner_verdict="clean",
+        should_promote=True,
+    ),
+)
+
+
 def hostile_pages() -> tuple[HostilePage, ...]:
     """Return immutable pages without consulting the host environment."""
 
@@ -90,3 +221,9 @@ def observed_channels() -> frozenset[str]:
         for page in hostile_pages()
         for channel in page.channels
     ) | {"top_level"}
+
+
+def download_cases() -> tuple[HostileDownload, ...]:
+    """Return every bounded download case without network or browser access."""
+
+    return DOWNLOAD_CASES

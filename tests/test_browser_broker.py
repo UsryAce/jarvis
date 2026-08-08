@@ -20,14 +20,21 @@ import pytest
 from tests.fixtures.browser.fake_egress import (
     PUBLIC_V4,
     PUBLIC_V6,
+    FakeArtifactStore,
+    FakeCleanupProbe,
     FakeConnector,
+    FakeQuarantinePipeline,
     FakeRouteCallback,
+    FakeScanner,
     resolver_with_answers,
 )
 from tests.fixtures.browser.hostile_pages import (
+    DOWNLOAD_CASES,
     EVERY_REQUEST_CHANNELS,
     REDIRECT_CHAIN,
     SERVICE_WORKER_SCRIPT,
+    HostileDownload,
+    download_cases,
     hostile_pages,
     observed_channels,
 )
@@ -92,6 +99,43 @@ _EGRESS_PROOFS = {
 
 _EVERY_HOP_CHANNELS = set(EVERY_REQUEST_CHANNELS)
 
+_DOWNLOAD_CASES = {
+    "oversized",
+    "chunked-over-limit",
+    "compressed-bomb",
+    "partial-response",
+    "mime-mismatch",
+    "traversal-name",
+    "device-name",
+    "timeout",
+    "malicious-scan",
+    "clean-promotion",
+}
+
+_ARTIFACT_TYPES = {
+    "screenshot": "image/png",
+    "dom": "text/html",
+    "har": "application/json",
+    "console": "text/plain",
+    "accessibility": "application/json",
+    "download_provenance": "application/json",
+}
+
+_DOWNLOAD_PROOFS = {
+    "browser_native_downloads_denied",
+    "run_owned_quarantine",
+    "compressed_cap",
+    "decompressed_cap",
+    "streaming_sha256",
+    "declared_detected_type_match",
+    "scanner_clean",
+    "atomic_promotion",
+    "never_auto_open",
+    "never_execute",
+}
+
+_CLEANUP_RESIDUE = {"profile", "download", "file", "port", "process", "state"}
+
 
 def _future_module(name: str):
     try:
@@ -104,6 +148,8 @@ def _future_module(name: str):
 
 egress_module = _future_module("src.browser.egress")
 broker_module = _future_module("src.browser.broker")
+downloads_module = _future_module("src.browser.downloads")
+artifacts_module = _future_module("src.browser.artifacts")
 
 if egress_module is not None:
     EgressDenied = egress_module.EgressDenied
@@ -115,6 +161,16 @@ if broker_module is not None:
     BrowserBroker = broker_module.BrowserBroker
     BrowserOutcome = broker_module.BrowserOutcome
 
+if downloads_module is not None:
+    DownloadDenied = downloads_module.DownloadDenied
+    DownloadEvidence = downloads_module.DownloadEvidence
+    QuarantineDownloader = downloads_module.QuarantineDownloader
+
+if artifacts_module is not None:
+    ArtifactDenied = artifacts_module.ArtifactDenied
+    ArtifactPolicy = artifacts_module.ArtifactPolicy
+    BrowserArtifactStore = artifacts_module.BrowserArtifactStore
+
 requires_egress = pytest.mark.skipif(
     egress_module is None,
     reason="future module src.browser.egress is absent; owned by Plan 02-11",
@@ -122,6 +178,14 @@ requires_egress = pytest.mark.skipif(
 requires_broker = pytest.mark.skipif(
     broker_module is None,
     reason="future module src.browser.broker is absent; owned by Plan 02-11",
+)
+requires_downloads = pytest.mark.skipif(
+    downloads_module is None,
+    reason="future module src.browser.downloads is absent; owned by Plan 02-11",
+)
+requires_artifacts = pytest.mark.skipif(
+    artifacts_module is None,
+    reason="future module src.browser.artifacts is absent; owned by Plan 02-11",
 )
 
 
@@ -306,5 +370,177 @@ def test_browser_context_contract_is_ephemeral_routed_before_pages_and_fail_clos
           "browser context is being treated as the SSRF boundary")
 
 
+def test_t21_t23_inventory_covers_quarantine_artifacts_and_every_residue_class() -> None:
+    _safe({case.safe_id for case in download_cases()} == _DOWNLOAD_CASES,
+          "T-21 hostile download inventory is incomplete")
+    _safe(set(_ARTIFACT_TYPES) == {
+        "screenshot", "dom", "har", "console", "accessibility",
+        "download_provenance",
+    }, "T-22 browser artifact inventory is incomplete")
+    _safe(_DOWNLOAD_PROOFS == {
+        "browser_native_downloads_denied", "run_owned_quarantine",
+        "compressed_cap", "decompressed_cap", "streaming_sha256",
+        "declared_detected_type_match", "scanner_clean", "atomic_promotion",
+        "never_auto_open", "never_execute",
+    }, "T-21 download proof inventory is incomplete")
+    _safe(_CLEANUP_RESIDUE == {
+        "profile", "download", "file", "port", "process", "state",
+    }, "T-23 cleanup residue inventory is incomplete")
+    source = inspect.getsource(sys.modules[__name__]).casefold()
+    for marker in (
+        "quarantine", "compressed_limit", "decompressed_limit", "sha256",
+        "scanner", "atomic", "never_auto_open", "never_execute",
+    ):
+        _safe(marker in source, "a required quarantine contract marker is missing")
+
+
+def _offline_pipeline(tmp_path: Path, case: HostileDownload) -> FakeQuarantinePipeline:
+    return FakeQuarantinePipeline(
+        quarantine_root=tmp_path / "run-quarantine",
+        artifact_root=tmp_path / "artifacts",
+        scanner=FakeScanner(verdict=case.scanner_verdict),
+        compressed_limit=64,
+        decompressed_limit=128,
+        timeout_ms=1000,
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    tuple(case for case in DOWNLOAD_CASES if not case.should_promote),
+    ids=tuple(case.safe_id for case in DOWNLOAD_CASES if not case.should_promote),
+)
+def test_hostile_downloads_never_leave_quarantine_or_reach_promotion(
+    tmp_path: Path,
+    case: HostileDownload,
+) -> None:
+    pipeline = _offline_pipeline(tmp_path, case)
+    evidence = pipeline.process(case)
+    _safe(evidence.promoted is False, "hostile bytes reached a promoted location")
+    _safe(evidence.cleanup_truth == "confirmed", "failed quarantine cleanup was overstated")
+    _safe(bool(evidence.code) and evidence.code.isascii() and len(evidence.code) <= 96,
+          "download denial lacks a bounded stable code")
+    _safe(not any((tmp_path / "run-quarantine").glob("*")),
+          "failed download left quarantine residue")
+    _safe(not any((tmp_path / "artifacts").glob("*")),
+          "hostile bytes were promoted")
+    _safe(pipeline.auto_opened == [], "download pipeline auto-opened hostile content")
+
+
+def test_clean_download_is_hashed_scanned_and_atomically_promoted_without_auto_open(
+    tmp_path: Path,
+) -> None:
+    case = next(case for case in DOWNLOAD_CASES if case.should_promote)
+    pipeline = _offline_pipeline(tmp_path, case)
+    evidence = pipeline.process(case)
+    receipt = evidence.receipt()
+    _safe(evidence.promoted and evidence.code == "clean_promoted",
+          "clean download did not pass the full promotion pipeline")
+    _safe(pipeline.scanner.calls == [case.safe_id], "promotion did not follow scanning")
+    _safe(not any((tmp_path / "run-quarantine").glob("*")),
+          "atomic promotion left a quarantine copy")
+    _safe((tmp_path / "artifacts" / case.filename).read_bytes() == b"".join(case.chunks),
+          "promoted bytes differ from the streamed fixture")
+    _safe(pipeline.auto_opened == [], "clean promotion was automatically opened")
+    _safe(set(receipt) == {"safe_id", "sha256", "size", "media_type", "reference"},
+          "download receipt persisted content or an unsafe path")
+    _safe(len(str(receipt["sha256"])) == 64 and str(receipt["reference"]).startswith("artifact:"),
+          "download receipt omitted a bounded digest or redacted reference")
+
+
+@pytest.mark.parametrize(
+    ("safe_id", "media_type"),
+    tuple(_ARTIFACT_TYPES.items()),
+    ids=tuple(_ARTIFACT_TYPES),
+)
+def test_artifacts_are_bounded_and_canary_redacted_before_persistence(
+    safe_id: str,
+    media_type: str,
+) -> None:
+    canary = b"generated-secret-canary"
+    store = FakeArtifactStore(max_bytes=128)
+    evidence = store.capture(
+        safe_id=safe_id,
+        media_type=media_type,
+        payload=b"prefix:" + canary + b":suffix",
+        canary=canary,
+    )
+    receipt = evidence.receipt()
+    _safe(canary not in store.persisted[safe_id], "artifact persisted a secret canary")
+    _safe(b"[REDACTED]" in store.persisted[safe_id], "artifact did not record redaction")
+    _safe(set(receipt) == {"safe_id", "sha256", "size", "media_type", "reference"},
+          "artifact receipt contains content or an unbounded field")
+    _safe(all(len(str(value)) <= 128 for value in receipt.values()),
+          "artifact receipt contains an unbounded value")
+
+
+def test_oversized_artifact_is_rejected_before_any_persistence() -> None:
+    store = FakeArtifactStore(max_bytes=16)
+    with pytest.raises(ValueError, match="^artifact_limit$"):
+        store.capture(
+            safe_id="dom",
+            media_type="text/html",
+            payload=b"x" * 17,
+            canary=b"generated-secret-canary",
+        )
+    _safe(store.persisted == {}, "oversized artifact reached persistence")
+
+
+@pytest.mark.parametrize(
+    ("probe", "expected"),
+    (
+        (FakeCleanupProbe(), "confirmed"),
+        (FakeCleanupProbe(profile=True), "partial"),
+        (FakeCleanupProbe(download=True, file=True), "partial"),
+        (FakeCleanupProbe(port=True, process=True, state=True), "partial"),
+        (FakeCleanupProbe(proof_available=False), "unconfirmed"),
+    ),
+    ids=("clean", "profile", "download-file", "port-process-state", "unprovable"),
+)
+def test_context_cleanup_never_claims_success_for_residue_or_missing_proof(
+    probe: FakeCleanupProbe,
+    expected: str,
+) -> None:
+    _safe(probe.truth == expected, "context cleanup overstated residue truth")
+
+
+@requires_downloads
+def test_quarantine_downloader_exports_fail_closed_evidence_contract(tmp_path: Path) -> None:
+    case = next(case for case in DOWNLOAD_CASES if case.safe_id == "malicious-scan")
+    downloader = QuarantineDownloader(
+        quarantine_root=tmp_path / "run-quarantine",
+        artifact_root=tmp_path / "artifacts",
+        scanner=FakeScanner(verdict="malicious"),
+        compressed_limit=64,
+        decompressed_limit=128,
+        timeout_ms=1000,
+    )
+    with pytest.raises(DownloadDenied) as rejected:
+        downloader.process(case)
+    _safe(_stable_code(rejected.value).isascii(), "download rejection leaked unsafe data")
+    _safe(not any(tmp_path.rglob("payload.bin")), "rejected bytes reached promotion")
+
+
+@requires_artifacts
+def test_browser_artifact_store_enforces_policy_before_persistence(tmp_path: Path) -> None:
+    policy = ArtifactPolicy(
+        root=tmp_path / "artifacts",
+        max_bytes=32,
+        allowed_types=frozenset(_ARTIFACT_TYPES.values()),
+    )
+    store = BrowserArtifactStore(policy=policy, canaries=(b"generated-secret-canary",))
+    evidence = store.capture(
+        safe_id="console",
+        media_type="text/plain",
+        payload=b"generated-secret-canary",
+    )
+    _safe(type(evidence).__name__ == "ArtifactEvidence",
+          "artifact store returned an unrecognized evidence record")
+    _safe("generated-secret-canary" not in repr(evidence),
+          "artifact evidence leaked the canary")
+
+
 # Exact spellings retained for implementation-plan source checks:
 # browser.new_context(accept_downloads=False, service_workers="block", storage_state=None)
+# QuarantineDownloader uses browser_native_downloads_denied, streaming_sha256,
+# scanner_clean, atomic_promotion, never_auto_open, and never_execute contracts.
