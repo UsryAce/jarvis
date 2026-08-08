@@ -524,3 +524,65 @@ def test_public_receipt_projection_is_exact_and_rejects_untyped_hostile_input(
               "projection rejection exposed hostile input")
     finally:
         control.close()
+
+
+@requires_effect_receipts
+def test_cancel_and_failed_reconciliation_preserve_cleanup_and_unknown_truth(
+    isolated_control_path, fake_clock, crash_point
+) -> None:
+    control, store = _open_store(isolated_control_path, fake_clock, crash_point)
+    try:
+        cancelled = _reserve(control, store, action_digest="c" * 64)
+        _transition(
+            control,
+            store.record_dispatching,
+            cancelled.reservation_id,
+            fence_token=cancelled.fence_token,
+        )
+        _transition(
+            control,
+            store.record_cancelled,
+            cancelled.reservation_id,
+            fence_token=cancelled.fence_token,
+            cleanup_truth="confirmed",
+        )
+        cancelled_receipt = store.load_receipt(cancelled.reservation_id)
+        _safe(cancelled_receipt.state == "not_applied", "cancel claimed application")
+        _safe(cancelled_receipt.cleanup_truth.value == "confirmed",
+              "cancel omitted confirmed cleanup truth")
+
+        ambiguous = _reserve(control, store, action_digest="d" * 64)
+        _transition(
+            control,
+            store.record_dispatching,
+            ambiguous.reservation_id,
+            fence_token=ambiguous.fence_token,
+        )
+        _transition(
+            control,
+            store.record_ambiguous,
+            ambiguous.reservation_id,
+            fence_token=ambiguous.fence_token,
+            safe_evidence={"reason_code": "remote_truth_ambiguous"},
+        )
+        attempt = _transition(
+            control,
+            store.begin_reconciliation,
+            ambiguous.reservation_id,
+            probe_kind="fixture_authoritative_lookup",
+            read_only=True,
+        )
+        failed = _transition(
+            control,
+            store.fail_reconciliation,
+            attempt.reconciliation_id,
+            safe_evidence={"reason_code": "authoritative_probe_failed"},
+        )
+        failed_receipt = store.load_receipt(ambiguous.reservation_id)
+        _safe(failed.state == "reconciliation_failed", "probe failure state was lost")
+        _safe(failed_receipt.applied_truth.value == "unknown",
+              "failed probe fabricated applied truth")
+        _safe(failed_receipt.reconciliation_truth.value == "failed",
+              "failed probe omitted reconciliation truth")
+    finally:
+        control.close()

@@ -33,6 +33,18 @@ EXPECTED_TABLES = {
     "audit_keyring",
     "audit_events",
     "audit_checkpoints",
+    "capability_manifests",
+    "policy_snapshots",
+    "resolved_actions",
+    "approval_keys",
+    "approval_consumptions",
+    "action_reservations",
+    "idempotency_records",
+    "effect_attempts",
+    "effect_receipts",
+    "reconciliation_attempts",
+    "artifact_records",
+    "capability_release_state",
 }
 REQUIRED_RESTORE_CHECKS = {
     "schema",
@@ -167,6 +179,19 @@ def test_ordered_migrations_have_stable_checksums_and_all_required_tables(
         _safe(len(versions) == len(set(versions)), "migration version is duplicated")
         _safe(all(len(value) == 64 for value in checksums), "migration checksum is not SHA-256")
         _safe(EXPECTED_TABLES.issubset(store.table_names()), "required control tables are missing")
+        phase_two = next(item for item in migrations if item.version == 4)
+        _safe(
+            phase_two.checksum
+            == "e3081e8aba6598abdcdf17ae6e723c349faa9f094c0aabda66b99dae4f18e1a5",
+            "committed capability-authority migration checksum changed",
+        )
+        _safe(
+            store.query_value(
+                "SELECT state FROM capability_release_state WHERE singleton = 1"
+            )
+            == "closed",
+            "fresh migration opened capability release authority",
+        )
     finally:
         store.close()
 

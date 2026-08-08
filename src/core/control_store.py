@@ -331,8 +331,6 @@ _MIGRATIONS = (
                 idempotency_key TEXT NOT NULL,
                 action_digest TEXT NOT NULL,
                 request_id TEXT NOT NULL,
-                tool_id TEXT NOT NULL,
-                policy_outcome TEXT NOT NULL CHECK(policy_outcome IN ('allow','ask','deny')),
                 state TEXT NOT NULL CHECK(state IN
                     ('reserved','dispatching','applied','not_applied',
                      'needs_reconciliation','reconciled_applied',
@@ -383,6 +381,15 @@ _MIGRATIONS = (
             )""",
             """INSERT INTO capability_release_state(singleton, state, revision, reason_code, updated_at)
                VALUES(1, 'closed', 1, 'phase_2_release_gate_closed', '1970-01-01T00:00:00Z')""",
+        ),
+    ),
+    _Migration(
+        5,
+        "capability_receipt_projection",
+        (
+            "ALTER TABLE effect_receipts ADD COLUMN tool_id TEXT NOT NULL DEFAULT 'capability.effect'",
+            """ALTER TABLE effect_receipts ADD COLUMN policy_outcome TEXT NOT NULL
+               DEFAULT 'allow' CHECK(policy_outcome IN ('allow','ask','deny'))""",
         ),
     ),
 )

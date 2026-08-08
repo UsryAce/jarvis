@@ -477,12 +477,15 @@ class CapabilityStore:
         fence_token: str,
         outcome: str,
         safe_evidence: Mapping[str, Any],
+        cleanup_truth: str = "not_required",
     ) -> EffectRecord:
         self._require_tx(tx)
         row = self._require_reservation(tx, reservation_id)
         self._require_fence(row, fence_token)
         if outcome not in {"applied", "not_applied", "needs_reconciliation"}:
             raise CapabilityStoreError("invalid_effect_outcome")
+        if cleanup_truth not in {"not_required", "confirmed", "partial", "unconfirmed"}:
+            raise CapabilityStoreError("invalid_cleanup_truth")
         state = str(row["state"])
         if state == outcome:
             return _effect_record(row)
@@ -521,19 +524,28 @@ class CapabilityStore:
         tx.execute(
             """UPDATE effect_receipts
                SET state = ?, applied_truth = ?, reconciliation_truth = ?,
-                   reason_code = ?, completed_at = ?, safe_evidence_json = ?
+                   cleanup_truth = ?, reason_code = ?, completed_at = ?, safe_evidence_json = ?
                WHERE reservation_id = ?""",
             (
                 outcome,
                 applied_truth,
                 reconciliation_truth,
+                cleanup_truth,
                 reason_code,
                 completed_at,
                 evidence_json,
                 row["reservation_id"],
             ),
         )
-        action = "execution.effect_ambiguous" if outcome == "needs_reconciliation" else "execution.dispatch_finished"
+        if outcome == "needs_reconciliation":
+            action = "execution.effect_ambiguous"
+        elif outcome == "not_applied" and reason_code in {
+            "cancelled", "canceled", "cancel_requested", "control_cancelled",
+            "emergency_stop", "timeout",
+        }:
+            action = "execution.cancelled"
+        else:
+            action = "execution.dispatch_finished"
         self._append_audit(
             tx,
             action,
@@ -554,6 +566,7 @@ class CapabilityStore:
         *,
         fence_token: str,
         safe_evidence: Mapping[str, Any],
+        cleanup_truth: str = "not_required",
     ) -> EffectRecord:
         return self.record_effect_result(
             tx,
@@ -561,6 +574,7 @@ class CapabilityStore:
             fence_token=fence_token,
             outcome="applied",
             safe_evidence=safe_evidence,
+            cleanup_truth=cleanup_truth,
         )
 
     def record_not_applied(
@@ -570,6 +584,7 @@ class CapabilityStore:
         *,
         fence_token: str,
         safe_evidence: Mapping[str, Any],
+        cleanup_truth: str = "not_required",
     ) -> EffectRecord:
         return self.record_effect_result(
             tx,
@@ -577,6 +592,7 @@ class CapabilityStore:
             fence_token=fence_token,
             outcome="not_applied",
             safe_evidence=safe_evidence,
+            cleanup_truth=cleanup_truth,
         )
 
     def record_ambiguous(
@@ -586,6 +602,7 @@ class CapabilityStore:
         *,
         fence_token: str,
         safe_evidence: Mapping[str, Any],
+        cleanup_truth: str = "not_required",
     ) -> EffectRecord:
         return self.record_effect_result(
             tx,
@@ -593,6 +610,27 @@ class CapabilityStore:
             fence_token=fence_token,
             outcome="needs_reconciliation",
             safe_evidence=safe_evidence,
+            cleanup_truth=cleanup_truth,
+        )
+
+    def record_cancelled(
+        self,
+        tx: ControlStoreTransaction,
+        reservation_id: str,
+        *,
+        fence_token: str,
+        cleanup_truth: str,
+        safe_evidence: Mapping[str, Any] | None = None,
+    ) -> EffectRecord:
+        evidence = dict(safe_evidence or {})
+        evidence.setdefault("reason_code", "cancelled")
+        return self.record_effect_result(
+            tx,
+            reservation_id,
+            fence_token=fence_token,
+            outcome="not_applied",
+            safe_evidence=evidence,
+            cleanup_truth=cleanup_truth,
         )
 
     def begin_reconciliation(
@@ -724,6 +762,72 @@ class CapabilityStore:
             state=next_state,
             reason_code=reason_code,
             applied=authoritative_truth == "applied",
+        )
+        updated = self._require_reservation(tx, str(reservation["reservation_id"]))
+        return _effect_record(updated)
+
+    def fail_reconciliation(
+        self,
+        tx: ControlStoreTransaction,
+        reconciliation_id: str,
+        *,
+        safe_evidence: Mapping[str, Any],
+    ) -> EffectRecord:
+        """Record probe failure without converting unknown effect truth to success."""
+
+        self._require_tx(tx)
+        identifier = _safe_id(reconciliation_id)
+        attempt = tx.fetchone(
+            "SELECT * FROM reconciliation_attempts WHERE reconciliation_id = ?",
+            (identifier,),
+        )
+        if attempt is None:
+            raise CapabilityStoreError("reconciliation_not_found")
+        if str(attempt["state"]) != "pending":
+            raise CapabilityStoreError("reconciliation_already_finished")
+        reservation = self._require_reservation(tx, str(attempt["reservation_id"]))
+        if str(reservation["state"]) != "needs_reconciliation":
+            raise CapabilityStoreError("invalid_reconciliation_transition")
+        evidence_json = _safe_evidence_json(safe_evidence)
+        reason_code = _evidence_reason(safe_evidence, default="reconciliation_failed")
+        timestamp = self._timestamp()
+        revision = int(reservation["revision"]) + 1
+        tx.execute(
+            """UPDATE reconciliation_attempts
+               SET state = 'failed', authoritative_truth = NULL,
+                   safe_evidence_json = ?, finished_at = ?
+               WHERE reconciliation_id = ?""",
+            (evidence_json, timestamp, identifier),
+        )
+        tx.execute(
+            """UPDATE action_reservations
+               SET state = 'reconciliation_failed', revision = ?, updated_at = ?
+               WHERE reservation_id = ?""",
+            (revision, timestamp, reservation["reservation_id"]),
+        )
+        tx.execute(
+            """UPDATE idempotency_records
+               SET state = 'reconciliation_failed', updated_at = ?
+               WHERE reservation_id = ?""",
+            (timestamp, reservation["reservation_id"]),
+        )
+        tx.execute(
+            """UPDATE effect_receipts
+               SET state = 'reconciliation_failed', applied_truth = 'unknown',
+                   reconciliation_truth = 'failed', reason_code = ?,
+                   completed_at = ?, safe_evidence_json = ?
+               WHERE reservation_id = ?""",
+            (reason_code, timestamp, evidence_json, reservation["reservation_id"]),
+        )
+        self._append_audit(
+            tx,
+            "execution.reconciliation_failed",
+            "rejected",
+            identifier,
+            revision,
+            state="reconciliation_failed",
+            reason_code=reason_code,
+            applied=False,
         )
         updated = self._require_reservation(tx, str(reservation["reservation_id"]))
         return _effect_record(updated)
