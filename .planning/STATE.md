@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Brain repair committed and synchronized; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
+status: Brain publication transaction hardening verified; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
 stopped_at: Human approval checkpoint -- present the exact Playwright closure hashes and Chromium source contract; require a fresh exact `approved`
-last_updated: "2026-08-09T11:35:47.6637215+03:00"
-last_activity: 2026-08-09 -- Regenerated Graphify and Obsidian at the repair commit with 5394 nodes, 13713 edges, matching snapshot/report/vault truth, and a fresh tree explorer
+last_updated: "2026-08-09T12:44:38.2600321+03:00"
+last_activity: 2026-08-09 -- Added serialized staged Brain publication with exact-topology/ADS/reparse guards and reverse rollback; 521 tests plus checked frontend build and three independent reviews passed
 progress:
   total_phases: 9
   completed_phases: 0
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 
 Phase: 1 release closure with Phase 2 controlled pre-release execution
 Plan: 01-14 release gate pending; 02-05 Task 2 complete; Task 3 awaits a separate exact human approval
-Status: Brain repair committed and synchronized; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
-Last activity: 2026-08-09 -- Regenerated a current 5394-node/13713-edge Graphify projection, matching snapshot and Obsidian report/status, and a fresh 381174-byte tree explorer with zero topology diff
+Status: Brain publication transaction hardening verified; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
+Last activity: 2026-08-09 -- Brain refresh/sync now stage and serialize canonical plus vault publication, reject topology/ADS/reparse drift, and reverse-roll back late failures; 521 tests, checked frontend build, and three independent reviews passed
 
 Progress: [█████████░] 93%
 
@@ -114,11 +114,13 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Repository]: Local desktop/mobile, public backend readiness, worker/scheduler/swarm readiness, fresh HTTPS mobile projection, remote mobile delivery, protected remote API rejection, canonical owner lock, and a stability window all passed after one expected first-tunnel backend restart.
 - [Memory]: The migrated Chroma inventory is byte-identical to the prior live store. Both copies inherit six legacy `segments` foreign-key reports caused by the historical singular `collection` reference; this is not a migration regression, so runtime initialization plus a future maintenance-disabled local retrieval probe—not a false FK-clean claim—is the acceptance boundary.
 - [Brain]: The authenticated dashboard projected 5,121 Graphify nodes, 12,426 edges, and 281 vault notes from the migrated canonical runtime.
-- [Brain]: The final refresh rebuilt ignored graph JSON to 5,375 nodes and 13,673 edges, then stopped before report/snapshot/vault synchronization because Graphify skipped optional `graph.html` above its 5,000-node visualization limit while `brain.ps1` still required that file. The partial refresh is recorded, not claimed complete.
+- [Brain history]: A prior refresh rebuilt ignored graph JSON to 5,375 nodes and 13,673 edges, then stopped before report/snapshot/vault synchronization because Graphify skipped optional `graph.html`; the later tree-explorer repair superseded this historical partial state.
 - [Models]: The authenticated dashboard projects 38 configured NVIDIA catalog entries and an AUTO route to Nemotron 3 Ultra, but its current `0/38 SELECTABLE · HEALTH UNVERIFIED` state means catalog rendering must not be reported as successful inference.
 - [Phase 02 Planning]: Fifteen independently checked plans over Waves 0-8 cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; Plan 02-14 freezes evidence while authority stays closed, and Plan 02-15 alone consumes the exact approval and opens authority transactionally.
 - [Phase 02 Wave 0]: Plans 02-01 through 02-04 added fail-closed hostile contracts; the integrated gate passed 428 tests, 168 intentional future-module skips, one expected distinct-SID xfail, and 36 subtests without installing or launching Chromium.
 - [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 2 recorded and validator-checked cryptography 49.0.0, cffi 2.1.1, and pycparser 3.0 as APPROVED; Playwright 1.61.0, greenlet 3.5.4, pyee 13.0.1, typing-extensions 4.16.0, and Chromium remain PENDING/ABSENT under separate non-auto-approvable gates.
+- [Brain]: Refresh and sync share a current-user-owned global mutex, validate generated source and exact node/typed-edge topology in isolated stages, reject unsafe reparse/Cloud Files/alternate-stream paths, publish four canonical plus two vault artifacts through durable sibling swaps, and restore exact prior bytes/absence on caught late failures; crash-atomic group visibility remains explicitly out of scope.
+- [Repository]: The canonical `C:\Jarvis` root now has a protected DACL granting full control only to the current operator, SYSTEM, and Administrators; critical child paths expose zero broad-write rules, reducing cross-account path-race risk while preserving Codex/Claude/Cursor access under Ahmed's account.
 
 ### Pending Todos
 
@@ -130,7 +132,7 @@ None yet.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
 - Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
 - Plan 02-05 Task 3 cannot be inferred from prior approval: Ahmed must separately approve the exact Playwright 1.61.0 Python closure and package-declared Chromium source/revision contract while Chromium archive/executable bytes remain pending.
-- Brain refresh repair is committed and its generated source, snapshot, full-or-tree explorer, report, and Obsidian projections agreed exactly at verification; after this durable state update is committed, refresh once more so the generated `built_at_commit` matches the final handoff HEAD.
+- Brain publication hardening passed 521 tests, checked frontend build, strict plan validation, hostile NTFS rollback/ADS/concurrency cases, and three independent reviews; after this durable state update is committed, refresh once so generated source/snapshot/vault truth matches the final handoff HEAD.
 - The migrated memory store needs a future local-only, maintenance-disabled semantic retrieval acceptance probe; the existing recall route can request NVIDIA embeddings and mutate/promote vector state, so it is not a safe no-effect health check.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
@@ -142,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09T11:35:47.6637215+03:00
-Stopped at: Brain repair and synchronization passed; commit this final state, refresh once at that HEAD, then present Phase 02 Plan 05 Task 3 exact approval and do not infer it from prior approvals
+Last session: 2026-08-09T12:44:38.2600321+03:00
+Stopped at: Brain publication hardening passed; commit this state, refresh once at that HEAD, then present Phase 02 Plan 05 Task 3 exact approval and do not infer it from prior approvals
 Resume file: None
