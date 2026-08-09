@@ -26,3 +26,5 @@ scripts\brain.ps1 search -Query "model routing"
 - `POST /api/brain/open` — explicitly open the vault, graph explorer, or report.
 
 Generated graph files must only be changed by Graphify. Durable notes should contain decisions and evidence, not copied source code, secrets, logs, or transient chat.
+
+`graph.json` and `GRAPH_REPORT.md` are mandatory refresh outputs. After incremental update, Brain refresh runs Graphify's local `cluster-only --no-label` pass so a no-topology-change result still rebuilds source provenance at the current commit without invoking an LLM or spending provider tokens. Graphify may skip its full `graph.html` community visualization above the node limit, so refresh generates Graphify's large-graph tree explorer as a fallback. The vault projection records `explorerAvailable` and `explorerMode` (`full`, `tree`, `existing`, or `unavailable`). A stale prior explorer is never reused: every successful refresh requires a new nonempty, non-reparse explorer together with current JSON, report, snapshot, and Obsidian status, and rejects generated paths whose directory components are reparse points or escape the canonical repository.

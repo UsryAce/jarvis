@@ -56,12 +56,31 @@ class KnowledgeVault:
         )
         markdown = self._markdown_files()
         graph_path = self.graph_root / "graph.json"
+        report_path = self.graph_root / "GRAPH_REPORT.md"
+        html_path = self.graph_root / "graph.html"
+        graph_available = bool(graph)
+        report_available = report_path.is_file()
+        html_available = html_path.is_file()
+        vault_available = self.vault_root.is_dir()
+        degradation_reasons = [
+            reason
+            for missing, reason in (
+                (not graph_available, "graph_unavailable"),
+                (not report_available, "report_unavailable"),
+                (not html_available, "explorer_unavailable"),
+                (not vault_available, "vault_unavailable"),
+            )
+            if missing
+        ]
         return {
-            "health": "good" if graph and self.vault_root.is_dir() else "degraded",
+            "health": "good" if not degradation_reasons else "degraded",
+            "degradation_reasons": degradation_reasons,
             "graph": {
                 "path": str(graph_path),
-                "report_path": str(self.graph_root / "GRAPH_REPORT.md"),
-                "html_path": str(self.graph_root / "graph.html"),
+                "report_path": str(report_path),
+                "report_available": report_available,
+                "html_path": str(html_path),
+                "html_available": html_available,
                 "node_count": len(nodes),
                 "edge_count": len(links),
                 "hyperedge_count": len(hyperedges),
@@ -70,7 +89,7 @@ class KnowledgeVault:
             },
             "vault": {
                 "path": str(self.vault_root),
-                "exists": self.vault_root.is_dir(),
+                "exists": vault_available,
                 "markdown_count": len(markdown),
                 "obsidian_configured": (self.vault_root / ".obsidian").is_dir(),
                 "home": str(self.vault_root / "Home.md"),
