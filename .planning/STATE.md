@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Brain refresh repair verified; canonical runtime remains stopped; commit then regenerate Graphify/Obsidian before Phase 2 approval continuation
-stopped_at: Post-verification boundary -- commit the Brain repair, run refresh then separate status, and inspect exact source/vault agreement
-last_updated: "2026-08-09T11:32:00.6160916+03:00"
-last_activity: 2026-08-09 -- Closed Graphify stale-provenance, token-use, reparse-path, large-explorer, snapshot, and health-truth gaps with full tests and independent review
+status: Brain repair committed and synchronized; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
+stopped_at: Human approval checkpoint -- present the exact Playwright closure hashes and Chromium source contract; require a fresh exact `approved`
+last_updated: "2026-08-09T11:35:47.6637215+03:00"
+last_activity: 2026-08-09 -- Regenerated Graphify and Obsidian at the repair commit with 5394 nodes, 13713 edges, matching snapshot/report/vault truth, and a fresh tree explorer
 progress:
   total_phases: 9
   completed_phases: 0
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 
 Phase: 1 release closure with Phase 2 controlled pre-release execution
 Plan: 01-14 release gate pending; 02-05 Task 2 complete; Task 3 awaits a separate exact human approval
-Status: Brain refresh repair verified; canonical runtime remains stopped; post-commit Graphify/Obsidian regeneration is next before Phase 2 approval continuation
-Last activity: 2026-08-09 -- Verified the fail-closed full-or-tree explorer, exact commit/snapshot checks, no-label provenance rebuild, hostile path defenses, and degraded-health truth across 508 passing tests
+Status: Brain repair committed and synchronized; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
+Last activity: 2026-08-09 -- Regenerated a current 5394-node/13713-edge Graphify projection, matching snapshot and Obsidian report/status, and a fresh 381174-byte tree explorer with zero topology diff
 
 Progress: [█████████░] 93%
 
@@ -130,7 +130,7 @@ None yet.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
 - Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
 - Plan 02-05 Task 3 cannot be inferred from prior approval: Ahmed must separately approve the exact Playwright 1.61.0 Python closure and package-declared Chromium source/revision contract while Chromium archive/executable bytes remain pending.
-- Brain refresh source repair is verified but generated artifacts remain intentionally stale until the repair commit exists; after commit, run `scripts\brain.ps1 refresh` followed by a separate `status`, then require exact HEAD/source, snapshot, explorer, report, and vault agreement before claiming synchronization.
+- Brain refresh repair is committed and its generated source, snapshot, full-or-tree explorer, report, and Obsidian projections agreed exactly at verification; after this durable state update is committed, refresh once more so the generated `built_at_commit` matches the final handoff HEAD.
 - The migrated memory store needs a future local-only, maintenance-disabled semantic retrieval acceptance probe; the existing recall route can request NVIDIA embeddings and mutate/promote vector state, so it is not a safe no-effect health check.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
@@ -142,6 +142,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09T11:32:00.6160916+03:00
-Stopped at: Brain repair and full verification passed; commit source, regenerate Graphify/Obsidian from that exact HEAD, inspect status, then present Phase 02 Plan 05 Task 3 exact approval
+Last session: 2026-08-09T11:35:47.6637215+03:00
+Stopped at: Brain repair and synchronization passed; commit this final state, refresh once at that HEAD, then present Phase 02 Plan 05 Task 3 exact approval and do not infer it from prior approvals
 Resume file: None
