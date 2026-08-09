@@ -42,7 +42,11 @@ The tunnel address and operator credentials are intentionally absent from this d
 
 ## Known inherited memory condition
 
-The prior and canonical Chroma stores both report six legacy `segments` foreign-key rows because the historical schema references singular `collection` while those rows logically join the current `collections` table. The cutover did not introduce this condition. Use initialized runtime health and a future maintenance-disabled local semantic retrieval probe as the acceptance boundary; do not claim that this inherited store is foreign-key clean.
+The prior and canonical Chroma stores both report six legacy `segments` foreign-key rows because the historical schema references singular `collection` while those rows logically join the current `collections` table. The cutover did not introduce this condition.
+
+At commit `9f2b06d`, with the canonical runtime stopped, a standard-library-only immutable SQLite probe read the migrated Chroma store without importing Chroma, Jarvis configuration, provider, or model modules. SQLite integrity passed; the six documented inherited `segments -> collection` reports remained, while explicit joins found zero logical collection orphans. Five deterministically selected retained local `FLOAT32` vectors self-retrieved by bounded cosine similarity with minimum score `1.0`. The recursive canonical source inventory was identical before and after, the probe emitted fixed safe JSON, and no plaintext memory content was selected or returned. Together with the prior initialized-runtime health evidence, this closes the standalone cutover's migrated-store no-effect readability boundary. The safe aggregate receipt is [standalone-memory-readability-evidence.json](standalone-memory-readability-evidence.json).
+
+This is a witnessed one-shot acceptance result, not a repair or permanent regression gate. It does not prove foreign-key cleanliness, Chroma/HNSW behavior, `/api/memory/recall`, query-text embedding, provider/model health, or natural-language ranking quality. Only 86 of 96 active local records had retained queue vectors (`89.58%`), and five were sampled. The probe observed zero Python socket or subprocess events; it does not claim system-wide network impossibility. Phase 8 owns the reproducible product probe and hostile regression coverage.
 
 ## Remaining release gates
 

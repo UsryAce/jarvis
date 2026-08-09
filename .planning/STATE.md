@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Brain publication transaction hardening verified; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
+status: Migrated-store no-effect readability accepted; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
 stopped_at: Human approval checkpoint -- present the exact Playwright closure hashes and Chromium source contract; require a fresh exact `approved`
-last_updated: "2026-08-09T12:44:38.2600321+03:00"
-last_activity: 2026-08-09 -- Added serialized staged Brain publication with exact-topology/ADS/reparse guards and reverse rollback; 521 tests plus checked frontend build and three independent reviews passed
+last_updated: "2026-08-09T13:15:48.3552369+03:00"
+last_activity: 2026-08-09 -- Witnessed a zero-write immutable SQLite local-vector retrieval drill over the migrated Chroma store; 86/96 retained-vector coverage, five deterministic self-retrievals, and the exact before/after source inventory matched
 progress:
   total_phases: 9
   completed_phases: 0
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 
 Phase: 1 release closure with Phase 2 controlled pre-release execution
 Plan: 01-14 release gate pending; 02-05 Task 2 complete; Task 3 awaits a separate exact human approval
-Status: Brain publication transaction hardening verified; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
-Last activity: 2026-08-09 -- Brain refresh/sync now stage and serialize canonical plus vault publication, reject topology/ADS/reparse drift, and reverse-roll back late failures; 521 tests, checked frontend build, and three independent reviews passed
+Status: Migrated-store no-effect readability accepted; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
+Last activity: 2026-08-09 -- A stdlib-only immutable SQLite drill preserved the exact 15-file Chroma inventory and passed five deterministic persisted-vector self-retrievals without selecting plaintext memory
 
 Progress: [█████████░] 93%
 
@@ -112,7 +112,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Repository]: Trust state moved through supported verified backup/restore, while agent, swarm, workspace, and Chroma state used coherent SQLite/file migration with rollback copies retained under `C:\Jarvis\data-pre-cutover-20260809T012423`.
 - [Repository]: The standalone cutover backup is `standalone-cutover-20260809T012316.sqlite3` with SHA-256 `5D01286F8D77A83C2C0CFC140E6589849A52C611574977703C828A947F60D496`; no secret or public tunnel address is recorded in planning artifacts.
 - [Repository]: Local desktop/mobile, public backend readiness, worker/scheduler/swarm readiness, fresh HTTPS mobile projection, remote mobile delivery, protected remote API rejection, canonical owner lock, and a stability window all passed after one expected first-tunnel backend restart.
-- [Memory]: The migrated Chroma inventory is byte-identical to the prior live store. Both copies inherit six legacy `segments` foreign-key reports caused by the historical singular `collection` reference; this is not a migration regression, so runtime initialization plus a future maintenance-disabled local retrieval probe—not a false FK-clean claim—is the acceptance boundary.
+- [Memory]: The migrated Chroma inventory is byte-identical to the prior live store. At commit `9f2b06d`, a witnessed stdlib-only immutable SQLite drill covered 86/96 active local records with retained vectors, passed five deterministic persisted-vector self-retrievals, preserved the exact 15-file source inventory, and found zero logical collection orphans. Together with prior initialized-runtime health, this closes only the standalone cutover's no-effect readability boundary; the six inherited `segments` reports remain and the store is not foreign-key clean.
 - [Brain]: The authenticated dashboard projected 5,121 Graphify nodes, 12,426 edges, and 281 vault notes from the migrated canonical runtime.
 - [Brain history]: A prior refresh rebuilt ignored graph JSON to 5,375 nodes and 13,673 edges, then stopped before report/snapshot/vault synchronization because Graphify skipped optional `graph.html`; the later tree-explorer repair superseded this historical partial state.
 - [Models]: The authenticated dashboard projects 38 configured NVIDIA catalog entries and an AUTO route to Nemotron 3 Ultra, but its current `0/38 SELECTABLE · HEALTH UNVERIFIED` state means catalog rendering must not be reported as successful inference.
@@ -132,8 +132,8 @@ None yet.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
 - Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
 - Plan 02-05 Task 3 cannot be inferred from prior approval: Ahmed must separately approve the exact Playwright 1.61.0 Python closure and package-declared Chromium source/revision contract while Chromium archive/executable bytes remain pending.
-- Brain publication hardening passed 521 tests, checked frontend build, strict plan validation, hostile NTFS rollback/ADS/concurrency cases, and three independent reviews; after this durable state update is committed, refresh once so generated source/snapshot/vault truth matches the final handoff HEAD.
-- The migrated memory store needs a future local-only, maintenance-disabled semantic retrieval acceptance probe; the existing recall route can request NVIDIA embeddings and mutate/promote vector state, so it is not a safe no-effect health check.
+- Brain publication hardening is committed and the canonical graph/snapshot/vault generation matched commit `9f2b06d`; refresh again after this evidence-only state commit so the final handoff generation remains exact.
+- The witnessed memory drill closes migrated-store no-effect readability only. It bypasses Chroma/HNSW, `/api/memory/recall`, query-text embedding, provider/model health, and natural-language ranking quality; only 86/96 active local records had retained queue vectors and five were sampled. Phase 8 must own the reproducible regression probe and hostile tests before broader Brain or production-memory claims.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
 
 ## Deferred Items
@@ -144,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09T12:44:38.2600321+03:00
-Stopped at: Brain publication hardening passed; commit this state, refresh once at that HEAD, then present Phase 02 Plan 05 Task 3 exact approval and do not infer it from prior approvals
+Last session: 2026-08-09T13:15:48.3552369+03:00
+Stopped at: Migrated-store no-effect readability accepted; commit the evidence, refresh Brain at that exact HEAD, then wait for Phase 02 Plan 05 Task 3's fresh exact approval
 Resume file: None
