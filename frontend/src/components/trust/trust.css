@@ -1,0 +1,948 @@
+.trust-protected-root {
+  --trust-bg: #01070b;
+  --trust-panel: #04151d;
+  --trust-panel-alt: #071e27;
+  --trust-cyan: #00d9ff;
+  --trust-green: #00e889;
+  --trust-amber: #ffae19;
+  --trust-red: #ff5c52;
+  --trust-text: #d7eff5;
+  --trust-secondary: #9ab9c2;
+  --trust-muted: #7897a1;
+  --trust-disabled: #536b73;
+  width: 100%;
+  height: 100dvh;
+  box-sizing: border-box;
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  overflow: hidden;
+  color: var(--trust-text);
+  background: var(--trust-bg);
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.trust-protected-root *,
+.trust-protected-root *::before,
+.trust-protected-root *::after {
+  box-sizing: border-box;
+}
+
+.trust-protected-content {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.trust-control-rail {
+  position: relative;
+  z-index: 120;
+  min-width: 0;
+  height: 48px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid rgba(0, 217, 255, 0.52);
+  background: var(--trust-panel);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.trust-control-rail--warning {
+  border-color: rgba(255, 174, 25, 0.75);
+}
+
+.trust-control-rail--critical {
+  border-color: rgba(255, 92, 82, 0.9);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 92, 82, 0.035) 0 1px, transparent 1px 10px),
+    #2a090b;
+}
+
+.trust-control-rail__state,
+.trust-control-rail__actions,
+.trust-control-rail__evidence {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.trust-control-rail__state {
+  gap: 8px;
+}
+
+.trust-control-rail__state svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--trust-cyan);
+}
+
+.trust-control-rail--warning .trust-control-rail__state svg {
+  color: var(--trust-amber);
+}
+
+.trust-control-rail--critical .trust-control-rail__state svg {
+  color: var(--trust-red);
+}
+
+.trust-control-rail__state strong,
+.trust-control-rail__evidence span,
+.trust-control-rail__locked {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trust-control-rail__state strong {
+  overflow: hidden;
+  color: var(--trust-text);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trust-control-rail__evidence {
+  gap: 8px;
+  color: var(--trust-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trust-control-rail__evidence span:first-child {
+  color: var(--trust-cyan);
+}
+
+.trust-control-rail__actions {
+  gap: 8px;
+}
+
+.trust-control-rail button,
+.trust-control-rail input,
+.trust-control-rail select,
+.trust-dialog button,
+.trust-dialog input,
+.trust-dialog select,
+.credential-manager button,
+.credential-manager input,
+.credential-manager select,
+.trust-integrity-surface button {
+  min-height: 44px;
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  border-radius: 8px;
+  color: var(--trust-text);
+  background: var(--trust-bg);
+  font: inherit;
+  font-size: 14px;
+}
+
+.trust-control-rail button,
+.trust-dialog button,
+.credential-manager button,
+.trust-integrity-surface button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: var(--trust-cyan);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trust-control-rail button svg,
+.trust-dialog button svg,
+.credential-manager button svg,
+.trust-integrity-surface button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.trust-control-rail button:hover:not(:disabled),
+.trust-dialog button:hover:not(:disabled),
+.credential-manager button:hover:not(:disabled),
+.trust-integrity-surface button:hover:not(:disabled) {
+  border-color: var(--trust-cyan);
+  background: rgba(0, 217, 255, 0.08);
+}
+
+.trust-control-rail button:disabled,
+.trust-dialog button:disabled,
+.trust-dialog input:disabled,
+.trust-dialog select:disabled,
+.credential-manager button:disabled,
+.credential-manager input:disabled,
+.credential-manager select:disabled,
+.trust-integrity-surface button:disabled {
+  color: var(--trust-disabled);
+  border-color: rgba(83, 107, 115, 0.55);
+  cursor: not-allowed;
+}
+
+.trust-control-rail button:focus-visible,
+.trust-dialog button:focus-visible,
+.trust-dialog input:focus-visible,
+.trust-dialog select:focus-visible,
+.trust-dialog [tabindex]:focus-visible,
+.credential-manager button:focus-visible,
+.credential-manager input:focus-visible,
+.credential-manager select:focus-visible,
+.credential-manager [tabindex]:focus-visible,
+.trust-integrity-surface button:focus-visible {
+  outline: 2px solid var(--trust-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.22);
+}
+
+.trust-control-rail__actions button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.trust-control-rail__primary {
+  min-width: 168px;
+  min-height: 48px !important;
+  border-radius: 0 !important;
+}
+
+.trust-button--danger {
+  color: #ffd5d1 !important;
+  border-color: rgba(255, 92, 82, 0.75) !important;
+  background: rgba(255, 92, 82, 0.1) !important;
+}
+
+.trust-button--danger:hover:not(:disabled) {
+  border-color: var(--trust-red) !important;
+  background: rgba(255, 92, 82, 0.18) !important;
+}
+
+.trust-integrity-surface {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: start center;
+  overflow: auto;
+  padding: 32px 16px;
+  background: var(--trust-bg);
+}
+
+.trust-dialog-backdrop,
+.credential-manager-backdrop {
+  position: fixed;
+  inset: 48px 0 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(1, 7, 11, 0.88);
+  backdrop-filter: blur(5px);
+}
+
+.credential-manager-backdrop {
+  z-index: 100;
+  padding: 16px 32px 24px;
+}
+
+.trust-dialog-backdrop {
+  z-index: 110;
+}
+
+.trust-dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100dvh - 80px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(0, 217, 255, 0.52);
+  border-radius: 8px;
+  color: var(--trust-text);
+  background: var(--trust-panel);
+  box-shadow: 0 0 48px rgba(0, 217, 255, 0.12);
+}
+
+.trust-dialog form,
+.trust-dialog fieldset {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.trust-dialog fieldset {
+  margin: 8px 0 0;
+  padding: 16px;
+  border: 1px solid rgba(0, 217, 255, 0.24);
+}
+
+.trust-dialog legend,
+.trust-dialog label,
+.credential-add-form label {
+  color: var(--trust-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.trust-dialog input,
+.credential-add-form input,
+.credential-add-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 16px;
+}
+
+.trust-dialog__header {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+}
+
+.trust-dialog h2,
+.credential-manager h2,
+.credential-manager h3,
+.trust-notice h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.12em;
+}
+
+.trust-dialog p,
+.credential-manager p,
+.trust-notice p,
+.credential-manager dd,
+.credential-manager dt {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.trust-dialog__target,
+.trust-field-help {
+  color: var(--trust-secondary);
+}
+
+.trust-field-help,
+.trust-field-error {
+  margin: 0;
+}
+
+.trust-field-error {
+  color: #ffc2bc;
+}
+
+.trust-dialog__actions,
+.credential-add-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.credential-manager {
+  width: min(1040px, calc(100vw - 64px));
+  max-height: calc(100dvh - 88px);
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(0, 217, 255, 0.52);
+  border-radius: 8px;
+  color: var(--trust-text);
+  background: var(--trust-panel);
+  box-shadow: 0 0 56px rgba(0, 217, 255, 0.14);
+}
+
+.credential-manager__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid rgba(0, 217, 255, 0.24);
+  background: rgba(4, 21, 29, 0.98);
+}
+
+.credential-manager__header > div:first-child {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.credential-manager__header p {
+  overflow: hidden;
+  margin: 0;
+  color: var(--trust-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credential-manager__header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.credential-manager__header-actions button:last-child {
+  width: 44px;
+  padding: 0;
+}
+
+.credential-manager__body {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+}
+
+.trust-notice {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 217, 255, 0.04);
+}
+
+.trust-notice > svg {
+  width: 22px;
+  height: 22px;
+  color: var(--trust-cyan);
+}
+
+.trust-notice h3 {
+  font-size: 14px;
+}
+
+.trust-notice p {
+  margin: 4px 0 0;
+  color: var(--trust-secondary);
+  overflow-wrap: anywhere;
+}
+
+.trust-notice--success {
+  border-color: rgba(0, 232, 137, 0.45);
+}
+
+.trust-notice--success > svg {
+  color: var(--trust-green);
+}
+
+.trust-notice--warning {
+  border-color: rgba(255, 174, 25, 0.55);
+}
+
+.trust-notice--warning > svg {
+  color: var(--trust-amber);
+}
+
+.trust-notice--critical {
+  border-color: rgba(255, 92, 82, 0.7);
+  background: rgba(255, 92, 82, 0.08);
+}
+
+.trust-notice--critical > svg {
+  color: var(--trust-red);
+}
+
+.trust-notice__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.trust-notice__evidence div {
+  display: flex;
+  gap: 4px;
+}
+
+.trust-notice__evidence dt {
+  color: var(--trust-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.trust-notice__evidence dd {
+  margin: 0;
+  color: var(--trust-secondary);
+  overflow-wrap: anywhere;
+}
+
+.credential-add-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.35fr) minmax(0, 1fr);
+  gap: 8px 16px;
+  padding: 16px;
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: 8px;
+  background: var(--trust-panel-alt);
+}
+
+.credential-add-form header,
+.credential-add-form__actions {
+  grid-column: 1 / -1;
+}
+
+.credential-add-form header p {
+  margin: 4px 0 8px;
+  color: var(--trust-secondary);
+}
+
+.credential-add-form label {
+  align-self: center;
+}
+
+.credential-add-form .trust-field-help {
+  grid-column: 2;
+}
+
+.credential-manager__summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--trust-secondary);
+}
+
+.credential-manager__summary > span {
+  margin-right: auto;
+}
+
+.credential-manager__summary label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.credential-manager__summary input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--trust-cyan);
+}
+
+.credential-skeletons {
+  display: grid;
+  gap: 16px;
+}
+
+.credential-skeletons span {
+  min-height: 92px;
+  border: 1px solid rgba(0, 217, 255, 0.12);
+  border-radius: 8px;
+  background: var(--trust-panel-alt);
+}
+
+.credential-list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credential-card {
+  min-width: 0;
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) 132px 264px minmax(180px, 1fr);
+  align-items: start;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid rgba(0, 217, 255, 0.22);
+  border-radius: 8px;
+  background: var(--trust-panel-alt);
+}
+
+.credential-card__identity,
+.credential-card__state {
+  min-width: 0;
+}
+
+.credential-card__identity {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.credential-card__identity > svg {
+  width: 20px;
+  color: var(--trust-cyan);
+}
+
+.credential-card h3 {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credential-card p {
+  margin: 4px 0 0;
+  color: var(--trust-secondary);
+  overflow-wrap: anywhere;
+}
+
+.credential-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--trust-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.credential-badge svg {
+  width: 16px;
+  height: 16px;
+}
+
+.credential-badge--confirmed {
+  color: var(--trust-green);
+}
+
+.credential-badge--warning {
+  color: var(--trust-amber);
+}
+
+.credential-badge--critical {
+  color: var(--trust-red);
+}
+
+.credential-card__metadata {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.credential-card__metadata div {
+  min-width: 0;
+}
+
+.credential-card__metadata dt {
+  color: var(--trust-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.credential-card__metadata dd {
+  margin: 2px 0 0;
+  color: var(--trust-secondary);
+  overflow-wrap: anywhere;
+}
+
+.credential-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.credential-card__actions button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.credential-rotation-evidence {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  padding: 8px 16px;
+  border-left: 2px solid var(--trust-amber);
+  background: rgba(255, 174, 25, 0.06);
+}
+
+.credential-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 8px;
+  background: var(--trust-panel-alt);
+}
+
+.credential-empty p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--trust-secondary);
+}
+
+.trust-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (max-width: 1179px) {
+  .credential-manager {
+    width: calc(100vw - 32px);
+  }
+
+  .credential-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .credential-card__metadata,
+  .credential-card__actions {
+    grid-column: 1 / -1;
+  }
+
+  .credential-card__metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .credential-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1050px) {
+  .trust-protected-root {
+    grid-template-rows: 72px minmax(0, 1fr);
+  }
+
+  .trust-control-rail {
+    height: 72px;
+  }
+
+  .trust-control-rail__state strong {
+    white-space: normal;
+  }
+
+  .trust-dialog-backdrop,
+  .credential-manager-backdrop {
+    inset-block-start: 72px;
+  }
+}
+
+@media (max-width: 767px) {
+  .trust-protected-root {
+    grid-template-rows: 96px minmax(0, 1fr);
+  }
+
+  .trust-control-rail {
+    height: 96px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 48px 48px;
+    gap: 0 8px;
+    padding: 0 8px;
+  }
+
+  .trust-control-rail__state strong {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+
+  .trust-control-rail__evidence {
+    justify-content: flex-end;
+  }
+
+  .trust-control-rail__evidence span:nth-child(n + 2) {
+    display: none;
+  }
+
+  .trust-control-rail__actions {
+    grid-column: 1 / -1;
+  }
+
+  .trust-control-rail__actions button {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 48px;
+  }
+
+  .trust-control-rail__locked {
+    width: 100%;
+    text-align: center;
+  }
+
+  .trust-dialog-backdrop,
+  .credential-manager-backdrop {
+    inset:
+      calc(96px + env(safe-area-inset-top, 0px))
+      env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px)
+      env(safe-area-inset-left, 0px);
+    padding: 0;
+  }
+
+  .trust-dialog-backdrop {
+    padding: 8px;
+  }
+
+  .trust-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 112px);
+    padding: 16px;
+  }
+
+  .trust-dialog__actions,
+  .credential-add-form__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .credential-manager {
+    width: 100%;
+    height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: none;
+    grid-template-rows: auto minmax(0, 1fr);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+
+  .credential-manager__header {
+    min-height: 136px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .credential-manager__header > div:first-child {
+    display: grid;
+    gap: 4px;
+  }
+
+  .credential-manager__header p {
+    white-space: normal;
+  }
+
+  .credential-manager__header-actions button:first-child {
+    flex: 1 1 auto;
+  }
+
+  .credential-manager__header-actions {
+    width: 100%;
+  }
+
+  .credential-manager__body {
+    padding: 16px 8px;
+  }
+
+  .trust-notice {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .trust-notice__action {
+    grid-column: 1 / -1;
+  }
+
+  .credential-add-form,
+  .credential-card,
+  .credential-card__metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .credential-add-form > *,
+  .credential-add-form .trust-field-help,
+  .credential-card > *,
+  .credential-card__metadata,
+  .credential-card__actions {
+    grid-column: 1;
+  }
+
+  .credential-card__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .credential-manager__summary {
+    align-items: stretch;
+  }
+
+  .credential-manager__summary > span,
+  .credential-manager__summary > label,
+  .credential-manager__summary > button {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .trust-control-rail__actions button:first-child:not(:last-child) {
+    flex: 0 0 48px;
+    overflow: hidden;
+    padding: 0;
+    color: transparent;
+    font-size: 0;
+  }
+
+  .trust-control-rail__actions button:first-child:not(:last-child)::after {
+    content: "KEYS";
+    color: var(--trust-cyan);
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trust-control-rail,
+  .trust-control-rail *,
+  .trust-control-rail *::before,
+  .trust-control-rail *::after,
+  .trust-dialog,
+  .trust-dialog *,
+  .trust-dialog *::before,
+  .trust-dialog *::after,
+  .credential-manager,
+  .credential-manager *,
+  .credential-manager *::before,
+  .credential-manager *::after,
+  .trust-integrity-surface,
+  .trust-integrity-surface *,
+  .trust-integrity-surface *::before,
+  .trust-integrity-surface *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+}

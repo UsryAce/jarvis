@@ -1,0 +1,11 @@
+{
+  "graphify": {
+    "enabled": true
+  },
+  "workflow": {
+    "use_worktrees": false,
+    "_auto_chain_active": true,
+    "nyquist_validation": true,
+    "ai_integration_phase": true
+  }
+}

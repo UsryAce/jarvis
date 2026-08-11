@@ -10,8 +10,6 @@ jarvis:
 # NVIDIA API Configuration
 nvidia:
   api_base: "https://integrate.api.nvidia.com/v1"
-  # Get your API key from https://build.nvidia.com/
-  api_key: "${NVIDIA_API_KEY}"
   models:
     # Chat/Completion Models
     chat:
@@ -95,6 +93,28 @@ nvidia:
         type: "tts"
         voices: ["female", "male"]
 
+# Provider secrets are resolved only from the protected control store.
+credentials:
+  provider: "control_store"
+  legacy_env_migration_enabled: true
+
+trust:
+  database_path: "data/control.db"
+  backup_directory: "data/backups"
+  backup_retention_count: 5
+  backup_retention_bytes: 536870912
+  # Trusted-device sessions survive browser restarts, while server-side idle,
+  # absolute-expiry, revocation, scope, and CSRF checks remain authoritative.
+  session_idle_timeout_seconds: 43200  # 12 hours
+  session_absolute_timeout_seconds: 604800  # 7 days
+  allowed_origins:
+    - "http://localhost:8080"
+    - "http://127.0.0.1:8080"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+
 # Skills Configuration
 skills:
   enabled:
@@ -165,4 +185,8 @@ security:
   allowed_origins:
     - "http://localhost:8080"
     - "http://127.0.0.1:8080"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
   rate_limit: 100

@@ -3,7 +3,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -76,17 +76,22 @@ async def skills():
 
 
 @app.post("/api/skills/{skill_name}")
-async def execute_skill(skill_name: str, params: dict = {}):
-    """Execute a skill."""
+async def execute_skill(skill_name: str, params: dict | None = None):
+    """Execute only a reviewed read-only legacy skill action."""
     try:
-        result = await jarvis.execute_skill(skill_name, params)
+        result = await jarvis.skills.execute_read_only(
+            skill_name, params or {}, jarvis,
+        )
         return {"result": result}
-    except ValueError as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Skill was not found") from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail="Skill action is outside the guarded capability boundary",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Skill execution failed") from exc
 
 
 @app.post("/api/memory/remember")

@@ -2,7 +2,6 @@
 # Copy this to config.yaml and modify as needed
 
 nvidia:
-  api_key: ""  # Set via NVIDIA_API_KEY env var
   api_base: "https://integrate.api.nvidia.com/v1"
   models:
     chat:
@@ -60,6 +59,28 @@ nvidia:
       - id: "nvidia/nv-rerank-qa-mistral-4b-v3"
         name: "NV-Rerank-QA-Mistral-4B-v3"
 
+# Provider secrets are resolved only from the protected control store.
+credentials:
+  provider: "control_store"
+  legacy_env_migration_enabled: true
+
+trust:
+  database_path: "data/control.db"
+  backup_directory: "data/backups"
+  backup_retention_count: 5
+  backup_retention_bytes: 536870912
+  # Trusted-device sessions survive browser restarts, while server-side idle,
+  # absolute-expiry, revocation, scope, and CSRF checks remain authoritative.
+  session_idle_timeout_seconds: 43200  # 12 hours
+  session_absolute_timeout_seconds: 604800  # 7 days
+  allowed_origins:
+    - "http://localhost:8080"
+    - "http://127.0.0.1:8080"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+
 jarvis:
   name: "JARVIS"
   wake_word: "jarvis"
@@ -67,11 +88,36 @@ jarvis:
   response_length: "medium"
   personality: "professional_witty"
 
+agent:
+  database: "./data/agent.db"
+  workspace_root: "."
+  max_retries: 2
+  tool_timeout_seconds: 120
+
+swarm:
+  enabled: true
+  max_agents: 8
+  default_agents: 8
+  max_agents_per_project: 3
+  max_writers_per_project: 1
+  task_timeout_seconds: 600
+  default_runtime_seconds: 1800
+  max_runtime_seconds: 7200
+  workspace_database: "./data/workspaces.db"
+  modes:
+    - "cowork"
+    - "council"
+    - "swarm"
+
 memory:
   type: "chromadb"
   path: "./data/memory"
   collection: "jarvis_memory"
   embedding_model: "nvidia/nv-embedqa-e5-v5"
+  embedding_version: "nvidia-api-v2-query-passage"
+  embedding_dimensions: 1024
+  fallback_embedding_dimensions: 1024
+  promotion_batch_size: 25
   max_context: 8192
   similarity_threshold: 0.7
 
@@ -88,6 +134,16 @@ skills:
     - "business"
     - "education"
     - "design"
+    - "email"
+    - "calendar"
+    - "news"
+    - "note"
+    - "translation"
+    - "reminder"
+    - "search"
+    - "time_date"
+    - "knowledge"
+    - "productivity"
   auto_load: true
   skill_dir: "src/skills"
 
@@ -126,6 +182,10 @@ security:
   allowed_origins:
     - "http://localhost:8080"
     - "http://127.0.0.1:8080"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
   rate_limit: 100
 
 external_apis:

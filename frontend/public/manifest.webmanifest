@@ -1,0 +1,14 @@
+{
+  "name": "JARVIS Mobile Command",
+  "short_name": "JARVIS",
+  "description": "Ahmed's protected mobile interface for the local JARVIS agent system.",
+  "start_url": "/mobile",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#02070b",
+  "theme_color": "#02070b",
+  "icons": [
+    { "src": "/assets/jarvis-reactor-core.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

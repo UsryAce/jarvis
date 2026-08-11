@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="./jarvis-adapter.js"></script>
+<style>
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#03060A}
+x-dc{display:block;width:100%;height:100%}
+#dc-root,.sc-host{width:100%;height:100%;min-height:0;overflow:hidden}
+a{color:#35D6FF;text-decoration:none}a:hover{color:#9BE9FF}
+*{scrollbar-width:thin;scrollbar-color:rgba(53,214,255,.25) transparent}
+@keyframes jBreathe{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes jBlink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes jSweep{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+</style>
+</helmet>
+<div style="width:100%;max-width:390px;height:100%;min-height:0;box-sizing:border-box;margin:0 auto;background:radial-gradient(120% 70% at 50% 0%,#071119 0%,#03060A 60%);color:#DCE8F2;font-family:'JetBrains Mono',monospace;display:flex;flex-direction:column;overflow:hidden;position:relative;border:1px solid rgba(53,214,255,.14)">
+
+  <div style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(4,9,15,.9)">
+    <div style="font:700 13px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF">JARVIS</div>
+    <div style="font:500 7px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#5C7C8C">{{ linkLabel }}</div>
+    <div style="flex:1"></div>
+    <div onClick="{{ reconnect }}" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid {{ sourceCol }}">
+      <div style="width:4px;height:4px;border-radius:50%;background:{{ sourceCol }};box-shadow:0 0 7px {{ sourceCol }}"></div>
+      <div style="font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:{{ sourceCol }}">{{ sourceLabel }}</div>
+    </div>
+    <div style="font:500 9px/1 'JetBrains Mono',monospace;color:#5C7C8C">{{ clock }}</div>
+  </div>
+
+  <div style="height:34px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid rgba(53,214,255,.1);background:rgba(4,9,15,.7)">
+    <div style="width:6px;height:6px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 10px {{ stateColor }};animation:jBlink 1.8s ease-in-out infinite"></div>
+    <div style="font:700 10px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:{{ stateColor }}">{{ stateLabel }}</div>
+    <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#5C7C8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">{{ stateSub }}</div>
+    <div onClick="{{ estop }}" style="cursor:pointer;padding:5px 9px;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.09);font:700 8px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#FF8FA3">STOP</div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column">
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:12px;padding:14px">
+      <div style="position:relative;height:250px;border:1px solid rgba(53,214,255,.16);background:radial-gradient(circle at 50% 52%,rgba(9,22,34,.95),rgba(4,8,13,.98) 76%);overflow:hidden">
+        <canvas ref="{{ coreRef }}" width="720" height="500" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+        <div style="position:absolute;left:12px;top:11px;pointer-events:none">
+          <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#9BE9FF">REACTOR CORE</div>
+          <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#3F5B69;margin-top:6px">TAP TO SURGE · {{ linkDetail }}</div>
+        </div>
+        <div onClick="{{ surge }}" style="position:absolute;inset:0;cursor:pointer"></div>
+        <div style="position:absolute;right:12px;bottom:11px;font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:{{ stateColor }};pointer-events:none">AUTONOMY {{ autonomy }}</div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C;flex:none">AUTONOMY</div>
+        <div style="flex:1;display:flex;gap:6px">
+          <sc-for list="{{ levels }}" as="l" hint-placeholder-count="4">
+            <div onClick="{{ l.pick }}" style="cursor:pointer;flex:1;min-height:30px;display:flex;align-items:center;justify-content:center;border:1px solid {{ l.bd }};background:{{ l.bg }};font:700 9px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ l.col }}">{{ l.name }}</div>
+          </sc-for>
+        </div>
+        <div style="font:500 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#FFB43C;flex:none">{{ autonomyDesc }}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <sc-for list="{{ tel }}" as="m" hint-placeholder-count="4">
+          <div style="border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);padding:10px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C">{{ m.k }}</div>
+              <div style="font:600 13px/1 'JetBrains Mono',monospace;color:{{ m.col }}">{{ m.v }}</div>
+            </div>
+            <div style="height:3px;background:rgba(255,255,255,.06);margin-top:9px"><div style="height:3px;background:{{ m.col }};width:{{ m.w }};box-shadow:0 0 7px {{ m.col }}"></div></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF">QUICK DIRECTIVES</div>
+          <div style="padding:3px 6px;border:1px solid {{ src.bd }};background:{{ src.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ src.col }}">{{ src.label }}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 12px">
+          <sc-for list="{{ quick }}" as="q" hint-placeholder-count="6">
+            <div onClick="{{ q.go }}" style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 11px;border:1px solid rgba(53,214,255,.16);background:rgba(53,214,255,.03)" style-active="background:rgba(53,214,255,.12)">
+              <div style="width:4px;height:4px;border-radius:50%;background:{{ q.col }};box-shadow:0 0 7px {{ q.col }};flex:none"></div>
+              <div style="font:600 8px/1.3 'JetBrains Mono',monospace;letter-spacing:.1em;color:#DCE8F2">{{ q.name }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF">EVENT STREAM</div>
+          <div style="padding:3px 6px;border:1px solid {{ src.bd }};background:{{ src.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ src.col }}">{{ src.label }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+            <div style="display:flex;gap:9px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04)">
+              <div style="font:400 8px/1.5 'JetBrains Mono',monospace;color:#3F5B69;flex:none">{{ e.time }}</div>
+              <div style="min-width:0">
+                <div style="font:600 8px/1.5 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ e.col }}">{{ e.who }} · {{ e.meta }}</div>
+                <div style="font:400 9px/1.55 'JetBrains Mono',monospace;color:#B9D0DC;text-wrap:pretty">{{ e.text }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isVoice }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;flex-direction:column;padding:14px;gap:12px">
+      <div style="position:relative;flex:1;min-height:320px;border:1px solid rgba(53,214,255,.16);background:radial-gradient(circle at 50% 46%,rgba(9,22,34,.95),rgba(4,8,13,.98) 76%);overflow:hidden">
+        <canvas ref="{{ coreRef }}" width="720" height="900" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+        <div onPointerDown="{{ pttStart }}" onPointerUp="{{ pttStop }}" onPointerCancel="{{ pttStop }}" style="position:absolute;inset:0;cursor:pointer;touch-action:none"></div>
+        <div style="position:absolute;left:0;right:0;bottom:16px;text-align:center;pointer-events:none">
+          <div style="font:700 14px/1 'Space Grotesk',sans-serif;letter-spacing:.24em;color:{{ stateColor }}">{{ stateLabel }}</div>
+          <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C;margin-top:8px">HOLD TO SPEAK · RELEASES TO {{ voiceState }}</div>
+        </div>
+      </div>
+      <div style="border:1px solid rgba(53,214,255,.16);background:rgba(5,9,15,.9);padding:12px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C">LAST TRANSCRIPT</div>
+          <div style="font:400 10px/1.55 'JetBrains Mono',monospace;color:#B9D0DC;margin-top:7px;text-wrap:pretty">{{ transcript }}</div>
+        </div>
+        <div onClick="{{ toggleArm }}" style="cursor:pointer;flex:none;padding:9px 12px;border:1px solid rgba(0,229,196,.4);background:rgba(0,229,196,.06);font:700 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#7CFFE6">{{ voiceState }}</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isOps }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:12px;padding:14px">
+      <div style="position:relative;height:92px;flex:none;border:1px solid rgba(53,214,255,.16);background:radial-gradient(circle at 18% 50%,rgba(9,22,34,.95),rgba(4,8,13,.98) 76%);overflow:hidden">
+        <canvas ref="{{ coreRef }}" width="720" height="184" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+        <div style="position:absolute;right:12px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:7px;pointer-events:none">
+          <div style="font:700 15px/1 'Space Grotesk',sans-serif;letter-spacing:.2em;color:#F2FAFF">{{ opsTitle }}</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font:500 7px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:{{ stateColor }}">CORE {{ stateLabel }}</div>
+            <div style="padding:3px 7px;border:1px solid {{ src.bd }};background:{{ src.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ src.col }}">{{ src.label }}</div>
+          </div>
+        </div>
+      </div>
+      <sc-for list="{{ opsCards }}" as="c" hint-placeholder-count="4">
+        <div style="border:1px solid rgba(53,214,255,.14);background:linear-gradient(160deg,rgba(12,22,32,.95),rgba(5,9,15,.95));padding:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:flex-start;gap:9px">
+            <div style="font:600 10px/1.4 'JetBrains Mono',monospace;letter-spacing:.08em;color:#EAF6FF;flex:1;min-width:0">{{ c.name }}</div>
+            <div style="padding:3px 7px;border:1px solid {{ c.tagCol }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ c.tagCol }};flex:none;white-space:nowrap">{{ c.tag }}</div>
+          </div>
+          <div style="font:400 8px/1.6 'JetBrains Mono',monospace;color:#8FA8B6;text-wrap:pretty">{{ c.sub }}</div>
+          <div style="height:3px;background:rgba(255,255,255,.06)"><div style="height:3px;background:{{ c.tagCol }};width:{{ c.w }};box-shadow:0 0 7px {{ c.tagCol }}"></div></div>
+          <sc-if value="{{ c.gate }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px">
+              <div onClick="{{ c.approve }}" style="cursor:pointer;flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,229,196,.4);background:rgba(0,229,196,.07);font:700 9px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#7CFFE6" style-active="background:rgba(0,229,196,.18)">APPROVE</div>
+              <div onClick="{{ c.reject }}" style="cursor:pointer;flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,77,109,.4);background:rgba(255,77,109,.06);font:700 9px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#FF8FA3" style-active="background:rgba(255,77,109,.16)">REJECT</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+  </div>
+
+  <div style="height:26px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;border-top:1px solid rgba(53,214,255,.1);background:rgba(4,9,15,.85);overflow:hidden">
+    <div style="width:4px;height:4px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 7px {{ stateColor }};flex:none;opacity:{{ toastOpacity }}"></div>
+    <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.08em;color:#9BE9FF;opacity:{{ toastOpacity }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toast }}</div>
+  </div>
+
+  <div style="height:66px;flex:none;display:flex;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
+    <sc-for list="{{ navTabs }}" as="t" hint-placeholder-count="5">
+      <div onClick="{{ t.go }}" style="cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-top:2px solid {{ t.bar }}">
+        <div style="width:5px;height:5px;border-radius:50%;background:{{ t.dot }};box-shadow:0 0 8px {{ t.dot }}"></div>
+        <div style="font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ t.col }}">{{ t.name }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;apiBase&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;pollMs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2000,&quot;min&quot;:500,&quot;max&quot;:10000,&quot;step&quot;:250,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;forceDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#FFB43C&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#35D6FF&quot;,&quot;#00E5C4&quot;,&quot;#FFB43C&quot;,&quot;#4C8CFF&quot;],&quot;section&quot;:&quot;Core&quot;},&quot;coreGlow&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.1,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;reduceMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;tickMs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:500,&quot;min&quot;:300,&quot;max&quot;:3000,&quot;step&quot;:100,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;System&quot;}}">
+const CY='#35D6FF', TE='#00E5C4', AM='#FFB43C', RD='#FF4D6D', DIM='#5C7C8C';
+const TONE = {ok:TE, info:CY, warn:AM, danger:RD, muted:DIM};
+const STATES = {
+  ready:{label:'READY', sub:'Standing by for your directive', color:CY, e:0.35},
+  listening:{label:'LISTENING', sub:'Capturing audio from remote device', color:CY, e:0.75},
+  thinking:{label:'THINKING', sub:'Reasoning over the directive', color:'#B98CFF', e:0.85},
+  delegating:{label:'DELEGATING', sub:'Routing subtasks to the swarm', color:'#4C8CFF', e:0.7},
+  executing:{label:'EXECUTING', sub:'Agents working · gates enforced', color:AM, e:0.95},
+  speaking:{label:'SPEAKING', sub:'Reporting back over secure link', color:TE, e:0.8},
+  awaiting_approval:{label:'AWAITING APPROVAL', sub:'A gated step needs your decision', color:AM, e:0.45},
+  paused:{label:'HELD', sub:'Autonomy suspended by operator', color:AM, e:0.2},
+  idle:{label:'IDLE', sub:'Standing by · nothing queued', color:DIM, e:0.22},
+  transcribing:{label:'TRANSCRIBING', sub:'Converting capture to text', color:CY, e:0.7},
+  testing:{label:'TESTING', sub:'Running the verification suite', color:TE, e:0.8},
+  degraded:{label:'DEGRADED', sub:'Running on fallback capacity', color:AM, e:0.5},
+  completed:{label:'COMPLETED', sub:'Last directive finished', color:TE, e:0.3},
+  error:{label:'ERROR', sub:'Last step failed · recovery available', color:RD, e:0.35}
+};
+const CYCLE = ['ready','listening','transcribing','thinking','delegating','executing','testing','speaking','ready'];
+const SRC = (mode)=> mode === 'stale'
+  ? {label:'STALE', col:AM, bd:'rgba(255,180,60,.52)', bg:'rgba(255,180,60,.10)'}
+  : mode
+    ? {label:'LIVE', col:TE, bd:'rgba(0,229,196,.4)', bg:'rgba(0,229,196,.08)'}
+    : {label:'DEMO', col:AM, bd:'rgba(255,180,60,.38)', bg:'rgba(255,180,60,.07)'};
+const fmtAge = (at)=>{ const ms=Date.now()-Date.parse(at||''); if(!Number.isFinite(ms)||ms<0)return '?';
+  const sec=Math.floor(ms/1000); return sec<60?sec+'s':sec<3600?Math.floor(sec/60)+'m':Math.floor(sec/3600)+'h'; };
+const OPS = {
+  MISSIONS:['MISSIONS',[
+    {name:'MERIDIAN · CHECKOUT HARDENING', sub:'Phase 2 of 5 · deploy gate held for your approval', tag:'NEEDS APPROVAL', tone:'danger', pct:42, gate:true},
+    {name:'ATLAS · KNOWLEDGE BACKFILL', sub:'Phase 4 of 4 · writing vault notes', tag:'RUNNING', tone:'ok', pct:88},
+    {name:'BEACON · PROVIDER FAILOVER DRILL', sub:'Scheduled 02:00 · will not start without window', tag:'QUEUED', tone:'warn', pct:0},
+    {name:'CINDER · TEST FLAKE SWEEP', sub:'Paused by operator', tag:'HELD', tone:'warn', pct:26}]],
+  AGENTS:['AGENTS',[
+    {name:'ORCHESTRATOR', sub:'Decomposing MERIDIAN phase 3', tag:'ACTIVE', tone:'ok', pct:41},
+    {name:'DEVELOPER', sub:'Patching retry backoff in checkout-svc', tag:'CODING', tone:'info', pct:63},
+    {name:'SECURITY REVIEWER', sub:'Threat model on diff #4821', tag:'REVIEW', tone:'info', pct:22},
+    {name:'BROWSER OPERATOR', sub:'3 sandboxed tabs · extraction quarantined', tag:'AWAITING', tone:'warn', pct:35},
+    {name:'TESTER', sub:'Integration suite 148/210', tag:'TESTING', tone:'ok', pct:70},
+    {name:'KNOWLEDGE CURATOR', sub:'Writing 6 decision notes', tag:'SYNCING', tone:'muted', pct:54}]],
+  ALERTS:['ALERTS',[
+    {name:'DEPLOY GATE · CANARY 5%', sub:'Tests green · security review clean · awaiting your remote approval', tag:'DECISION', tone:'danger', pct:0, gate:true},
+    {name:'WORKSPACE BOUNDARY', sub:'Agent requested /system32 · denied twice by policy', tag:'ALERT', tone:'warn', pct:0},
+    {name:'SPEND LIMIT', sub:'$0.42 of $5.00 daily cap used', tag:'ENFORCED', tone:'ok', pct:8},
+    {name:'SECRET PROTECTION', sub:'6 provider keys vaulted · rotated 12d ago', tag:'ENFORCED', tone:'ok', pct:0}]]
+};
+
+class Component extends DCLogic {
+  state = {tab:'HOME', si:0, held:false, armed:false, t:0, live:null, meta:null, level:2, voice:{connected:false,ready:false,armed:false},
+    toast:'Waiting for live transport evidence · commands remain gated', toastOn:true,
+    transcript:'No voice command captured yet.'};
+
+  componentDidMount(){
+    this.timer = setInterval(()=>{
+      if (this.state.live) { this.setState(s=>({t:s.t+1})); return; }
+      this.setState(s=> s.held ? {t:s.t+1} : {t:s.t+1, si:(s.si+1)%CYCLE.length});
+    }, this.props.tickMs ?? 1400);
+    this.clockT = setInterval(()=> this.forceUpdate(), 1000);
+    this.connectBackend();
+    window.jarvisPushMobile = (raw)=>{
+      const A = window.JarvisAdapter; if (!A) return ['adapter not loaded'];
+      const res = A.normalize(raw);
+      this.setState({live:res.data, meta:{transport:'injected'}});
+      return res.problems;
+    };
+    this.voiceMessage = (event)=>{
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || data.type !== 'jarvis-voice-state' || !data.value || typeof data.value !== 'object') return;
+      this.setState(s=>({
+        voice:{...s.voice,...data.value,connected:true},
+        armed:typeof data.value.armed === 'boolean' ? data.value.armed : s.armed,
+        transcript:data.value.lastUser ? '"'+data.value.lastUser+'"' : s.transcript
+      }));
+    };
+    window.addEventListener('message', this.voiceMessage);
+    this.voiceControl('state');
+  }
+  componentWillUnmount(){ if (this.store) this.store.dispose(); if (this.voiceMessage) window.removeEventListener('message', this.voiceMessage); clearInterval(this.timer); clearInterval(this.clockT); clearInterval(this.drawT); clearTimeout(this.toastT); }
+
+  connectBackend(){
+    const A = window.JarvisAdapter; if (!A) return;
+    if (this.store) this.store.dispose();
+    this.store = A.connect({
+      baseUrl: this.props.forceDemo === true ? '' : (this.props.apiBase ?? ''),
+      pollMs: this.props.pollMs ?? 2000,
+      onChange: (snap, meta)=> this.setState(s=>({
+        live:snap, meta:meta,
+        held:snap && snap.agent ? snap.agent.held : s.held,
+        level:snap && snap.agent ? snap.agent.autonomy : s.level
+      }))
+    });
+  }
+
+  cur(){
+    const V = this.state.voice || {};
+    if (V.capturing) return STATES.listening;
+    if (V.transcribing || V.processing) return STATES.thinking;
+    if (V.speaking) return STATES.speaking;
+    const L = this.state.live;
+    if (L) return STATES[L.agent.held ? 'paused' : L.agent.state] || STATES.idle;
+    return STATES[this.state.held ? 'paused' : CYCLE[this.state.si]] || STATES.ready;
+  }
+  hex(c,a){ const n=parseInt(c.slice(1),16); return 'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+  accent(){ return this.props.accent ?? CY; }
+
+  toastMsg(m){ clearTimeout(this.toastT); this.setState({toast:m, toastOn:true}); this.toastT = setTimeout(()=> this.setState({toastOn:false}), 4200); }
+
+  voiceControl(action, payload){
+    try { window.parent.postMessage({type:'jarvis-voice-control', action:action, payload:payload||{}}, window.location.origin); }
+    catch(err){ this.toastMsg('Voice controller unavailable'); }
+  }
+
+  runCommand(action, payload, localUpdate, quiet){
+    if (!this.store){ if (!quiet) this.toastMsg('Backend connection is not ready'); return Promise.resolve(false); }
+    return this.store.command(action, payload || {}).then((result)=>{
+      if (!quiet || !result || !result.ok) this.toastMsg((result && result.message) || (result && result.ok ? 'Command completed' : 'Command failed'));
+      if (result && result.ok){
+        if (localUpdate) localUpdate(result);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  openTab(tab){
+    this.setState({tab});
+    const key = tab === 'HOME' ? 'DASHBOARD' : tab === 'ALERTS' ? 'SECURITY' : tab;
+    this.runCommand('open_screen', {key:key}, null, true);
+  }
+
+  runCardAction(item, decision){
+    const action = item && item.action;
+    let command = action && typeof action.command === 'string' ? action.command.trim() : '';
+    const payload = action && action.payload && typeof action.payload === 'object' ? action.payload : {};
+    if (decision === 'reject') {
+      if (command === 'approve_agent_run') command = 'cancel_agent_run';
+      else if (command === 'approve_swarm_run') command = 'cancel_swarm_run';
+      else command = '';
+    }
+    if (!command){ this.toastMsg((item && item.name ? item.name : 'Item')+' · no '+decision+' operation available'); return; }
+    this.runCommand(command, payload);
+  }
+
+  pttStart = (event)=>{
+    if (event && event.currentTarget && event.currentTarget.setPointerCapture && event.pointerId != null) {
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch(err) {}
+    }
+    this.pttStartedAt = Date.now();
+    this.voiceControl('ptt-start');
+  };
+
+  pttStop = ()=>{
+    this.voiceControl('ptt-stop');
+    const ms = Math.max(0, Date.now() - (this.pttStartedAt || Date.now()));
+    this.pttStartedAt = 0;
+    this.runCommand('push_to_talk', {ms:ms}, null, true);
+  };
+
+  /* Interval-driven draw loop: refs can fire before this iframe is visible,
+     where an early requestAnimationFrame never ticks. */
+  coreRef = (el)=>{
+    this.cv = el;
+    clearInterval(this.drawT); this.drawT = 0;
+    if (!el) return;
+    this.drawT = setInterval(()=>{
+      if (!this.cv || !this.cv.isConnected) return;
+      this.draw(performance.now()/1000);
+    }, 33);
+  };
+
+  /* The real JARVIS reactor, ported verbatim from JARVIS Core (rings, ticks,
+     glyphs, sweep, spectrum, particles, filaments, emblem, flare, arc). */
+  draw(time){
+    const cv = this.cv; if (!cv) return;
+    const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    const still = this.props.reduceMotion === true;
+    const glow = this.props.coreGlow ?? 1;
+    const st = this.cur(), col = st.color;
+    const wide = W/H > 2.4;
+    const cx = wide ? H*0.62 : W/2, cy = H/2;
+    const R = Math.min(W,H)*(wide ? 0.4 : 0.42);
+    if (!this.parts){
+      this.e = st.e; this.spin = 0; this.surge = 0; this.arcs = [];
+      this.bars = Array.from({length:72},()=>0.1);
+      this.parts = Array.from({length:60},()=>({a:Math.random()*Math.PI*2, sp:(Math.random()<0.5?-1:1)*(0.5+Math.random()*1.5), r:R*(1.0+Math.random()*0.9), drift:4+Math.random()*10, tw:Math.random()*9, z:0.4+Math.random()*1.1}));
+    }
+    this.e += (st.e - this.e) * 0.05;
+    this.surge *= 0.94;
+    const E = Math.min(1.6, this.e + this.surge);
+    if (!still) this.spin += 0.0026 + E*0.004;
+    const spin = this.spin;
+    ctx.clearRect(0,0,W,H);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(cx,cy,0,cx,cy,R*1.5);
+    halo.addColorStop(0, this.hex(col, 0.26*glow*E));
+    halo.addColorStop(0.32, this.hex(col, 0.09*glow));
+    halo.addColorStop(0.7, 'rgba(20,60,90,0.04)');
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0,0,W,H);
+    ctx.lineWidth = 1;
+    for (let i=0;i<7;i++){
+      const r = R*(0.5 + i*0.13);
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle = this.hex(col, 0.05 + 0.02*Math.sin(time*0.7 + i));
+      ctx.stroke();
+    }
+    const rings = [
+      {r:0.98, w:2.5, seg:[0.62,0.06], sp:-0.34, a:0.55, c:col},
+      {r:0.90, w:1.2, seg:[0.02,0.03], sp:0.5, a:0.4, c:col},
+      {r:0.80, w:7, seg:[0.2,0.14], sp:0.22, a:0.14, c:col},
+      {r:0.70, w:2, seg:[0.4,0.22], sp:-0.6, a:0.5, c:TE},
+      {r:0.60, w:1.2, seg:[0.05,0.05], sp:0.9, a:0.34, c:AM},
+      {r:0.50, w:4, seg:[0.9,0.35], sp:-0.28, a:0.3, c:col},
+      {r:0.40, w:1.6, seg:[0.28,0.1], sp:1.15, a:0.45, c:col}
+    ];
+    rings.forEach((g,i)=>{
+      const r = R*g.r;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*g.sp*4 + i);
+      ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+      ctx.setLineDash([r*g.seg[0], r*g.seg[1]]);
+      ctx.lineWidth = g.w; ctx.strokeStyle = this.hex(g.c, g.a*(0.55+0.45*E));
+      ctx.shadowBlur = 22*glow; ctx.shadowColor = this.hex(g.c, 0.8);
+      ctx.stroke(); ctx.restore();
+    });
+    ctx.setLineDash([]);
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(-spin*1.4);
+    for (let i=0;i<144;i++){
+      const a = i/144*Math.PI*2, big = i%12===0, mid = i%4===0;
+      const r0 = R*0.925, len = big ? R*0.06 : mid ? R*0.035 : R*0.018;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*(r0+len), Math.sin(a)*(r0+len));
+      ctx.lineWidth = big ? 2.4 : 1;
+      ctx.strokeStyle = this.hex(col, big ? 0.6 : 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*0.8);
+    ctx.font = '600 ' + Math.max(9, Math.round(R*0.05)) + 'px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const glyphs = 'JARVIS·0x4F·SYS·ARC·PWR·NODE·SEC·0x9C·LINK·CORE·';
+    for (let i=0;i<glyphs.length;i++){
+      const a = i/glyphs.length*Math.PI*2;
+      ctx.save(); ctx.rotate(a); ctx.translate(0,-R*0.845); ctx.rotate(Math.PI/2);
+      ctx.fillStyle = this.hex(col, 0.28 + 0.3*Math.abs(Math.sin(time*1.2 + i*0.4)));
+      ctx.fillText(glyphs[i],0,0); ctx.restore();
+    }
+    ctx.restore();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(time*(still?0:0.9));
+    for (let i=0;i<44;i++){
+      const a0 = -i*0.021, a1 = a0-0.022;
+      ctx.beginPath(); ctx.arc(0,0,R*0.995,a1,a0);
+      ctx.lineWidth = R*0.13; ctx.strokeStyle = this.hex(col, 0.05*(1-i/44));
+      ctx.stroke();
+    }
+    ctx.restore();
+    const liveSt = this.state.live ? this.state.live.agent.state : CYCLE[this.state.si];
+    const hot = ['listening','speaking','executing'].includes(liveSt) && !this.state.held;
+    for (let i=0;i<this.bars.length;i++){
+      const target = hot ? (0.25 + 0.75*Math.abs(Math.sin(i*0.7 + time*3.1 + Math.sin(i)*2))*Math.random()) * E : 0.08 + 0.06*Math.random();
+      this.bars[i] += (target - this.bars[i]) * 0.18;
+    }
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*0.35);
+    this.bars.forEach((v,i)=>{
+      const a = i/this.bars.length*Math.PI*2;
+      const r0 = R*0.44, r1 = r0 + R*0.19*v;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*r1, Math.sin(a)*r1);
+      ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.strokeStyle = this.hex(i%9===0 ? TE : col, (0.08 + 0.14*v)*glow);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*r1, Math.sin(a)*r1);
+      ctx.lineWidth = 3; ctx.strokeStyle = this.hex(i%9===0 ? TE : col, 0.4 + 0.5*v);
+      ctx.stroke();
+    });
+    ctx.restore();
+    this.parts.forEach((p,i)=>{
+      if (!still) p.a += p.sp * 0.004 * (0.4 + E);
+      const r = p.r*0.62 + Math.sin(time*0.6 + i)*p.drift;
+      const x = cx + Math.cos(p.a)*r, y = cy + Math.sin(p.a)*r*0.94;
+      const tw = 0.3 + 0.7*Math.abs(Math.sin(time*2 + p.tw));
+      ctx.beginPath(); ctx.arc(x,y,p.z*4.5,0,Math.PI*2);
+      ctx.fillStyle = this.hex(i%11===0 ? TE : col, 0.09*tw*glow); ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,p.z*1.5,0,Math.PI*2);
+      ctx.fillStyle = this.hex(i%11===0 ? TE : col, 0.75*tw); ctx.fill();
+    });
+    if (!still && Math.random() < 0.09 + E*0.1){
+      this.arcs.push({a: Math.random()*Math.PI*2, life:1, seed: Math.random()*99});
+      if (this.arcs.length > 8) this.arcs.shift();
+    }
+    this.arcs.forEach(arc=>{
+      arc.life -= 0.05;
+      if (arc.life <= 0) return;
+      ctx.beginPath();
+      const steps = 9;
+      for (let i=0;i<=steps;i++){
+        const tt = i/steps;
+        const rr = R*(0.22 + tt*0.72);
+        const jit = (Math.sin(arc.seed + i*2.7 + time*8) * 0.09) * (1-Math.abs(0.5-tt)*1.2);
+        const a = arc.a + jit;
+        const x = cx + Math.cos(a)*rr, y = cy + Math.sin(a)*rr;
+        i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+      }
+      ctx.lineWidth = 1.6; ctx.strokeStyle = this.hex('#EAFDFF', 0.55*arc.life);
+      ctx.shadowBlur = 26*glow; ctx.shadowColor = this.hex(col,1);
+      ctx.stroke();
+    });
+    this.arcs = this.arcs.filter(a=>a.life>0);
+    const armOuter = R*0.36, armInner = R*0.19;
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.sin(time*0.4)*0.06);
+    for (let k=0;k<3;k++){
+      const base = k*(Math.PI*2/3) - Math.PI/2;
+      const half = 0.46;
+      const g = ctx.createLinearGradient(0,-armOuter,0,armOuter);
+      g.addColorStop(0, this.hex('#EAFDFF', 0.95));
+      g.addColorStop(1, this.hex(col, 0.75));
+      ctx.beginPath();
+      ctx.arc(0,0,armOuter, base-half, base+half);
+      ctx.arc(0,0,armInner, base+half, base-half, true);
+      ctx.closePath();
+      ctx.fillStyle = g; ctx.shadowBlur = 40*glow; ctx.shadowColor = this.hex(col,1);
+      ctx.fill();
+      ctx.lineWidth = 1.4; ctx.strokeStyle = this.hex('#FFFFFF',0.55); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0,0,armOuter*1.16, base-half*0.7, base+half*0.7);
+      ctx.lineWidth = 4; ctx.strokeStyle = this.hex(col, 0.5+0.4*E); ctx.stroke();
+    }
+    ctx.beginPath();
+    for (let k=0;k<3;k++){
+      const a = k*(Math.PI*2/3) - Math.PI/2 + Math.PI/3;
+      const x = Math.cos(a)*armOuter*0.98, y = Math.sin(a)*armOuter*0.98;
+      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.closePath(); ctx.lineWidth = 2; ctx.strokeStyle = this.hex(col, 0.45); ctx.stroke();
+    ctx.restore();
+    const pulse = 1 + 0.09*Math.sin(time*3.4) + this.surge*0.4;
+    const cr = R*0.115*pulse;
+    const core = ctx.createRadialGradient(cx,cy,0,cx,cy,cr*3.2);
+    core.addColorStop(0,'rgba(255,255,255,1)');
+    core.addColorStop(0.22, this.hex('#EAFDFF',0.95));
+    core.addColorStop(0.5, this.hex(col,0.6));
+    core.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(cx,cy,cr*3.2,0,Math.PI*2); ctx.fillStyle = core; ctx.fill();
+    ctx.save(); ctx.translate(cx,cy);
+    [[1,0],[0,1]].forEach(([dx,dy],i)=>{
+      const len = R*(i? 0.5:0.95)*(0.8+0.3*E);
+      const fg = ctx.createLinearGradient(-dx*len,-dy*len,dx*len,dy*len);
+      fg.addColorStop(0,'rgba(0,0,0,0)'); fg.addColorStop(0.5, this.hex('#EAFDFF',0.4*E)); fg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.moveTo(-dx*len,-dy*len); ctx.lineTo(dx*len,dy*len);
+      ctx.lineWidth = i?2:3; ctx.strokeStyle = fg; ctx.stroke();
+    });
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(cx,cy,R*1.03, -Math.PI/2, -Math.PI/2 + Math.PI*2*((time*0.2)%1));
+    ctx.lineWidth = 3; ctx.strokeStyle = this.hex(st.color, 0.75);
+    ctx.shadowBlur = 26*glow; ctx.shadowColor = this.hex(st.color,1); ctx.stroke();
+    ctx.restore();
+  }
+
+  renderVals(){
+    const s = this.state, st = this.cur(), L = s.live, col = this.accent();
+    const live = !!L;
+    const stale = !!(s.meta && s.meta.stale);
+    const remoteCapability = L && (L.capabilities||[]).find(c=>c.id==='remote_https');
+    const go = (tab)=> ()=> this.openTab(tab);
+    const cmd = (name)=> ()=>{
+      if (name === 'HOLD ALL AGENTS') return this.runCommand('hold', {});
+      if (name === 'RESUME MISSIONS') return this.runCommand('release', {});
+      return this.runCommand('quick_command', {name:name});
+    };
+    const tl = L ? L.telemetry : null;
+    const pct = (demo, liveV)=> Math.round(live ? liveV : demo);
+    const cpu = pct(14 + 10*Math.abs(Math.sin(s.t/3)), tl ? tl.cpuPct : 0);
+    const ram = pct(68 + 4*Math.abs(Math.sin(s.t/5)), tl ? tl.ramPct : 0);
+    const gpu = pct(9 + 8*Math.abs(Math.sin(s.t/4)), tl ? tl.gpuPct : 0);
+    const dsk = pct(46, tl ? tl.diskPct : 0);
+    const opsKey = s.tab === 'MISSIONS' ? 'MISSIONS' : s.tab === 'AGENTS' ? 'AGENTS' : 'ALERTS';
+    const scr = L && L.screens[opsKey === 'ALERTS' ? 'SECURITY' : opsKey];
+    const opsSrc = SRC(!!scr);
+    const cards = scr
+      ? scr.items.map(i=>({name:i.name, sub:i.sub, tag:i.tag, tagCol:TONE[i.tone]||CY, w:Math.round(i.pct)+'%',
+          gate:!!(i.action && /^(approve_agent_run|approve_swarm_run)$/.test(i.action.command)),
+          approve: ()=> this.runCardAction(i, 'approve'), reject: ()=> this.runCardAction(i, 'reject')}))
+      : OPS[opsKey][1].map(c=>({name:c.name, sub:c.sub, tag:c.tag, tagCol:TONE[c.tone], w:(c.pct||0)+'%',
+          gate:!!c.gate,
+          approve: ()=> this.toastMsg('Approved (demo): '+c.name), reject: ()=> this.toastMsg('Rejected (demo): '+c.name)}));
+    const events = (L ? L.events.map(e=>({time:(e.at||'').slice(11,19), who:e.who, meta:e.meta, text:e.text,
+        col: e.level==='error'?RD:e.level==='warn'?AM:(e.who==='JARVIS'?TE:col)})) : [
+      {time:'00:41:12', who:'JARVIS', meta:'router · 1.2s', col:TE, text:'Patch staged on checkout-svc. Deploy gate held for your approval.'},
+      {time:'00:39:04', who:'SECURITY', meta:'policy', col:AM, text:'Workspace boundary enforced — /system32 request denied.'},
+      {time:'00:36:50', who:'TESTER', meta:'suite', col:col, text:'Integration suite passing 148 of 210 · no new failures.'},
+      {time:'00:31:22', who:'YOU', meta:'demo', col:'#DCE8F2', text:'Illustrative directive event · no live transport evidence.'}]).slice(0,5);
+    return {
+      clock: new Date().toTimeString().slice(0,8),
+      linkLabel: stale ? 'STALE' : remoteCapability ? remoteCapability.state.toUpperCase() : live ? 'UNVERIFIED' : 'DEMO',
+      linkDetail: stale ? ('TRANSPORT EVIDENCE EXPIRED · '+fmtAge(L&&L.at)) : remoteCapability ? remoteCapability.summary.toUpperCase() : live ? 'TRANSPORT EVIDENCE UNAVAILABLE' : 'DEMO LINK',
+      stateColor: st.color, stateLabel: st.label,
+      stateSub: L ? (L.agent.detail || st.sub) : st.sub,
+      autonomy: 'L' + (L ? L.agent.autonomy : s.level),
+      autonomyDesc: ['ASK','ASSISTED','TRUSTED','AUTOPILOT'][(L ? L.agent.autonomy : s.level)-1],
+      levels: [1,2,3,4].map(n=>{
+        const on = (L ? L.agent.autonomy : s.level) === n;
+        return {name:'L'+n,
+          col: on ? '#03060A' : DIM,
+          bd: on ? AM : 'rgba(255,255,255,.1)',
+          bg: on ? AM : 'rgba(255,255,255,.02)',
+          pick: ()=> this.runCommand('set_autonomy', {level:n}, ()=>this.setState({level:n}))};
+      }),
+      sourceLabel: stale ? 'STALE '+fmtAge(L&&L.at) : live ? 'LIVE' : 'DEMO', sourceCol: stale ? AM : live ? TE : AM,
+      src: stale ? SRC('stale') : (s.tab === 'MISSIONS' || s.tab === 'AGENTS' || s.tab === 'ALERTS' ? opsSrc : SRC(live)), opsSrcLabel: stale ? 'STALE' : opsSrc.label,
+      reconnect: ()=>{ this.connectBackend(); this.toastMsg('Reconnecting to '+((this.props.apiBase ?? '')||'the current origin')); },
+      estop: ()=>{
+        if (s.held) return this.toastMsg('Emergency stop is already active · use the protected control rail to reset it');
+        if (!this.store || !this.store.emergencyStop) return this.toastMsg('Control plane is not connected');
+        this.store.emergencyStop().then(result=>{
+          this.toastMsg((result && (result.message||result.code)) || (result && result.ok ? 'Emergency stop applied' : 'Emergency stop failed'));
+          if (result && result.ok) this.setState({held:true});
+        });
+      },
+      surge: ()=>{ this.surge = Math.min(0.9, (this.surge||0) + 0.55); this.toastMsg('Core surge acknowledged'); },
+      pttStart: this.pttStart,
+      pttStop: this.pttStop,
+      toggleArm: ()=>{
+        const armed = !(s.voice && s.voice.connected && typeof s.voice.armed === 'boolean' ? s.voice.armed : (L && L.voice ? L.voice.armed : s.armed));
+        this.voiceControl(armed ? 'arm' : 'disarm');
+        this.runCommand(armed ? 'voice_arm' : 'voice_disarm', {}, ()=>this.setState({armed:armed}));
+      },
+      voiceState: (s.voice && s.voice.connected)
+        ? (!s.voice.armed ? 'DISARMED' : s.voice.error ? 'ERROR' : s.voice.capturing ? 'LISTENING' : s.voice.transcribing ? 'TRANSCRIBING' : s.voice.processing ? 'THINKING' : s.voice.speaking ? 'SPEAKING' : s.voice.ready ? (s.voice.handsFree ? 'HANDS-FREE' : s.voice.clapWake ? 'CLAP-WAKE' : 'READY') : 'CONFIGURED')
+        : L && L.voice
+        ? (L.voice.capabilityState||'unverified').toUpperCase()
+        : (s.armed ? 'CONFIGURED' : 'DISARMED'),
+      transcript: s.transcript,
+      coreRef: this.coreRef,
+      isHome: s.tab === 'HOME', isVoice: s.tab === 'VOICE',
+      isOps: s.tab === 'MISSIONS' || s.tab === 'AGENTS' || s.tab === 'ALERTS',
+      opsTitle: opsKey, opsCards: cards,
+      tel: [
+        {k:'CPU', v:cpu+'%', col:col, w:cpu+'%'},
+        {k:'RAM', v:ram+'%', col:AM, w:ram+'%'},
+        {k:'GPU', v:gpu+'%', col:TE, w:gpu+'%'},
+        {k:'DISK', v:dsk+'%', col:col, w:dsk+'%'}
+      ],
+      quick: [
+        {name:'MORNING BRIEF', col:TE, go:cmd('MORNING BRIEF')},
+        {name:'STATUS REPORT', col:col, go:cmd('STATUS REPORT')},
+        {name:'HOLD ALL AGENTS', col:AM, go:cmd('HOLD ALL AGENTS')},
+        {name:'RESUME MISSIONS', col:TE, go:cmd('RESUME MISSIONS')},
+        {name:'LOCK WORKSPACE', col:RD, go:cmd('LOCK WORKSPACE')},
+        {name:'PROVIDER SWEEP', col:col, go:cmd('PROVIDER SWEEP')}
+      ],
+      events,
+      toast: s.toast, toastOpacity: s.toastOn ? 1 : 0,
+      navTabs: ['HOME','VOICE','MISSIONS','AGENTS','ALERTS'].map(n=>{
+        const on = s.tab === n;
+        return {name:n, go:go(n),
+          col: on ? '#F2FAFF' : '#5C7C8C',
+          dot: on ? col : 'rgba(255,255,255,.14)',
+          bar: on ? col : 'transparent'};
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

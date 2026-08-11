@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body, x-dc { width:100%; height:100%; margin:0; padding:0; overflow:hidden; background:#03060A; }
+  x-dc { display:block; position:relative; }
+  #dc-root, .sc-host { width:100%; height:100%; min-height:0; overflow:hidden; }
+  a { color:#35D6FF; text-decoration:none; }
+  a:hover { color:#9BE9FF; }
+  ::selection { background:#35D6FF; color:#03060A; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:rgba(53,214,255,.26); border-radius:3px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  input, select, textarea { font-family:'JetBrains Mono',monospace; }
+  select option { background:#080D14; color:#DCE8F2; }
+  @keyframes jSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  @keyframes jSpinR { from { transform:rotate(360deg); } to { transform:rotate(0deg); } }
+  @keyframes jBreathe { 0%,100% { opacity:.5; transform:scale(.92); } 50% { opacity:1; transform:scale(1.08); } }
+  @keyframes jScan { 0% { transform:translateY(-140%); } 100% { transform:translateY(1500%); } }
+  @keyframes jBlink { 0%,100% { opacity:1; } 50% { opacity:.2; } }
+  @keyframes jSweep { from { transform:translateX(-100%); } to { transform:translateX(340%); } }
+  @keyframes jRise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+</style>
+<script src="./jarvis-adapter.js"></script>
+<script>
+(function(){
+  if (window.__jvDriver) return;
+  window.__jvDriver = true;
+  var beat = function(){ if (window.__jvCB) { try { window.__jvCB(); } catch(e){} } };
+  var raf = function(){ requestAnimationFrame(raf); beat(); };
+  raf();
+  setInterval(beat, 40);
+})();
+</script>
+</helmet>
+
+<div ref="{{ shellRef }}" style="width:1920px;height:1080px;display:flex;flex-direction:column;background:#03060A;font-family:'JetBrains Mono',ui-monospace,monospace;color:#DCE8F2;position:absolute;left:0;top:0;overflow:hidden;transform-origin:top left">
+
+  <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(1500px 900px at 50% -10%, rgba(53,214,255,.10), transparent 62%), radial-gradient(1100px 800px at 92% 62%, rgba(76,140,255,.06), transparent 60%), radial-gradient(900px 700px at 5% 84%, rgba(0,229,196,.05), transparent 60%)"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(53,214,255,.024) 1px,transparent 1px),linear-gradient(90deg,rgba(53,214,255,.024) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(1250px 780px at 50% 34%,#000,transparent 92%)"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(180deg,rgba(255,255,255,.013) 0 1px,transparent 1px 3px)"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:{{ motionOpacity }}"><div style="position:absolute;left:0;right:0;height:180px;background:linear-gradient(180deg,transparent,rgba(53,214,255,.035),transparent);animation:jScan 15s linear infinite"></div></div>
+  <div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 320px 90px rgba(0,0,0,.8)"></div>
+
+  <div style="position:relative;display:flex;align-items:center;height:30px;padding:0 16px;gap:14px;border-bottom:1px solid rgba(53,214,255,.14);background:rgba(6,11,18,.9)">
+    <div style="display:flex;align-items:center;gap:8px;font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#7CFFE6">
+      <div style="width:6px;height:6px;border-radius:50%;background:#00E5C4;box-shadow:0 0 10px #00E5C4;animation:jBlink 2.4s ease-in-out infinite"></div>
+      CONTROL PLANE {{ planeState }} — {{ stopNotice }}
+    </div>
+    <div style="flex:1"></div>
+    <div onClick="{{ reconnect }}" title="Data source" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid {{ sourceCol }}">
+      <div style="width:5px;height:5px;border-radius:50%;background:{{ sourceCol }};box-shadow:0 0 8px {{ sourceCol }}"></div>
+      <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:{{ sourceCol }}">{{ sourceLabel }}</div>
+      <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#5C7C8C;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sourceDetail }}</div>
+    </div>
+    <div style="font:400 10px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#5C7C8C">REV 1 · LAST CONFIRMED {{ clock }}</div>
+    <div onClick="{{ notifyKeys }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(53,214,255,.3);background:rgba(53,214,255,.07);font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.16)">PROTECTED API KEYS</div>
+    <div onClick="{{ remoteApp }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(53,214,255,.3);background:rgba(53,214,255,.05);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.14)">REMOTE APP</div>
+    <div onClick="{{ estop }}" style="cursor:pointer;padding:5px 12px;border:1px solid rgba(255,77,109,.38);background:rgba(255,77,109,.09);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#FF8FA3" style-hover="background:rgba(255,77,109,.2)">EMERGENCY STOP</div>
+  </div>
+
+  <div style="position:relative;display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;border-bottom:1px solid rgba(53,214,255,.10);background:rgba(4,9,15,.85)">
+    <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#3F5B69;flex:none">EVENT</div>
+    <div style="width:5px;height:5px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 8px {{ stateColor }};flex:none;opacity:{{ toastOpacity }}"></div>
+    <div style="font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:#9BE9FF;opacity:{{ toastOpacity }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toast }}</div>
+  </div>
+
+  <sc-if value="{{ dashOn }}" hint-placeholder-val="{{ true }}">
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+  <div style="position:relative;display:flex;align-items:stretch;height:74px;border-bottom:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#070C14,#03060A)">
+    <div style="display:flex;align-items:center;gap:12px;padding:0 18px;width:250px;flex:none;border-right:1px solid rgba(255,255,255,.05)">
+      <div style="position:relative;width:38px;height:38px;flex:none">
+        <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.5);border-top-color:transparent;animation:jSpin 6s linear infinite"></div>
+        <div style="position:absolute;inset:6px;border-radius:50%;border:1px dashed rgba(0,229,196,.45);animation:jSpinR 11s linear infinite"></div>
+        <div style="position:absolute;inset:14px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 18px {{ stateColor }};animation:jBreathe 2.6s ease-in-out infinite"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font:700 20px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF;text-shadow:0 0 22px rgba(53,214,255,.55)">J.A.R.V.I.S.</div>
+        <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C">JUST A RATHER VERY INTELLIGENT SYSTEM</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:0 16px;width:250px;flex:none;border-right:1px solid rgba(255,255,255,.05);overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:2px;height:26px;flex:none">
+        <sc-for list="{{ headBars }}" as="b" hint-placeholder-count="14">
+          <div style="width:3px;background:{{ b.col }};height:{{ b.h }};box-shadow:0 0 6px rgba(53,214,255,.5)"></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+        <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:{{ stateColor }}">{{ stateLabel }}</div>
+        <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#5C7C8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ stateSub }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding:0 20px;flex:none;width:150px;border-right:1px solid rgba(255,255,255,.05);text-align:center">
+      <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7C8C">{{ dateStr }}</div>
+      <div style="font:600 22px/1 'JetBrains Mono',monospace;letter-spacing:.05em;color:#9BE9FF;text-shadow:0 0 16px rgba(53,214,255,.5)">{{ clock }}</div>
+      <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#3F5B69">LOCAL TIME</div>
+    </div>
+
+    <sc-for list="{{ telemetry }}" as="m" hint-placeholder-count="5">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 18px;border-right:1px solid rgba(255,255,255,.05)">
+        <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#5C7C8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.k }}</div>
+        <div style="font:600 15px/1 'JetBrains Mono',monospace;color:{{ m.col }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.v }}</div>
+        <div style="height:3px;background:rgba(255,255,255,.07);overflow:hidden"><div style="height:3px;background:{{ m.col }};width:{{ m.w }};box-shadow:0 0 8px {{ m.col }}"></div></div>
+      </div>
+    </sc-for>
+
+    <div onClick="{{ goVoice }}" title="Open hands-free voice dashboard" style="cursor:pointer;width:88px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+      <div style="position:relative;width:44px;height:44px">
+        <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.4);animation:jSpin 9s linear infinite"></div>
+        <div style="position:absolute;inset:5px;border-radius:50%;border:1px solid rgba(0,229,196,.35);border-bottom-color:transparent;animation:jSpinR 5s linear infinite"></div>
+        <div style="position:absolute;inset:12px;border-radius:50%;background:radial-gradient(circle,#EAFDFF,{{ stateColor }} 55%,transparent 74%);box-shadow:0 0 26px {{ stateColor }};animation:jBreathe 2.2s ease-in-out infinite"></div>
+      </div>
+      <div style="font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF">HANDS-FREE</div>
+    </div>
+  </div>
+
+  <div style="position:relative;display:flex;align-items:stretch;height:44px;border-bottom:1px solid rgba(53,214,255,.12);background:rgba(6,11,18,.6)">
+    <sc-for list="{{ ribbon }}" as="r" hint-placeholder-count="5">
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid rgba(255,255,255,.05)">
+        <div style="width:6px;height:6px;border-radius:50%;background:{{ r.col }};box-shadow:0 0 9px {{ r.col }};flex:none"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C">{{ r.k }}</div>
+          <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#DCE8F2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.v }}</div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="padding:3px 7px;border:1px solid {{ r.col }};font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ r.col }};flex:none">{{ r.tag }}</div>
+      </div>
+    </sc-for>
+    <div style="flex:none;display:flex;align-items:center;padding:0 14px">
+      <div style="padding:4px 8px;border:1px solid {{ srcRibbon.bd }};background:{{ srcRibbon.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcRibbon.col }}">{{ srcRibbon.label }}</div>
+    </div>
+  </div>
+
+  <div style="position:relative;flex:1;min-height:0;perspective:2200px;perspective-origin:50% 45%">
+  <div ref="{{ stageRef }}" style="height:100%;display:grid;grid-template-columns:312px 1fr 348px;gap:14px;padding:14px 16px 8px;box-sizing:border-box;transform-style:preserve-3d;transition:transform .25s cubic-bezier(.2,.7,.3,1);will-change:transform">
+
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));position:relative">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">MODEL ROUTER</div>
+          <div style="flex:1"></div>
+          <div style="padding:3px 7px;border:1px solid {{ srcRouter.bd }};background:{{ srcRouter.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcRouter.col }};margin-right:7px">{{ srcRouter.label }}</div>
+          <div onClick="{{ toggleAuto }}" style="cursor:pointer;padding:3px 8px;border:1px solid rgba(0,229,196,.4);background:rgba(0,229,196,.09);font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#7CFFE6">{{ autoLabel }}</div>
+        </div>
+        <div style="padding:12px">
+          <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C;margin-bottom:8px">ACTIVE ROUTE</div>
+          <div style="font:600 17px/1.1 'JetBrains Mono',monospace;color:#F2FAFF;text-shadow:0 0 16px rgba(53,214,255,.4)">{{ route }}</div>
+          <div style="font:400 8px/1.5 'JetBrains Mono',monospace;letter-spacing:.13em;color:#5C7C8C;margin-top:7px">{{ routeSub }}</div>
+          <div style="height:1px;background:rgba(53,214,255,.12);margin:12px 0"></div>
+          <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C;margin-bottom:7px">SELECT MODEL / PROVIDER</div>
+          <select value="{{ model }}" onChange="{{ setModel }}" style="width:100%;padding:8px 9px;background:rgba(4,8,13,.9);border:1px solid rgba(53,214,255,.24);color:#DCE8F2;font-size:11px;outline:none">
+            <sc-for list="{{ modelOptions }}" as="o" hint-placeholder-count="6">
+              <option value="{{ o }}">{{ o }}</option>
+            </sc-for>
+          </select>
+          <div style="display:flex;gap:7px;margin-top:10px">
+            <div onClick="{{ refresh }}" style="cursor:pointer;flex:1;text-align:center;padding:7px 0;border:1px solid rgba(53,214,255,.22);background:rgba(53,214,255,.05);font:500 9px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.14)">REFRESH</div>
+            <div onClick="{{ notifyKeys }}" style="cursor:pointer;flex:1;text-align:center;padding:7px 0;border:1px solid rgba(53,214,255,.22);background:rgba(53,214,255,.05);font:500 9px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.14)">KEY MANAGER</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1;display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">MODEL COUNCIL</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#7CFFE6">{{ councilStatus }}</div>
+            <div style="padding:3px 7px;border:1px solid {{ srcRouter.bd }};background:{{ srcRouter.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcRouter.col }}">{{ srcRouter.label }}</div>
+          </div>
+        </div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:6px;overflow:auto">
+          <sc-for list="{{ council }}" as="c" hint-placeholder-count="6">
+            <div onClick="{{ c.pick }}" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 9px;border:1px solid {{ c.bd }};background:{{ c.bg }}" style-hover="border-color:rgba(53,214,255,.4)">
+              <div style="position:relative;width:22px;height:22px;flex:none">
+                <div style="position:absolute;inset:0;border-radius:50%;border:1px solid {{ c.col }};opacity:.55"></div>
+                <div style="position:absolute;inset:7px;border-radius:50%;background:{{ c.col }};box-shadow:0 0 10px {{ c.col }}"></div>
+              </div>
+              <div style="min-width:0;display:flex;flex-direction:column;gap:4px;flex:1">
+                <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#EAF6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#5C7C8C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.id }}</div>
+              </div>
+              <div style="text-align:right;flex:none">
+                <div style="font:600 11px/1 'JetBrains Mono',monospace;color:#9BE9FF">{{ c.n }}</div>
+                <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#3F5B69;margin-top:4px">MODELS</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">PROVIDER STATUS</div>
+          <div style="padding:3px 7px;border:1px solid {{ srcProviders.bd }};background:{{ srcProviders.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcProviders.col }}">{{ srcProviders.label }}</div>
+        </div>
+        <div style="padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+          <sc-for list="{{ providers }}" as="p" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+              <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8FA8B6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+              <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ p.col }}">{{ p.state }}</div>
+              <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#3F5B69">{{ p.ms }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.9),rgba(5,9,15,.9))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">OPERATIONS FLOW</div>
+          <div style="padding:3px 7px;border:1px solid {{ srcFlow.bd }};background:{{ srcFlow.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcFlow.col }}">{{ srcFlow.label }}</div>
+        </div>
+        <div style="padding:11px;display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid {{ f.bd }};background:{{ f.bg }};position:relative;overflow:hidden">
+              <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(53,214,255,.10),transparent);width:40%;animation:jSweep 3.6s linear infinite;opacity:{{ motionOpacity }}"></div>
+              <div style="width:7px;height:7px;border-radius:50%;background:{{ f.col }};box-shadow:0 0 10px {{ f.col }};flex:none"></div>
+              <div style="min-width:0">
+                <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#EAF6FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</div>
+                <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ f.col }};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.state }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ isScreen }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1 1 0;display:flex;flex-direction:column;gap:12px;min-height:0;transform-style:preserve-3d">
+        <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));padding:14px 16px;display:flex;align-items:flex-end;gap:18px">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="font:700 26px/1 'Space Grotesk',sans-serif;letter-spacing:.16em;color:#F2FAFF;text-shadow:0 0 24px rgba(53,214,255,.35)">{{ screenTitle }}</div>
+              <div style="padding:4px 8px;border:1px solid {{ srcScreen.bd }};background:{{ srcScreen.bg }};font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:{{ srcScreen.col }}">{{ srcScreen.label }}</div>
+            </div>
+            <div style="font:400 10px/1.6 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8FA8B6;margin-top:9px;text-wrap:pretty">{{ screenSub }}</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:9px">
+            <sc-for list="{{ screenKpis }}" as="k" hint-placeholder-count="4">
+              <div style="min-width:118px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);padding:9px 12px">
+                <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#5C7C8C">{{ k.k }}</div>
+                <div style="font:600 16px/1 'JetBrains Mono',monospace;color:{{ k.col }};margin-top:8px">{{ k.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{ vizOn }}" hint-placeholder-val="{{ true }}">
+        <div onMouseMove="{{ onViz }}" style="position:relative;height:224px;flex:none;border:1px solid rgba(53,214,255,.16);background:radial-gradient(circle at 50% 55%,rgba(9,22,34,.95),rgba(4,8,13,.98) 74%);overflow:hidden;cursor:crosshair">
+          <canvas ref="{{ vizRef }}" width="1060" height="572" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+          <div style="position:absolute;left:14px;top:13px;pointer-events:none">
+            <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#9BE9FF">{{ vizTitle }}</div>
+            <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#3F5B69;margin-top:7px">{{ vizHint }}</div>
+          </div>
+          <div style="position:absolute;right:14px;top:13px;display:flex;flex-direction:column;gap:7px;pointer-events:none">
+            <sc-for list="{{ vizLegend }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+                <div style="width:16px;height:2px;background:{{ l.col }};box-shadow:0 0 8px {{ l.col }}"></div>
+                <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#8FA8B6">{{ l.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:0;top:0;width:18px;height:18px;border-left:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
+          <div style="position:absolute;right:0;bottom:0;width:18px;height:18px;border-right:1px solid rgba(53,214,255,.5);border-bottom:1px solid rgba(53,214,255,.5)"></div>
+        </div>
+        </sc-if>
+        <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-content:start;padding:2px;transform-style:preserve-3d">
+          <sc-for list="{{ screenCards }}" as="c" hint-placeholder-count="6">
+            <div onClick="{{ c.go }}" style="cursor:pointer;border:1px solid rgba(53,214,255,.14);background:linear-gradient(160deg,rgba(12,22,32,.95),rgba(5,9,15,.95));padding:14px;display:flex;flex-direction:column;gap:11px;transition:transform .2s ease-out,border-color .2s,box-shadow .2s" style-hover="transform:translateZ(38px) translateY(-4px);border-color:rgba(53,214,255,.5);box-shadow:0 22px 48px rgba(0,0,0,.6),0 0 34px rgba(53,214,255,.14)">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <div style="font:600 12px/1.35 'JetBrains Mono',monospace;letter-spacing:.09em;color:#EAF6FF;flex:1;min-width:0">{{ c.name }}</div>
+                <div style="padding:3px 7px;border:1px solid {{ c.tagCol }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ c.tagCol }};flex:none;white-space:nowrap">{{ c.tag }}</div>
+              </div>
+              <div style="font:400 9px/1.6 'JetBrains Mono',monospace;color:#8FA8B6;text-wrap:pretty">{{ c.sub }}</div>
+              <div style="height:3px;background:rgba(255,255,255,.06)"><div style="height:3px;background:{{ c.tagCol }};width:{{ c.w }};box-shadow:0 0 8px {{ c.tagCol }}"></div></div>
+              <div style="display:flex;gap:16px">
+                <div style="min-width:0">
+                  <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7C8C">{{ c.k1 }}</div>
+                  <div style="font:500 9px/1 'JetBrains Mono',monospace;color:#B9D0DC;margin-top:6px">{{ c.v1 }}</div>
+                </div>
+                <div style="min-width:0">
+                  <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7C8C">{{ c.k2 }}</div>
+                  <div style="font:500 9px/1 'JetBrains Mono',monospace;color:#B9D0DC;margin-top:6px">{{ c.v2 }}</div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;display:flex;gap:12px;min-height:0">
+        <div style="width:204px;flex:none;display:flex;flex-direction:column;gap:12px">
+          <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
+              <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ASSISTANT STATUS</div>
+              <div style="padding:3px 6px;border:1px solid {{ srcState.bd }};background:{{ srcState.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcState.col }}">{{ srcState.label }}</div>
+            </div>
+            <div style="padding:12px 11px;display:flex;flex-direction:column;gap:10px;flex:1">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:7px;height:7px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 10px {{ stateColor }};animation:jBlink 2s ease-in-out infinite"></div>
+                <div style="font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:{{ stateColor }}">{{ stateLabel }}</div>
+              </div>
+              <div style="font:400 9px/1.6 'JetBrains Mono',monospace;color:#8FA8B6;text-wrap:pretty">{{ stateSub }}</div>
+              <div style="display:flex;align-items:flex-end;justify-content:center;gap:3px;height:64px;margin-top:2px">
+                <sc-for list="{{ sideBars }}" as="b" hint-placeholder-count="18">
+                  <div style="width:4px;background:{{ b.col }};height:{{ b.h }};box-shadow:0 0 7px rgba(53,214,255,.45)"></div>
+                </sc-for>
+              </div>
+              <div style="flex:1"></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ statusMeta }}" as="m" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                    <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#5C7C8C">{{ m.k }}</div>
+                    <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.09em;color:{{ m.col }}">{{ m.v }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="flex:1;min-width:0;position:relative;border:1px solid rgba(53,214,255,.14);background:radial-gradient(circle at 50% 50%, rgba(9,22,34,.95), rgba(3,6,10,.98) 72%);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:crosshair">
+          <canvas ref="{{ cref }}" width="880" height="720" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+          <div style="position:absolute;left:0;top:0;width:22px;height:22px;border-left:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
+          <div style="position:absolute;right:0;top:0;width:22px;height:22px;border-right:1px solid rgba(53,214,255,.5);border-top:1px solid rgba(53,214,255,.5)"></div>
+          <div style="position:absolute;left:0;bottom:0;width:22px;height:22px;border-left:1px solid rgba(53,214,255,.5);border-bottom:1px solid rgba(53,214,255,.5)"></div>
+          <div style="position:absolute;right:0;bottom:0;width:22px;height:22px;border-right:1px solid rgba(53,214,255,.5);border-bottom:1px solid rgba(53,214,255,.5)"></div>
+          <div style="position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none">
+            <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#9BE9FF">REACTOR CORE</div>
+            <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#3F5B69">ARC MK-VII · LIVE RENDER</div>
+          </div>
+          <div style="position:absolute;right:12px;top:12px;display:flex;flex-direction:column;align-items:flex-end;gap:7px;pointer-events:none">
+            <sc-for list="{{ coreReadouts }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7C8C">{{ r.k }}</div>
+                <div style="font:600 10px/1 'JetBrains Mono',monospace;color:{{ r.col }};min-width:52px;text-align:right">{{ r.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:12px;bottom:12px;font:400 8px/1.7 'JetBrains Mono',monospace;letter-spacing:.13em;color:#3F5B69;pointer-events:none">MOVE POINTER TO STEER FIELD · CLICK TO SURGE</div>
+          <div onClick="{{ hold }}" style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:7px 18px;border:1px solid rgba(53,214,255,.36);background:rgba(4,10,16,.8);font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.17em;color:#9BE9FF;cursor:pointer" style-hover="background:rgba(53,214,255,.18)">{{ holdLabel }}</div>
+        </div>
+
+        <div style="width:212px;flex:none;display:flex;flex-direction:column;gap:12px">
+          <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14)">
+              <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ACTIVE SESSION</div>
+              <div style="padding:3px 6px;border:1px solid {{ srcSession.bd }};background:{{ srcSession.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcSession.col }}">{{ srcSession.label }}</div>
+            </div>
+            <div style="padding:11px;display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ session }}" as="s" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#5C7C8C">{{ s.k }}</div>
+                  <div style="font:600 11px/1 'JetBrains Mono',monospace;color:#DCE8F2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.v }}</div>
+                </div>
+              </sc-for>
+              <div onClick="{{ viewSession }}" style="cursor:pointer;text-align:center;padding:7px 0;border:1px solid rgba(53,214,255,.24);background:rgba(53,214,255,.06);font:500 9px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.16)">VIEW SESSION</div>
+            </div>
+          </div>
+          <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1">
+            <div style="padding:9px 11px;border-bottom:1px solid rgba(53,214,255,.14);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">QUICK COMMANDS</div>
+            <div style="padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:7px">
+              <sc-for list="{{ quick }}" as="q" hint-placeholder-count="6">
+                <div onClick="{{ q.go }}" style="cursor:pointer;text-align:center;padding:8px 4px;border:1px solid rgba(53,214,255,.2);background:rgba(53,214,255,.045);font:500 8px/1.3 'JetBrains Mono',monospace;letter-spacing:.08em;color:#B9D0DC" style-hover="background:rgba(53,214,255,.16);color:#EAF6FF">{{ q.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));height:196px;flex:none;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">{{ panelTitle }}</div>
+          <div style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 7px;border:1px solid {{ srcEvents.bd }};background:{{ srcEvents.bg }};font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:{{ srcEvents.col }}"><div style="width:5px;height:5px;border-radius:50%;background:{{ srcEvents.col }};box-shadow:0 0 8px {{ srcEvents.col }}"></div>{{ srcEvents.label }}</div>
+          <sc-for list="{{ panelChips }}" as="c" hint-placeholder-count="4">
+            <div onClick="{{ c.go }}" style="cursor:pointer;padding:4px 8px;border:1px solid rgba(53,214,255,.22);font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.14)">{{ c.label }}</div>
+          </sc-for>
+        </div>
+        <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:11px 12px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;gap:11px;animation:jRise .3s ease both">
+              <div style="width:56px;flex:none;font:400 8px/1.5 'JetBrains Mono',monospace;letter-spacing:.09em;color:#3F5B69">{{ r.time }}</div>
+              <div style="width:3px;flex:none;background:{{ r.col }};box-shadow:0 0 8px {{ r.col }}"></div>
+              <div style="min-width:0;flex:1">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:{{ r.col }}">{{ r.who }}</div>
+                  <div style="font:400 8px/1 'JetBrains Mono',monospace;color:#3F5B69;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.meta }}</div>
+                </div>
+                <div style="font:400 11px/1.65 'JetBrains Mono',monospace;color:#D3E5F0;margin-top:6px;white-space:pre-wrap;text-wrap:pretty">{{ r.text }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid rgba(53,214,255,.14)">
+          <input value="{{ draft }}" onChange="{{ setDraft }}" onKeyDown="{{ onKey }}" placeholder="Give Jarvis a goal to plan and execute..." style="flex:1;padding:10px 12px;background:rgba(4,8,13,.9);border:1px solid rgba(53,214,255,.2);color:#EAF6FF;font-size:11px;outline:none">
+          <div onClick="{{ send }}" style="cursor:pointer;padding:10px 20px;border:1px solid rgba(0,229,196,.42);background:rgba(0,229,196,.1);font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#7CFFE6" style-hover="background:rgba(0,229,196,.22)">SEND</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">VOICE AUTHORITY</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="padding:3px 8px;border:1px solid rgba(0,229,196,.4);font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#7CFFE6">{{ voiceState }}</div>
+            <div style="padding:3px 6px;border:1px solid {{ srcVoice.bd }};background:{{ srcVoice.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcVoice.col }}">{{ srcVoice.label }}</div>
+          </div>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#5C7C8C;margin-bottom:7px">INPUT DEVICE</div>
+            <select style="width:100%;padding:8px 9px;background:rgba(4,8,13,.9);border:1px solid rgba(53,214,255,.22);color:#DCE8F2;font-size:10px;outline:none">
+              <option value="a">System default · SteelSeries Sonar Microphone</option>
+              <option value="b">Intel Smart Sound Array</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:2px;height:26px">
+            <sc-for list="{{ micBars }}" as="b" hint-placeholder-count="34">
+              <div style="flex:1;background:{{ b.col }};height:{{ b.h }}"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:7px">
+            <sc-for list="{{ voiceBtns }}" as="v" hint-placeholder-count="3">
+              <div onClick="{{ v.go }}" style="cursor:pointer;flex:1;text-align:center;padding:8px 0;border:1px solid {{ v.bd }};background:{{ v.bg }};font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ v.col }}" style-hover="background:rgba(53,214,255,.16)">{{ v.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#5C7C8C">SENSITIVITY</div>
+            <div style="font:600 10px/1 'JetBrains Mono',monospace;color:#9BE9FF">{{ sens }}</div>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,.07)"><div style="height:4px;background:linear-gradient(90deg,#00E5C4,#35D6FF);width:{{ sensW }};box-shadow:0 0 10px rgba(53,214,255,.7)"></div></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">API TOKENS USAGE</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#5C7C8C">TODAY</div>
+            <div style="padding:3px 6px;border:1px solid {{ srcTokens.bd }};background:{{ srcTokens.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcTokens.col }}">{{ srcTokens.label }}</div>
+          </div>
+        </div>
+        <div style="padding:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+            <sc-for list="{{ tokenStats }}" as="s" hint-placeholder-count="3">
+              <div style="border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);padding:9px">
+                <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#5C7C8C">{{ s.k }}</div>
+                <div style="font:600 15px/1 'JetBrains Mono',monospace;color:{{ s.col }};margin-top:7px">{{ s.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:62px;margin-top:12px">
+            <sc-for list="{{ spark }}" as="b" hint-placeholder-count="24">
+              <div style="flex:1;background:linear-gradient(180deg,#35D6FF,rgba(53,214,255,.12));height:{{ b.h }}"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:7px;font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#3F5B69">
+            <div>00:00</div><div>06:00</div><div>12:00</div><div>18:00</div><div>24:00</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92));flex:1;display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">BRAIN GRAPH</div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:#7CFFE6">{{ graphHealth }}</div>
+            <div style="padding:3px 6px;border:1px solid {{ srcBrain.bd }};background:{{ srcBrain.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcBrain.col }}">{{ srcBrain.label }}</div>
+          </div>
+        </div>
+        <div style="padding:12px;display:flex;gap:12px;flex:1;min-height:0">
+          <div style="position:relative;flex:1;min-width:0;border:1px solid rgba(255,255,255,.05);background:rgba(53,214,255,.02);overflow:hidden">
+            <sc-for list="{{ graphNodes }}" as="n" hint-placeholder-count="16">
+              <div style="position:absolute;left:{{ n.x }};top:{{ n.y }};width:{{ n.s }};height:{{ n.s }};border-radius:50%;background:{{ n.col }};box-shadow:0 0 9px {{ n.col }};opacity:{{ n.o }}"></div>
+            </sc-for>
+          </div>
+          <div style="width:96px;flex:none;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ graphStats }}" as="g" hint-placeholder-count="3">
+              <div>
+                <div style="font:600 13px/1 'JetBrains Mono',monospace;color:#9BE9FF">{{ g.v }}</div>
+                <div style="font:400 7px/1 'JetBrains Mono',monospace;letter-spacing:.13em;color:#5C7C8C;margin-top:5px">{{ g.k }}</div>
+              </div>
+            </sc-for>
+            <div onClick="{{ openGraph }}" style="cursor:pointer;text-align:center;padding:7px 0;border:1px solid rgba(53,214,255,.24);background:rgba(53,214,255,.06);font:500 8px/1 'JetBrains Mono',monospace;letter-spacing:.11em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.16)">OPEN GRAPH</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,rgba(10,18,27,.92),rgba(5,9,15,.92))">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid rgba(53,214,255,.14)">
+          <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.15em;color:#9BE9FF">ENVIRONMENT &amp; SYSTEM</div>
+          <div style="padding:3px 6px;border:1px solid {{ srcTel.bd }};background:{{ srcTel.bg }};font:600 7px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ srcTel.col }}">{{ srcTel.label }}</div>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ envRows }}" as="e" hint-placeholder-count="4">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7C8C">{{ e.k }}</div>
+                <div style="font:600 10px/1 'JetBrains Mono',monospace;color:{{ e.col }}">{{ e.v }}</div>
+              </div>
+              <div style="height:4px;background:rgba(255,255,255,.06)"><div style="height:4px;background:{{ e.col }};width:{{ e.w }};box-shadow:0 0 9px {{ e.col }}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <div style="position:relative;display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-top:1px solid rgba(53,214,255,.16);background:linear-gradient(180deg,#050A11,#03060A)">
+    <div style="position:relative;width:40px;height:40px;flex:none">
+      <div style="position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,214,255,.35);animation:jSpin 8s linear infinite"></div>
+      <div style="position:absolute;inset:11px;border-radius:50%;background:{{ stateColor }};box-shadow:0 0 16px {{ stateColor }};animation:jBreathe 2.4s ease-in-out infinite"></div>
+    </div>
+    <div style="flex:1;display:flex;align-items:stretch;gap:4px;min-width:0">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="12">
+        <div onClick="{{ t.go }}" style="cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:9px 2px;border:1px solid {{ t.bd }};background:{{ t.bg }};transition:transform .18s ease-out,border-color .18s" style-hover="border-color:rgba(53,214,255,.5);transform:translateY(-3px)">
+          <div style="width:5px;height:5px;border-radius:50%;background:{{ t.dot }};box-shadow:0 0 8px {{ t.dot }};flex:none"></div>
+          <div style="font:600 8px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ t.col }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ t.name }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="position:relative;width:40px;height:40px;flex:none">
+      <div style="position:absolute;inset:0;border-radius:50%;border:1px dashed rgba(0,229,196,.4);animation:jSpinR 12s linear infinite"></div>
+      <div style="position:absolute;inset:11px;border-radius:50%;background:#00E5C4;box-shadow:0 0 16px #00E5C4;animation:jBreathe 3s ease-in-out infinite"></div>
+    </div>
+  </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ voiceOn }}" hint-placeholder-val="{{ false }}">
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+    <div style="display:flex;align-items:center;gap:18px;padding:22px 44px 0">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font:700 30px/1 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#F2FAFF;text-shadow:0 0 30px rgba(53,214,255,.5)">J.A.R.V.I.S.</div>
+        <div style="font:400 9px/1 'JetBrains Mono',monospace;letter-spacing:.22em;color:#5C7C8C">VOICE COMMAND INTERFACE</div>
+      </div>
+      <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(53,214,255,.35),rgba(53,214,255,.04))"></div>
+      <div style="text-align:right">
+        <div style="font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5C7C8C">{{ dateStr }}</div>
+        <div style="font:600 26px/1 'JetBrains Mono',monospace;color:#9BE9FF;margin-top:7px;text-shadow:0 0 18px rgba(53,214,255,.5)">{{ clock }}</div>
+      </div>
+      <div onClick="{{ goDash }}" style="cursor:pointer;padding:13px 24px;border:1px solid rgba(53,214,255,.32);background:rgba(53,214,255,.06);font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#9BE9FF" style-hover="background:rgba(53,214,255,.18)">DASHBOARD</div>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 640px 1fr;gap:34px;align-items:center;padding:10px 44px 0;min-height:0">
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <div style="font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:#9BE9FF">VOICE AUTHORITY</div>
+        <div style="font:700 84px/.9 'Space Grotesk',sans-serif;letter-spacing:.03em;color:{{ stateColor }};text-shadow:0 0 60px {{ stateColor }}">{{ stateLabel }}</div>
+        <div style="font:400 13px/1.7 'JetBrains Mono',monospace;color:#8FA8B6;max-width:420px;text-wrap:pretty">{{ stateSub }} — hold the reactor, use push to talk, or enable free talking.</div>
+        <div style="display:flex;align-items:flex-end;gap:4px;height:52px">
+          <sc-for list="{{ micBars }}" as="b" hint-placeholder-count="34">
+            <div style="width:5px;background:{{ b.col }};height:{{ b.h }};box-shadow:0 0 8px rgba(53,214,255,.5)"></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:13px;margin-top:4px">
+          <sc-for list="{{ voiceMeta }}" as="m" hint-placeholder-count="5">
+            <div style="display:flex;align-items:baseline;gap:14px">
+              <div style="width:120px;flex:none;font:400 8px/1 'JetBrains Mono',monospace;letter-spacing:.17em;color:#5C7C8C">{{ m.k }}</div>
+              <div style="font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:.07em;color:{{ m.col }}">{{ m.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" onClick="{{ pulse }}" style="position:relative;height:640px;display:flex;align-items:center;justify-content:center;cursor:crosshair">
+        <canvas ref="{{ cref }}" width="900" height="900" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+        <div onClick="{{ hold }}" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:13px 34px;border:1px solid rgba(53,214,255,.4);background:rgba(4,10,16,.82);font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:#9BE9FF;cursor:pointer" style-hover="background:rgba(53,214,255,.2)">{{ holdLabel }}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <sc-for list="{{ voiceLines }}" as="l" hint-placeholder-count="2">
+          <div style="border-left:3px solid {{ l.col }};padding:14px 20px;background:linear-gradient(90deg,rgba(53,214,255,.05),transparent)">
+            <div style="font:600 9px/1 'JetBrains Mono',monospace;letter-spacing:.2em;color:{{ l.col }}">{{ l.who }}</div>
+            <div style="font:400 16px/1.6 'JetBrains Mono',monospace;color:#EAF6FF;margin-top:10px;text-wrap:pretty">{{ l.text }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:stretch;gap:10px;padding:20px 44px 24px">
+      <sc-for list="{{ voiceControls }}" as="v" hint-placeholder-count="7">
+        <div onClick="{{ v.go }}" style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:9px;padding:19px 8px;border:1px solid {{ v.bd }};background:{{ v.bg }}" style-hover="border-color:rgba(53,214,255,.55)">
+          <div style="width:6px;height:6px;border-radius:50%;background:{{ v.dot }};box-shadow:0 0 9px {{ v.dot }};flex:none"></div>
+          <div style="font:600 10px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:{{ v.col }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;apiBase&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;pollMs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2000,&quot;min&quot;:500,&quot;max&quot;:10000,&quot;step&quot;:250,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;forceDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Backend&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#FFB43C&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#35D6FF&quot;,&quot;#00E5C4&quot;,&quot;#FFB43C&quot;,&quot;#4C8CFF&quot;],&quot;section&quot;:&quot;Core&quot;},&quot;coreGlow&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;particles&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;reduceMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Core&quot;},&quot;tickMs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:800,&quot;min&quot;:120,&quot;max&quot;:2000,&quot;step&quot;:20,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;System&quot;}}">
+const CY='#35D6FF', TE='#00E5C4', AM='#FFB43C', RD='#FF4D6D', BL='#4C8CFF', DIM='#5C7C8C';
+const CYCLE = ['listening','thinking','delegating','executing','speaking','ready'];
+const STATES = {
+  listening:{label:'LISTENING', sub:'Voice channel armed · wake word JARVIS', color:CY, e:0.82},
+  thinking:{label:'THINKING', sub:'Decomposing directive into a plan', color:BL, e:0.55},
+  delegating:{label:'DELEGATING', sub:'Routing subtasks across the agent swarm', color:AM, e:0.66},
+  executing:{label:'EXECUTING', sub:'Running approved steps in the workspace', color:TE, e:0.95},
+  speaking:{label:'SPEAKING', sub:'Narrating result · en-GB voice profile', color:CY, e:1.0},
+  ready:{label:'AGENT READY', sub:'Plan, act, observe, verify', color:TE, e:0.38},
+  paused:{label:'HELD', sub:'Autonomy suspended by operator', color:AM, e:0.2},
+  idle:{label:'IDLE', sub:'Standing by · nothing queued', color:DIM, e:0.22},
+  transcribing:{label:'TRANSCRIBING', sub:'Converting capture to text', color:CY, e:0.7},
+  testing:{label:'TESTING', sub:'Running the verification suite', color:TE, e:0.8},
+  awaiting_approval:{label:'AWAITING APPROVAL', sub:'A gated step needs your decision', color:AM, e:0.45},
+  degraded:{label:'DEGRADED', sub:'Running on fallback capacity', color:AM, e:0.5},
+  completed:{label:'COMPLETED', sub:'Last directive finished', color:TE, e:0.3},
+  error:{label:'ERROR', sub:'Last step failed · recovery available', color:RD, e:0.35}
+};
+const TONE = {ok:TE, info:CY, warn:AM, danger:RD, muted:DIM};
+/* Per-panel provenance chip. A panel is LIVE only when the snapshot actually
+   carried its data; anything the backend omits stays visibly DEMO. */
+const SRC = (mode)=> mode === 'stale'
+  ? {label:'STALE', col:AM, bd:'rgba(255,180,60,.52)', bg:'rgba(255,180,60,.10)'}
+  : mode === 'partial'
+    ? {label:'PARTIAL', col:AM, bd:'rgba(255,180,60,.42)', bg:'rgba(255,180,60,.08)'}
+    : mode
+      ? {label:'LIVE', col:TE, bd:'rgba(0,229,196,.4)', bg:'rgba(0,229,196,.08)'}
+      : {label:'DEMO', col:AM, bd:'rgba(255,180,60,.38)', bg:'rgba(255,180,60,.07)'};
+const fmtDur = (sec)=>{ sec = Math.max(0, Math.round(sec||0)); const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); };
+const fmtAge = (at)=>{ const ms = Date.now() - Date.parse(at||''); if (!Number.isFinite(ms) || ms < 0) return 'unknown age';
+  const sec=Math.floor(ms/1000); return sec<60 ? sec+'s ago' : sec<3600 ? Math.floor(sec/60)+'m ago' : Math.floor(sec/3600)+'h ago'; };
+const TABS = ['DASHBOARD','CHAT','VOICE','MISSIONS','AGENTS','PROJECTS','FILES','NOTES','BROWSER','CODE','BRAIN','TASKS','TOOLS','AUTOMATIONS','GIT','SECURITY','USAGE','DEVICES','SETTINGS'];
+
+const K = (k,v,c)=>({k,v,col:c||'#DCE8F2'});
+const C = (name,sub,tag,tagCol,pct,m1,m2)=>({name,sub,tag,tagCol,pct,m1,m2});
+const SCREENS = {
+  CHAT:['CHAT','Conversation threads across the model council · full transcripts retained locally',
+    [K('THREADS','14'),K('COUNCIL RUNS','3',TE),K('AVG LATENCY','2.4 s',CY),K('SPEND TODAY','$0.42',AM)],
+    [C('CHECKOUT RETRY REVIEW','glm-5.2 · 18 messages','ACTIVE',TE,72,['TOKENS','12.4k'],['UPDATED','2m ago']),
+     C('IDEMPOTENCY STRATEGIES','council · 3 models','CONSENSUS 2/3',CY,100,['SOURCES','12'],['UPDATED','24m ago']),
+     C('WEEKLY OPS BRIEF','deepseek-v4-pro · 6 messages','ARCHIVED',DIM,100,['TOKENS','4.1k'],['UPDATED','yesterday']),
+     C('VAULT CLEANUP PLAN','mistral-small-4 · 9 messages','STALE',AM,40,['TOKENS','3.0k'],['UPDATED','3d ago'])]],
+  MISSIONS:['MISSIONS','Durable multi-phase work with approval gates, rollback, and audit trail',
+    [K('ACTIVE','1',TE),K('BLOCKED','1',RD),K('QUEUED','3',AM),K('COMPLETED · 7D','9')],
+    [C('MERIDIAN · CHECKOUT HARDENING','phase 2 of 5 · deploy gate held','NEEDS APPROVAL',RD,42,['OWNER','ORCHESTRATOR'],['BUDGET','120 min']),
+     C('ATLAS · KNOWLEDGE BACKFILL','phase 4 of 4 · writing vault notes','RUNNING',TE,88,['OWNER','CURATOR'],['BUDGET','45 min']),
+     C('BEACON · PROVIDER FAILOVER DRILL','not started · scheduled 02:00','QUEUED',AM,0,['OWNER','PLANNER'],['BUDGET','30 min']),
+     C('CINDER · TEST FLAKE SWEEP','paused by operator','HELD',AM,26,['OWNER','TESTER'],['BUDGET','60 min'])]],
+  AGENTS:['AGENTS','Bounded specialists under one orchestrator · capability policy always applies',
+    [K('ACTIVE','2',TE),K('IDLE','8'),K('CONCURRENCY','6 max',CY),K('AUTONOMY','L2 ASSISTED',AM)],
+    [C('ORCHESTRATOR','decomposing MERIDIAN phase 3','ACTIVE',TE,41,['MODEL','glm-5.2'],['SCOPE','all projects']),
+     C('DEVELOPER','patching retry backoff in checkout-svc','CODING',CY,63,['MODEL','deepseek-v4-pro'],['SCOPE','workspace']),
+     C('SECURITY REVIEWER','threat model on diff #4821','REVIEW',BL,22,['MODEL','glm-5.2'],['SCOPE','read only']),
+     C('BROWSER OPERATOR','3 sandboxed tabs · extraction pending','AWAITING',AM,35,['MODEL','llama-4-maverick'],['SCOPE','allowlist']),
+     C('TESTER','integration suite 148/210','TESTING',TE,70,['MODEL','glm-5.2'],['SCOPE','workspace']),
+     C('KNOWLEDGE CURATOR','writing 6 decision notes','SYNCING',DIM,54,['MODEL','mistral-small-4'],['SCOPE','vault'])]],
+  PROJECTS:['PROJECTS','Isolated workspaces · agents cannot cross a project boundary without approval',
+    [K('PROJECTS','4'),K('ISOLATED','4',TE),K('DIRTY TREES','1',AM),K('DISK','46%',CY)],
+    [C('JARVIS','master · 6 changed files','DIRTY',AM,0,['AGENTS','2'],['SIZE','1.2 GB']),
+     C('CHECKOUT-SVC','fix/checkout-retry-jitter','DRAFT PR',CY,0,['AGENTS','3'],['SIZE','420 MB']),
+     C('KNOWLEDGE VAULT','obsidian-compatible','CLEAN',TE,0,['NOTES','62'],['SIZE','88 MB']),
+     C('SANDBOX','scratch experiments','CLEAN',DIM,0,['AGENTS','0'],['SIZE','210 MB'])]],
+  FILES:['FILES','Workspace roots the file operator may touch · everything else needs approval',
+    [K('INDEXED','1,204'),K('CHANGED','6',AM),K('UNTRACKED','2',AM),K('INDEX AGE','810 ms',TE)],
+    [C('/jarvis/src','412 files · semantic index fresh','READ / WRITE',TE,0,['OWNER','FILE OP'],['LAST SCAN','1m ago']),
+     C('/checkout-svc','286 files · 6 modified','READ / WRITE',CY,0,['OWNER','DEVELOPER'],['LAST SCAN','2m ago']),
+     C('/vault','62 notes · obsidian format','READ / APPEND',TE,0,['OWNER','CURATOR'],['LAST SCAN','8m ago']),
+     C('/system32','outside workspace','BLOCKED',RD,0,['OWNER','—'],['POLICY','denied'])]],
+  NOTES:['NOTES','Reviewed knowledge layer · every note carries source, confidence, and freshness',
+    [K('NOTES','62'),K('BACKLINKS','8',CY),K('DECISIONS','11',TE),K('STALE','3',AM)],
+    [C('ADR-0043 · RETRY JITTER','confidence high · reviewed by you','FRESH',TE,0,['SOURCES','4'],['LINKS','8']),
+     C('PAYMENTS RELIABILITY MAP','confidence medium · agent drafted','NEEDS REVIEW',AM,0,['SOURCES','7'],['LINKS','5']),
+     C('POSTMORTEM 2026-06','confidence high','ARCHIVED',DIM,0,['SOURCES','3'],['LINKS','2'])]],
+  BROWSER:['BROWSER','Sandboxed browsing · extracted content is quarantined until you accept it',
+    [K('TABS','3',AM),K('ALLOWLIST','12 DOMAINS',TE),K('QUARANTINED','2',AM),K('BLOCKED','0',TE)],
+    [C('PROVIDER RETRY DOCS','reading · 4 sections extracted','QUARANTINED',AM,0,['DOMAIN','allowlisted'],['SESSION','9m']),
+     C('RFC 7231 · IDEMPOTENCY','read complete','ACCEPTED',TE,0,['DOMAIN','allowlisted'],['SESSION','4m']),
+     C('INTERNAL ADR INDEX','read complete','ACCEPTED',TE,0,['DOMAIN','local'],['SESSION','2m'])]],
+  CODE:['CODE','Sandboxed execution with diffs, dry-runs, and revert — nothing applies silently',
+    [K('RUNS TODAY','18'),K('PASSED','15',TE),K('FAILED','1',RD),K('PENDING DIFFS','2',AM)],
+    [C('RETRY SIMULATION','10k requests · peak concurrency 812 → 96','PASSED',TE,100,['RUNTIME','node 22'],['TIME','1.2 s']),
+     C('INTEGRATION SUITE','148 / 210 cases','RUNNING',CY,70,['RUNTIME','node 22'],['TIME','3m 41s']),
+     C('MIGRATION DRY RUN','idempotency key backfill','AWAITING APPROVAL',AM,0,['RUNTIME','postgres'],['ROWS','1.2M']),
+     C('LINT SWEEP','0 errors · 3 warnings','PASSED',TE,100,['RUNTIME','eslint'],['TIME','0.8 s'])]],
+  BRAIN:['BRAIN','Graph of entities, decisions, code symbols, and documents with attribution',
+    [K('NODES','3,475'),K('EDGES','8,504',CY),K('CLUSTERS','9',TE),K('LOW CONFIDENCE','14',AM)],
+    [C('PAYMENTS · RELIABILITY','412 nodes · grew 14 this session','HOT',TE,0,['FRESHNESS','minutes'],['SOURCES','31']),
+     C('CODE SYMBOLS · CHECKOUT','1,180 nodes','INDEXED',CY,0,['FRESHNESS','2m'],['SOURCES','code']),
+     C('OPERATIONS HISTORY','604 nodes','INDEXED',CY,0,['FRESHNESS','1h'],['SOURCES','audit']),
+     C('UNVERIFIED CLAIMS','14 nodes · from browsing','QUARANTINED',AM,0,['FRESHNESS','9m'],['SOURCES','web'])]],
+  TASKS:['TASKS','Durable task state with dependencies, retries, and reassignment',
+    [K('QUEUED','6',AM),K('ACTIVE','0'),K('BLOCKED','1',RD),K('DONE · 7D','48',TE)],
+    [C('DEPLOY CANARY 5%','blocked by approval gate','BLOCKED',RD,0,['DEPENDS','tests pass'],['RETRIES','0']),
+     C('BACKFILL IDEMPOTENCY KEYS','dry run ready','QUEUED',AM,0,['DEPENDS','deploy'],['RETRIES','0']),
+     C('QUARANTINE FLAKY TESTS','3 cases identified','QUEUED',AM,0,['DEPENDS','—'],['RETRIES','1']),
+     C('WRITE ADR-0044','draft outline ready','QUEUED',DIM,0,['DEPENDS','deploy'],['RETRIES','0'])]],
+  TOOLS:['TOOLS','Capability grants · gated tools require explicit confirmation every time',
+    [K('TOOLS','18'),K('GRANTED','14',TE),K('GATED','4',AM),K('REVOKED','0')],
+    [C('FILESYSTEM WRITE','workspace roots only','GATED',AM,0,['SCOPE','2 roots'],['USES · 24H','12']),
+     C('SHELL','no network, no sudo','GATED',AM,0,['SCOPE','sandbox'],['USES · 24H','4']),
+     C('DEPLOY','canary then full','GATED',RD,0,['SCOPE','checkout-svc'],['USES · 24H','0']),
+     C('WEB SEARCH','allowlisted domains','GRANTED',TE,0,['SCOPE','12 domains'],['USES · 24H','31']),
+     C('VECTOR MEMORY','read + append','GRANTED',TE,0,['SCOPE','vault'],['USES · 24H','88']),
+     C('SYSTEM METRICS','read only','GRANTED',TE,0,['SCOPE','local'],['USES · 24H','420'])]],
+  AUTOMATIONS:['AUTOMATIONS','Triggers that wake Jarvis without you · each one is revocable',
+    [K('ENABLED','5',TE),K('PAUSED','2',AM),K('RUNS · 24H','36',CY),K('FAILURES','1',RD)],
+    [C('MORNING BRIEF','07:30 daily · reads calendar + inbox summary','ENABLED',TE,0,['LAST RUN','07:30'],['AVG','9 s']),
+     C('PROVIDER HEALTH SWEEP','every 15 min · circuit-break check','ENABLED',TE,0,['LAST RUN','4m ago'],['AVG','1.2 s']),
+     C('VAULT CONSOLIDATION','23:00 daily · merges session notes','ENABLED',TE,0,['LAST RUN','23:00'],['AVG','42 s']),
+     C('AUTO DEPLOY ON GREEN','paused · requires autonomy L3','PAUSED',AM,0,['LAST RUN','never'],['AVG','—'])]],
+  GIT:['GIT','Branch, diff, and PR state for every project workspace',
+    [K('BRANCHES','7'),K('OPEN PRS','2',CY),K('CONFLICTS','0',TE),K('UNPUSHED','4',AM)],
+    [C('fix/checkout-retry-jitter','draft PR #4822 · 2 commits','DRAFT',CY,0,['AHEAD','2'],['CHECKS','running']),
+     C('master','clean · 6 uncommitted in worktree','DIRTY',AM,0,['AHEAD','0'],['CHECKS','—']),
+     C('feat/brain-graph-v2','4 commits unpushed','LOCAL',DIM,0,['AHEAD','4'],['CHECKS','—']),
+     C('PR #4821 · CHECKOUT REVIEW','14 files · 2 blocking issues','NEEDS WORK',RD,0,['REVIEWER','security'],['CHECKS','1 failed'])]],
+  SECURITY:['SECURITY','Trust boundaries, secret protection, and the audit record',
+    [K('POLICY','ENFORCED',TE),K('OPEN ALERTS','2',AM),K('SECRETS','VAULTED',TE),K('AUDIT EVENTS','1,204',CY)],
+    [C('SECRET PROTECTION','keys never enter frontend state or logs','ENFORCED',TE,0,['KEYS','6 providers'],['ROTATED','12d ago']),
+     C('DESTRUCTIVE ACTION GUARD','confirm required for delete, deploy, migrate','ENFORCED',TE,0,['TRIGGERS · 24H','3'],['BYPASSES','0']),
+     C('WORKSPACE BOUNDARY','2 alerts · agent requested /system32','ALERT',AM,0,['DENIED','2'],['ALLOWED','0']),
+     C('SPEND LIMIT','$5.00 daily cap · $0.42 used','ENFORCED',TE,8,['CAP','$5.00'],['USED','$0.42'])]],
+  USAGE:['USAGE','Token, latency, and spend accounting per provider and per mission',
+    [K('REQUESTS','12'),K('TOKENS','48.2k',TE),K('SPEND','$0.42',AM),K('CAP','$5.00',CY)],
+    [C('GLM 5.2','primary route · 8 requests','HEALTHY',TE,62,['TOKENS','31.0k'],['SPEND','$0.24']),
+     C('DEEPSEEK V4 PRO','review + reasoning · 2 requests','HEALTHY',TE,18,['TOKENS','9.4k'],['SPEND','$0.11']),
+     C('LLAMA 4 MAVERICK','browsing summaries · 1 request','HEALTHY',TE,9,['TOKENS','4.8k'],['SPEND','$0.05']),
+     C('MISTRAL SMALL 4','vault notes · 1 request','HEALTHY',TE,6,['TOKENS','3.0k'],['SPEND','$0.02'])]],
+  DEVICES:['DEVICES','Audio, compute, and peripherals Jarvis is allowed to use',
+    [K('AUDIO IN','ARMED',TE),K('AUDIO OUT','READY',TE),K('GPU','ONLINE',TE),K('BLUETOOTH','2 PAIRED',CY)],
+    [C('STEELSERIES SONAR MIC','system default · -18 dBFS · noise floor clean','ARMED',TE,0,['SAMPLE','48 kHz'],['LATENCY','12 ms']),
+     C('SYSTEM SPEAKERS','en-GB voice profile · 168 wpm','READY',TE,0,['CHANNELS','2'],['LATENCY','18 ms']),
+     C('LOCAL GPU','inference offload for embeddings','ONLINE',TE,30,['VRAM','30%'],['TEMP','54°C']),
+     C('BLUETOOTH HEADSET','paired · not active','IDLE',DIM,0,['CODEC','aptX'],['BATTERY','72%'])]],
+  SETTINGS:['SETTINGS','Autonomy, routing, privacy, and interface behaviour',
+    [K('AUTONOMY','L2 ASSISTED',AM),K('ROUTER','AUTO',TE),K('DATA','LOCAL ONLY',TE),K('MOTION','FULL',CY)],
+    [C('AUTONOMY LEVEL','L1 ask · L2 assisted · L3 trusted workspace · L4 autopilot','L2',AM,50,['GATES','deploy, migrate'],['SCOPE','workspace']),
+     C('MODEL ROUTING','auto route with verified fallbacks','AUTO',TE,0,['PRIMARY','glm-5.2'],['FALLBACKS','3']),
+     C('PRIVACY','no telemetry · transcripts stay on disk','LOCAL',TE,0,['RETENTION','90 days'],['EXPORT','manual']),
+     C('INTERFACE','reduced motion, accent, and tick rate are tweakable','DEMO DATA',AM,0,['THEME','dark'],['SCALE','1920'])]]
+};
+
+const PANELS = {
+  DASHBOARD:['COMMAND TRANSCRIPT',[
+    ['00:41:12','AHMED','voice · en-GB · 0.9s capture',CY,'Jarvis, review the checkout pull request and prepare a deploy plan.'],
+    ['00:41:16','JARVIS','z-ai/glm-5.2 · 4.2s · 3,180 tok · $0.021',TE,'Reviewed PR #4821 — 14 files, 3 packages. Two blocking issues: the payment retry loop has no jitter, and the idempotency key is derived from cart id alone. Fixes staged; nothing applied until you approve.'],
+    ['00:42:03','AHMED','typed',CY,'Hold the deploy. Open the fixes as a draft PR and brief me on the risk.'],
+    ['00:42:05','JARVIS','glm-5.2 · 1.8s · 940 tok · $0.006',TE,'Draft PR open on fix/checkout-retry-jitter. Jitter change is low risk; the key change is medium — a dry-run backfill migration is attached. Deploy stays blocked.']
+  ],['COPY','SPEAK','TRACE','EXPAND']],
+  CHAT:['CHAT · MULTI-MODEL',[
+    ['00:38:02','AHMED','typed',CY,'Compare idempotency-key strategies for retried payments.'],
+    ['00:38:09','COUNCIL','3 models · consensus 2/3',BL,'GLM 5.2 and DeepSeek both recommend hashing cart id with payment intent and attempt; Mistral prefers a server-issued key. Divergence logged to the vault.']
+  ],['NEW THREAD','COUNCIL MODE','PIN']],
+  VOICE:['VOICE CHANNEL',[
+    ['00:41:02','CAPTURE','wake word · confidence 0.94',CY,'"Jarvis" detected on SteelSeries Sonar input. Channel opened for 6.0s.'],
+    ['00:41:09','SPEECH','en-GB · 168 wpm',TE,'Narration finished · 2 sentences · barge-in enabled.']
+  ],['PUSH TO TALK','FREE TALKING','CLAP WAKE']],
+  SWARM:['AGENT SWARM',[
+    ['00:40:44','ORCHESTRATOR','glm-5.2 · 4 subtasks',TE,'Phase 3 decomposed: patch, test, review, document. Two agents active, four idle.'],
+    ['00:41:20','DEVELOPER','deepseek-v4-pro · 63%',CY,'Patching payment retry backoff in checkout-svc.'],
+    ['00:41:31','TESTER','glm-5.2 · 148/210 passed',AM,'Integration suite running · 3 flaky cases quarantined.']
+  ],['PAUSE ALL','ADD AGENT','AUTONOMY 2']],
+  FILES:['WORKSPACE FILES',[
+    ['00:39:10','WATCHER','master · dirty',AM,'6 changed files in checkout-svc · 2 untracked under /migrations.'],
+    ['00:39:12','INDEX','1,204 files',CY,'Semantic index refreshed in 810ms.']
+  ],['OPEN','DIFF','INDEX']],
+  NOTES:['VAULT NOTES',[
+    ['00:36:00','CURATOR','62 vault notes',TE,'Wrote decision record ADR-0043 — retry jitter and idempotency keys.'],
+    ['00:36:04','LINKER','8 backlinks',CY,'Linked ADR-0043 to payments, reliability, and postmortem 2026-06.']
+  ],['NEW NOTE','SEARCH','GRAPH']],
+  BROWSER:['BROWSER OPERATOR',[
+    ['00:34:41','OPERATOR','3 tabs · sandboxed',AM,'Reading provider retry documentation · extraction awaiting your review before use.']
+  ],['OPEN TAB','SNAPSHOT','CLOSE ALL']],
+  CODE:['CODE EXECUTOR',[
+    ['00:33:12','SANDBOX','node 22 · 1.2s',TE,'Ran retry simulation over 10k requests: peak concurrency dropped from 812 to 96 with jitter applied.'],
+    ['00:33:20','LINTER','0 errors · 3 warnings',AM,'Warnings are all unused imports in the test harness.']
+  ],['RUN','DIFF','REVERT']],
+  BRAIN:['BRAIN GRAPH',[
+    ['00:30:02','GRAPH','3,475 nodes · 8,504 edges',CY,'Cluster "payments-reliability" grew by 14 nodes after this session.']
+  ],['REBUILD','PRUNE','EXPORT']],
+  TASKS:['TASK QUEUE',[
+    ['00:29:44','QUEUE','6 tasks · 0 active',TE,'Deploy step blocked pending approval. Five tasks queued behind it.'],
+    ['00:29:50','SCHEDULER','120 min budget',AM,'Mission window unavailable until the deploy gate clears.']
+  ],['APPROVE','REORDER','CANCEL']],
+  TOOLS:['TOOL REGISTRY',[
+    ['00:28:01','REGISTRY','18 tools · 4 gated',CY,'Filesystem write, shell, deploy, and payments API require explicit approval.']
+  ],['GRANT','REVOKE','AUDIT']],
+  SETTINGS:['SYSTEM SETTINGS',[
+    ['00:27:00','CONFIG','demo dataset',AM,'All figures on this screen are demonstration data, not a live machine.'],
+    ['00:27:04','SAFETY','autonomy level 2',TE,'Jarvis may plan and draft freely; execution outside the workspace needs approval.']
+  ],['AUTONOMY','KEYS','RESET']]
+};
+
+const VIZ = {
+  CHAT:['chart','THREAD VOLUME · 24H','tokens per hour across the council',[['TOKENS','#35D6FF'],['PROJECTED','#4C8CFF']]],
+  MISSIONS:['topology','MISSION MESH','orchestrator to specialist routing · packets are live handoffs',[['ORCHESTRATOR','#00E5C4'],['ACTIVE','#35D6FF'],['IDLE','#5C7C8C']]],
+  AGENTS:['topology','AGENT MESH','drag the pointer to orbit · packets show task handoffs',[['ORCHESTRATOR','#00E5C4'],['ACTIVE','#35D6FF'],['IDLE','#5C7C8C']]],
+  PROJECTS:['topology','WORKSPACE ISOLATION MAP','each spoke is a boundary an agent cannot cross unasked',[['GRANTED','#35D6FF'],['SEALED','#5C7C8C']]],
+  FILES:['chart','INDEX ACTIVITY · 24H','file reads and writes per hour',[['OPERATIONS','#35D6FF']]],
+  NOTES:['brain','VAULT LINK FIELD','notes clustered by domain · orbit with the pointer',[['DECISIONS','#00E5C4'],['DOCUMENTS','#35D6FF'],['CLAIMS','#FFB43C']]],
+  BROWSER:['chart','EXTRACTION VOLUME · 24H','quarantined content awaiting your review',[['EXTRACTED','#35D6FF']]],
+  CODE:['chart','RUN LATENCY · 24H','sandbox execution time per run',[['LATENCY','#35D6FF'],['BASELINE','#4C8CFF']]],
+  BRAIN:['brain','GRAPHIFY KNOWLEDGE FIELD','3,475 nodes · 8,504 edges · orbit with the pointer',[['PAYMENTS','#35D6FF'],['CODE','#00E5C4'],['OPS','#4C8CFF'],['UNVERIFIED','#FFB43C']]],
+  TASKS:['chart','QUEUE DEPTH · 24H','durable tasks waiting on gates',[['DEPTH','#35D6FF']]],
+  TOOLS:['topology','CAPABILITY GRAPH','every gated tool routes through the policy hub',[['GRANTED','#35D6FF'],['GATED','#FFB43C']]],
+  AUTOMATIONS:['chart','TRIGGER RUNS · 24H','scheduled and event-driven wakes',[['RUNS','#35D6FF']]],
+  GIT:['chart','COMMIT FLOW · 24H','commits and pushes per hour',[['COMMITS','#35D6FF']]],
+  SECURITY:['topology','TRUST BOUNDARY MAP','policy hub with every capability edge it guards',[['ENFORCED','#00E5C4'],['ALERT','#FFB43C']]],
+  USAGE:['chart','TOKEN + SPEND · 24H','front plane is today, back plane is the 7-day mean',[['TODAY','#35D6FF'],['7-DAY MEAN','#4C8CFF']]],
+  DEVICES:['chart','INPUT LEVEL · LAST HOUR','capture level from the armed microphone',[['dBFS','#35D6FF']]]
+};
+
+class Component extends DCLogic {
+  state = {
+    tab:'DASHBOARD', st:'listening', cyc:0, t:0, held:false, auto:true, mic:false,
+    model:'z-ai/glm-5.2', draft:'', extra:[], submitting:false, toast:'Deploy gate is blocking mission MERIDIAN — approval required', toastOn:true,
+    voice:{connected:false,ready:false,armed:false,capturing:false,transcribing:false,processing:false,speaking:false,handsFree:false,clapWake:false,level:0,inputDevice:'Browser microphone',inputDeviceId:'',inputDevices:[],profile:'JARVIS · BRITISH',lastUser:'',lastJarvis:'',error:''}
+  };
+
+  advance(){
+    if (this.state.live) { this.setState(s=>({t:s.t+1})); return; }
+    this.setState(s=>{
+      const t = s.t+1;
+      if (s.held) return {t, st:'paused'};
+      if (t % 6 === 0){ const cyc = (s.cyc+1)%CYCLE.length; return {t, cyc, st:CYCLE[cyc]}; }
+      return {t, st: s.st === 'paused' ? CYCLE[s.cyc] : s.st};
+    });
+  }
+
+  frameTick(){
+    const now = performance.now();
+    if (now - (this.last || 0) < 30) return;
+    this.last = now;
+    this.startLoop();
+    const t = now/1000;
+    if (!this.cv || !this.cv.isConnected) this.cv = document.querySelector('canvas') || this.cv;
+    if (this.cv && this.cv.isConnected){
+      try { if (this.vizMode && this.vizMode !== 'reactor') this.drawViz(t); else this.draw(t); }
+      catch(err){ window.__jvErr = (err && err.message) + ' @ ' + ((err && err.stack) || '').split('\n')[1]; }
+    }
+    const ms = Math.max(120, this.props.tickMs ?? 900);
+    if (now - (this.stateLast || 0) >= ms){ this.stateLast = now; this.advance(); }
+  }
+
+  installClock(){
+    window.__jvCB = ()=> this.frameTick();
+  }
+
+  connectBackend(){
+    const A = window.JarvisAdapter;
+    if (!A) return;
+    if (this.store) this.store.dispose();
+    this.store = A.connect({
+      baseUrl: this.props.forceDemo === true ? '' : ((this.props.apiBase ?? '') || window.location.origin),
+      pollMs: this.props.pollMs ?? 2000,
+      onChange: (snap, meta)=> this.setState(s=>({
+        live:snap, meta:meta,
+        auto:snap && snap.router ? snap.router.auto : s.auto,
+        model:snap && snap.router && snap.router.primary ? snap.router.primary : s.model,
+        mic:snap && snap.voice ? snap.voice.armed : s.mic,
+        held:snap && snap.agent ? snap.agent.held : s.held
+      }))
+    });
+  }
+
+  componentDidMount(){
+    this.installClock();
+    this.fitShell();
+    this.fitListener = ()=> this.fitShell();
+    window.addEventListener('resize', this.fitListener);
+    this.connectBackend();
+    /* Integration test hook: window.jarvisPush(rawSnapshot) renders a payload
+       without a running backend. Returns the adapter's validation problems. */
+    window.jarvisPush = (raw)=>{
+      const A = window.JarvisAdapter; if (!A) return ['adapter not loaded'];
+      const res = A.normalize(raw);
+      this.setState({live:res.data, meta:{transport:'injected', problems:res.problems}});
+      return res.problems;
+    };
+    window.jarvisDemo = ()=> this.setState({live:null, meta:{error:'demo mode restored'}});
+    this.startLoop();
+    this.toastT = setTimeout(()=> this.setState({toastOn:false}), 4200);
+    this.tilt = (ev)=>{
+      if (this.props.reduceMotion === true || this.tiltQ) return;
+      this.tiltQ = requestAnimationFrame(()=>{
+        this.tiltQ = 0;
+        const el = this.stage; if (!el) return;
+        const r = el.getBoundingClientRect();
+        const x = ((ev.clientX - r.left)/r.width - 0.5)*2, y = ((ev.clientY - r.top)/r.height - 0.5)*2;
+        el.style.transform = 'rotateX('+(-y*1.6).toFixed(2)+'deg) rotateY('+(x*2.2).toFixed(2)+'deg) translateZ(-10px)';
+      });
+    };
+    this.untilt = ()=>{ if (this.stage) this.stage.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(0)'; };
+    window.addEventListener('mousemove', this.tilt);
+    window.addEventListener('mouseleave', this.untilt);
+    this.voiceMessage = (event)=>{
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || data.type !== 'jarvis-voice-state' || !data.value || typeof data.value !== 'object') return;
+      this.setState(s=>({voice:{...s.voice,...data.value,connected:true}, mic:typeof data.value.armed==='boolean'?data.value.armed:s.mic}));
+    };
+    window.addEventListener('message', this.voiceMessage);
+    this.voiceControl('state');
+  }
+  componentWillUnmount(){ if (this.store) this.store.dispose(); clearInterval(this.bootT); window.removeEventListener('mousemove', this.tilt); window.removeEventListener('mouseleave', this.untilt); if(this.fitListener) window.removeEventListener('resize', this.fitListener); if(this.voiceMessage) window.removeEventListener('message', this.voiceMessage); clearInterval(this.timer); clearInterval(this.raf); clearTimeout(this.streamT); clearTimeout(this.toastT); }
+
+  shellRef = (el)=>{ this.shell = el; if (el) requestAnimationFrame(()=>this.fitShell()); };
+  fitShell(){
+    if (!this.shell) return;
+    const w = Math.max(1, document.documentElement.clientWidth || window.innerWidth || 1920);
+    const h = Math.max(1, document.documentElement.clientHeight || window.innerHeight || 1080);
+    const scale = Math.min(w/1920, h/1080);
+    this.shell.style.transform = 'scale('+scale+')';
+    this.shell.style.left = Math.max(0,(w-1920*scale)/2)+'px';
+    this.shell.style.top = Math.max(0,(h-1080*scale)/2)+'px';
+  }
+
+  accent(){ return this.props.accent ?? CY; }
+  cur(){
+    const V = this.state.voice || {};
+    if (V.capturing) return STATES.listening;
+    if (V.transcribing || V.processing) return STATES.thinking;
+    if (V.speaking) return STATES.speaking;
+    const L = this.state.live;
+    if (L) return STATES[L.agent.held ? 'paused' : L.agent.state] || STATES.idle;
+    return STATES[this.state.held ? 'paused' : this.state.st] || STATES.ready;
+  }
+  rnd(seed){ const x = Math.sin(seed*12.9898 + this.state.t*0.61)*43758.5453; return x - Math.floor(x); }
+
+  /* ---------- reactor core ---------- */
+  cref = (el)=>{
+    if (el) { this.cv = el; this.startLoop(); }
+    else if (this.cv && !this.cv.isConnected) this.cv = null;
+  };
+
+  vizRef = (el)=> this.cref(el);
+  onViz = (ev)=>{
+    const r = ev.currentTarget.getBoundingClientRect();
+    this.vx = ((ev.clientX - r.left)/r.width - 0.5)*2;
+    this.vy = ((ev.clientY - r.top)/r.height - 0.5)*2;
+  };
+
+  vizData(){
+    if (this._viz) return this._viz;
+    const rnd = (s)=>{ const x = Math.sin(s*127.1)*43758.5453; return x - Math.floor(x); };
+    const nodes = Array.from({length:96},(_,i)=>{
+      const cl = i % 6;
+      const ca = cl/6*Math.PI*2, cd = 0.55 + rnd(i*3)*0.45;
+      const th = rnd(i+1)*Math.PI*2, ph = Math.acos(2*rnd(i+9)-1);
+      return {
+        x: Math.cos(ca)*cd*0.62 + Math.sin(ph)*Math.cos(th)*0.34,
+        y: Math.sin(ca)*cd*0.42 + Math.sin(ph)*Math.sin(th)*0.3,
+        z: Math.cos(ph)*0.5 + (cl-2.5)*0.1,
+        cl, s: 1 + rnd(i+21)*2.4
+      };
+    });
+    const edges = [];
+    nodes.forEach((n,i)=> nodes.forEach((m,j)=>{
+      if (j <= i) return;
+      const d = Math.hypot(n.x-m.x, n.y-m.y, n.z-m.z);
+      if (d < 0.26 && edges.length < 240) edges.push([i,j,d]);
+    }));
+    const series = Array.from({length:56},(_,i)=> 0.22 + 0.5*rnd(i+41) + 0.3*Math.sin(i/7));
+    const agents = ['ORCHESTRATOR','DEVELOPER','REVIEWER','RESEARCHER','BROWSER','TESTER','CURATOR','PLANNER','DESIGNER','FILE OP'];
+    this._viz = {nodes, edges, series, agents};
+    return this._viz;
+  }
+
+  /* Map a live Viz payload onto the renderer's internal shape. */
+  fromLive(v){
+    if (v.kind === 'graph'){
+      const nodes = v.nodes.map(n=>({x:n.x, y:n.y, z:n.z, cl:(n.cluster||0)%6, s:0.8 + (n.size||1)*1.2}));
+      const edges = v.edges.map(e=>{
+        const a = nodes[e[0]], b = nodes[e[1]];
+        return (a && b) ? [e[0], e[1], Math.hypot(a.x-b.x, a.y-b.y, a.z-b.z)] : null;
+      }).filter(Boolean);
+      return {nodes, edges, series:[], agents:[]};
+    }
+    if (v.kind === 'topology'){
+      return {nodes:[], edges:[], series:[], agents:v.spokes.map(s=>s.label.toUpperCase()), spokes:v.spokes, hub:v.hub};
+    }
+    const max = Math.max(1, ...v.points.map(p=>p.v));
+    return {nodes:[], edges:[], agents:[], series:v.points.map(p=>p.v/max), axis:v.axis};
+  }
+
+  drawViz(time){
+    const cv = this.cv; if (!cv) return;
+    const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    const col = this.accent(), glow = this.props.coreGlow ?? 1;
+    const still = this.props.reduceMotion === true;
+    const vx = this.vx || 0, vy = this.vy || 0;
+    const lv = this.liveViz();
+    const d = lv ? this.fromLive(lv) : this.vizData();
+    ctx.clearRect(0,0,W,H);
+
+    // shared backdrop grid
+    ctx.save();
+    ctx.strokeStyle = this.hex(col, 0.06); ctx.lineWidth = 1;
+    for (let x=0;x<W;x+=56){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y=0;y<H;y+=56){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.restore();
+
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const mode = this.vizMode || 'chart';
+    const rot = (still ? 0 : time*0.16) + vx*0.9, tilt = 0.42 + vy*0.35;
+    const proj = (p)=>{
+      const cr = Math.cos(rot), sr = Math.sin(rot);
+      let x = p.x*cr - p.z*sr, z = p.x*sr + p.z*cr, y = p.y;
+      const ct = Math.cos(tilt), stl = Math.sin(tilt);
+      const y2 = y*ct - z*stl, z2 = y*stl + z*ct;
+      const f = 2.2/(2.2 + z2);
+      return {x: W/2 + x*W*0.42*f, y: H/2 + y2*H*0.55*f, f, z:z2};
+    };
+
+    if (mode === 'brain' || mode === 'topology'){
+      const pal = [col, TE, BL, AM, col, TE];
+      if (mode === 'brain'){
+        const pts = d.nodes.map(proj);
+        d.edges.forEach(([i,j,dist])=>{
+          const a = pts[i], b = pts[j];
+          const al = (0.3 - dist)*1.6 * Math.min(a.f,b.f) * 0.7;
+          const pulse = 0.6 + 0.4*Math.sin(time*2 + i*0.4);
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+          ctx.lineWidth = 1; ctx.strokeStyle = this.hex(col, Math.max(0, al*pulse));
+          ctx.stroke();
+        });
+        pts.map((p,i)=>({p,i})).sort((a,b)=>b.p.z-a.p.z).forEach(({p,i})=>{
+          const n = d.nodes[i], c = pal[n.cl];
+          const r = n.s*p.f*1.5;
+          ctx.beginPath(); ctx.arc(p.x,p.y,r*3.4,0,Math.PI*2);
+          ctx.fillStyle = this.hex(c, 0.07*glow*p.f); ctx.fill();
+          ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+          ctx.fillStyle = this.hex(c, 0.5 + 0.4*p.f); ctx.fill();
+        });
+      } else {
+        const hub = proj({x:0,y:0,z:0});
+        d.agents.forEach((name,i)=>{
+          const a = i/d.agents.length*Math.PI*2;
+          const ring = 0.55 + (i%3)*0.16;
+          const p = proj({x:Math.cos(a)*ring, y:Math.sin(a)*ring*0.55, z:Math.sin(a*2)*0.22});
+          const sp = d.spokes ? d.spokes[i] : null;
+          const live = sp ? ['active','running','executing','healthy','coding','review','testing'].indexOf(String(sp.state).toLowerCase()) >= 0 : i < 6;
+          const c = live ? (i===0 ? TE : col) : DIM;
+          ctx.beginPath(); ctx.moveTo(hub.x,hub.y); ctx.lineTo(p.x,p.y);
+          ctx.lineWidth = live ? 1.4 : 1; ctx.strokeStyle = this.hex(c, live?0.3:0.12); ctx.stroke();
+          if (live && !still){
+            const k = ((time*0.55 + i*0.17) % 1);
+            const px = hub.x + (p.x-hub.x)*k, py = hub.y + (p.y-hub.y)*k;
+            ctx.beginPath(); ctx.arc(px,py,2.6,0,Math.PI*2);
+            ctx.fillStyle = this.hex('#EAFDFF',0.9); ctx.fill();
+          }
+          ctx.beginPath(); ctx.arc(p.x,p.y,7*p.f*3,0,Math.PI*2);
+          ctx.fillStyle = this.hex(c,0.06*glow); ctx.fill();
+          ctx.beginPath(); ctx.arc(p.x,p.y,5.5*p.f,0,Math.PI*2);
+          ctx.fillStyle = this.hex(c,0.85); ctx.fill();
+          ctx.font = '600 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+          ctx.fillStyle = this.hex(live?'#DCE8F2':'#7E97A6', 0.75);
+          ctx.fillText(name, p.x, p.y - 14*p.f);
+        });
+        ctx.beginPath(); ctx.arc(hub.x,hub.y,34,0,Math.PI*2);
+        ctx.fillStyle = this.hex(col,0.08*glow); ctx.fill();
+        ctx.beginPath(); ctx.arc(hub.x,hub.y,11 + Math.sin(time*3)*1.6,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(hub.x,hub.y,26,-Math.PI/2,-Math.PI/2 + Math.PI*2*((time*0.25)%1));
+        ctx.lineWidth = 2.5; ctx.strokeStyle = this.hex(TE,0.8); ctx.stroke();
+      }
+    } else {
+      // 3D extruded area chart
+      const pad = 46, w = W - pad*2, h = H - pad*2;
+      const pts = d.series.map((v,i)=>({
+        x: pad + i/(d.series.length-1)*w,
+        y: pad + h - Math.min(1, v*(0.8 + 0.2*Math.sin(time*0.6 + i*0.3)))*h*0.86
+      }));
+      const dx = -18 - vx*10, dy = 16 + vy*8;
+      // back plane
+      ctx.beginPath(); ctx.moveTo(pts[0].x+dx, pts[0].y+dy);
+      pts.forEach(p=> ctx.lineTo(p.x+dx, p.y+dy));
+      ctx.lineTo(pts[pts.length-1].x+dx, pad+h+dy); ctx.lineTo(pts[0].x+dx, pad+h+dy); ctx.closePath();
+      ctx.fillStyle = this.hex(BL, 0.07); ctx.fill();
+      ctx.strokeStyle = this.hex(BL, 0.3); ctx.lineWidth = 1.4; ctx.stroke();
+      // front fill
+      const g = ctx.createLinearGradient(0,pad,0,pad+h);
+      g.addColorStop(0, this.hex(col,0.34)); g.addColorStop(1, this.hex(col,0.02));
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+      pts.forEach(p=> ctx.lineTo(p.x,p.y));
+      ctx.lineTo(pts[pts.length-1].x, pad+h); ctx.lineTo(pts[0].x, pad+h); ctx.closePath();
+      ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); pts.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+      ctx.lineWidth = 2.4; ctx.strokeStyle = this.hex('#EAFDFF',0.85); ctx.stroke();
+      // playhead
+      const k = (time*0.12)%1, px = pad + k*w;
+      const pi = Math.min(pts.length-1, Math.round(k*(pts.length-1)));
+      ctx.beginPath(); ctx.moveTo(px,pad); ctx.lineTo(px,pad+h);
+      ctx.lineWidth = 1; ctx.strokeStyle = this.hex(TE,0.5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, pts[pi].y, 5,0,Math.PI*2);
+      ctx.fillStyle = this.hex(TE,0.95); ctx.fill();
+      ctx.beginPath(); ctx.arc(px, pts[pi].y, 16,0,Math.PI*2);
+      ctx.fillStyle = this.hex(TE,0.1*glow); ctx.fill();
+      // axis ticks
+      ctx.font = '500 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = this.hex('#5C7C8C',0.9);
+      (d.axis && d.axis.length === 5 ? d.axis : ['00:00','06:00','12:00','18:00','24:00'])
+        .forEach((lb,i)=> ctx.fillText(lb, pad + i/4*w, pad+h+22));
+    }
+    ctx.restore();
+  }
+
+  startLoop(){
+    if (this.inited) return;
+    this.inited = true;
+    this.e = 0.3; this.mx = 0; this.my = 0; this.surge = 0; this.spin = 0;
+    this.bars = new Array(96).fill(0.2);
+    this.parts = Array.from({length:70}, ()=>({
+      a: Math.random()*Math.PI*2, r: 120 + Math.random()*420, sp: (0.06 + Math.random()*0.5)*(Math.random()<0.25?-1:1),
+      z: 0.4 + Math.random()*1.6, tw: Math.random()*Math.PI*2, drift: (Math.random()-0.5)*18
+    }));
+    this.arcs = [];
+  }
+
+  hex(h, a){
+    const n = parseInt(h.slice(1),16);
+    return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';
+  }
+
+  draw(time){
+    const cv = this.cv; if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const still = this.props.reduceMotion === true;
+    const glow = this.props.coreGlow ?? 1;
+    const col = this.accent();
+    const st = this.cur();
+
+    this.e += (st.e - this.e) * 0.05;
+    this.surge *= 0.94;
+    const E = Math.min(1.6, this.e + this.surge);
+    if (!still) this.spin += 0.0026 + E*0.004;
+    const spin = this.spin;
+
+    const cx = W/2 + this.mx*46, cy = H/2 + this.my*34;
+    const R = Math.min(W,H) * 0.42;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // volumetric halo
+    const halo = ctx.createRadialGradient(cx,cy,0,cx,cy,R*1.5);
+    halo.addColorStop(0, this.hex(col, 0.26*glow*E));
+    halo.addColorStop(0.32, this.hex(col, 0.09*glow));
+    halo.addColorStop(0.7, 'rgba(20,60,90,0.04)');
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0,0,W,H);
+
+    // deep field grid rings
+    ctx.lineWidth = 1;
+    for (let i=0;i<7;i++){
+      const r = R*(0.5 + i*0.13);
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle = this.hex(col, 0.05 + 0.02*Math.sin(time*0.7 + i));
+      ctx.stroke();
+    }
+
+    // rotating structural rings
+    const rings = [
+      {r:0.98, w:2.5, seg:[0.62,0.06], sp:-0.34, a:0.55, c:col},
+      {r:0.90, w:1.2, seg:[0.02,0.03], sp:0.5, a:0.4, c:col},
+      {r:0.80, w:7, seg:[0.2,0.14], sp:0.22, a:0.14, c:col},
+      {r:0.70, w:2, seg:[0.4,0.22], sp:-0.6, a:0.5, c:TE},
+      {r:0.60, w:1.2, seg:[0.05,0.05], sp:0.9, a:0.34, c:AM},
+      {r:0.50, w:4, seg:[0.9,0.35], sp:-0.28, a:0.3, c:col},
+      {r:0.40, w:1.6, seg:[0.28,0.1], sp:1.15, a:0.45, c:col}
+    ];
+    rings.forEach((g,i)=>{
+      const r = R*g.r;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*g.sp*4 + i);
+      ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+      ctx.setLineDash([r*g.seg[0], r*g.seg[1]]);
+      ctx.lineWidth = g.w; ctx.strokeStyle = this.hex(g.c, g.a*(0.55+0.45*E));
+      ctx.shadowBlur = 22*glow; ctx.shadowColor = this.hex(g.c, 0.8);
+      ctx.stroke(); ctx.restore();
+    });
+    ctx.setLineDash([]);
+
+    // tick ring
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(-spin*1.4);
+    for (let i=0;i<144;i++){
+      const a = i/144*Math.PI*2, big = i%12===0, mid = i%4===0;
+      const r0 = R*0.925, len = big ? R*0.06 : mid ? R*0.035 : R*0.018;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*(r0+len), Math.sin(a)*(r0+len));
+      ctx.lineWidth = big ? 2.4 : 1;
+      ctx.strokeStyle = this.hex(col, big ? 0.6 : 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // glyph ring
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*0.8);
+    ctx.font = '600 17px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const glyphs = 'JARVIS·0x4F·SYS·ARC·PWR·NODE·SEC·0x9C·LINK·CORE·';
+    for (let i=0;i<glyphs.length;i++){
+      const a = i/glyphs.length*Math.PI*2;
+      ctx.save(); ctx.rotate(a); ctx.translate(0,-R*0.845); ctx.rotate(Math.PI/2);
+      ctx.fillStyle = this.hex(col, 0.28 + 0.3*Math.abs(Math.sin(time*1.2 + i*0.4)));
+      ctx.fillText(glyphs[i],0,0); ctx.restore();
+    }
+    ctx.restore();
+
+    // radar sweep
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(time*(still?0:0.9));
+    for (let i=0;i<44;i++){
+      const a0 = -i*0.021, a1 = a0-0.022;
+      ctx.beginPath(); ctx.arc(0,0,R*0.995,a1,a0);
+      ctx.lineWidth = R*0.13; ctx.strokeStyle = this.hex(col, 0.05*(1-i/44));
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // radial spectrum bars
+    const live = ['listening','speaking','executing'].includes(this.state.st) && !this.state.held;
+    for (let i=0;i<this.bars.length;i++){
+      const target = live ? (0.25 + 0.75*Math.abs(Math.sin(i*0.7 + time*3.1 + Math.sin(i)*2))*Math.random()) * E : 0.08 + 0.06*Math.random();
+      this.bars[i] += (target - this.bars[i]) * 0.18;
+    }
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(spin*0.35);
+    this.bars.forEach((v,i)=>{
+      const a = i/this.bars.length*Math.PI*2;
+      const r0 = R*0.44, r1 = r0 + R*0.19*v;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*r1, Math.sin(a)*r1);
+      ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.strokeStyle = this.hex(i%9===0 ? TE : col, (0.08 + 0.14*v)*glow);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r0, Math.sin(a)*r0);
+      ctx.lineTo(Math.cos(a)*r1, Math.sin(a)*r1);
+      ctx.lineWidth = 3; ctx.strokeStyle = this.hex(i%9===0 ? TE : col, 0.4 + 0.5*v);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // orbiting particles
+    if (this.props.particles !== false){
+      this.parts.forEach((p,i)=>{
+        if (!still) p.a += p.sp * 0.004 * (0.4 + E);
+        const r = p.r*0.62 + Math.sin(time*0.6 + i)*p.drift;
+        const x = cx + Math.cos(p.a)*r, y = cy + Math.sin(p.a)*r*0.94;
+        const tw = 0.3 + 0.7*Math.abs(Math.sin(time*2 + p.tw));
+        ctx.beginPath(); ctx.arc(x,y,p.z*4.5,0,Math.PI*2);
+        ctx.fillStyle = this.hex(i%11===0 ? TE : col, 0.09*tw*glow); ctx.fill();
+        ctx.beginPath(); ctx.arc(x,y,p.z*1.5,0,Math.PI*2);
+        ctx.fillStyle = this.hex(i%11===0 ? TE : col, 0.75*tw); ctx.fill();
+      });
+    }
+
+    // energy filaments
+    if (!still && Math.random() < 0.09 + E*0.1){
+      this.arcs.push({a: Math.random()*Math.PI*2, life:1, seed: Math.random()*99});
+      if (this.arcs.length > 8) this.arcs.shift();
+    }
+    this.arcs.forEach(arc=>{
+      arc.life -= 0.05;
+      if (arc.life <= 0) return;
+      ctx.beginPath();
+      const steps = 9;
+      for (let i=0;i<=steps;i++){
+        const t = i/steps;
+        const rr = R*(0.22 + t*0.72);
+        const jit = (Math.sin(arc.seed + i*2.7 + time*8) * 0.09) * (1-Math.abs(0.5-t)*1.2);
+        const a = arc.a + jit;
+        const x = cx + Math.cos(a)*rr, y = cy + Math.sin(a)*rr;
+        i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+      }
+      ctx.lineWidth = 1.6; ctx.strokeStyle = this.hex('#EAFDFF', 0.55*arc.life);
+      ctx.shadowBlur = 26*glow; ctx.shadowColor = this.hex(col,1);
+      ctx.stroke();
+    });
+    this.arcs = this.arcs.filter(a=>a.life>0);
+
+    // reactor emblem — three arms
+    const armOuter = R*0.36, armInner = R*0.19;
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.sin(time*0.4)*0.06);
+    for (let k=0;k<3;k++){
+      const base = k*(Math.PI*2/3) - Math.PI/2;
+      const half = 0.46;
+      const g = ctx.createLinearGradient(0,-armOuter,0,armOuter);
+      g.addColorStop(0, this.hex('#EAFDFF', 0.95));
+      g.addColorStop(1, this.hex(col, 0.75));
+      ctx.beginPath();
+      ctx.arc(0,0,armOuter, base-half, base+half);
+      ctx.arc(0,0,armInner, base+half, base-half, true);
+      ctx.closePath();
+      ctx.fillStyle = g; ctx.shadowBlur = 40*glow; ctx.shadowColor = this.hex(col,1);
+      ctx.fill();
+      ctx.lineWidth = 1.4; ctx.strokeStyle = this.hex('#FFFFFF',0.55); ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0,0,armOuter*1.16, base-half*0.7, base+half*0.7);
+      ctx.lineWidth = 4; ctx.strokeStyle = this.hex(col, 0.5+0.4*E); ctx.stroke();
+    }
+    // inner triangle frame
+    ctx.beginPath();
+    for (let k=0;k<3;k++){
+      const a = k*(Math.PI*2/3) - Math.PI/2 + Math.PI/3;
+      const x = Math.cos(a)*armOuter*0.98, y = Math.sin(a)*armOuter*0.98;
+      k ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.closePath(); ctx.lineWidth = 2; ctx.strokeStyle = this.hex(col, 0.45); ctx.stroke();
+    ctx.restore();
+
+    // core singularity
+    const pulse = 1 + 0.09*Math.sin(time*3.4) + this.surge*0.4;
+    const cr = R*0.115*pulse;
+    const core = ctx.createRadialGradient(cx,cy,0,cx,cy,cr*3.2);
+    core.addColorStop(0,'rgba(255,255,255,1)');
+    core.addColorStop(0.22, this.hex('#EAFDFF',0.95));
+    core.addColorStop(0.5, this.hex(col,0.6));
+    core.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(cx,cy,cr*3.2,0,Math.PI*2); ctx.fillStyle = core; ctx.fill();
+
+    // lens flare cross
+    ctx.save(); ctx.translate(cx,cy);
+    [[1,0],[0,1]].forEach(([dx,dy],i)=>{
+      const len = R*(i? 0.5:0.95)*(0.8+0.3*E);
+      const fg = ctx.createLinearGradient(-dx*len,-dy*len,dx*len,dy*len);
+      fg.addColorStop(0,'rgba(0,0,0,0)'); fg.addColorStop(0.5, this.hex('#EAFDFF',0.4*E)); fg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.moveTo(-dx*len,-dy*len); ctx.lineTo(dx*len,dy*len);
+      ctx.lineWidth = i?2:3; ctx.strokeStyle = fg; ctx.stroke();
+    });
+    ctx.restore();
+
+    // progress arc + state color rim
+    const sc = st.color;
+    ctx.beginPath(); ctx.arc(cx,cy,R*1.03, -Math.PI/2, -Math.PI/2 + Math.PI*2*((time*0.2)%1));
+    ctx.lineWidth = 3; ctx.strokeStyle = this.hex(sc, 0.75);
+    ctx.shadowBlur = 26*glow; ctx.shadowColor = this.hex(sc,1); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  onMove = (ev)=>{
+    const r = ev.currentTarget.getBoundingClientRect();
+    this.mx = ((ev.clientX - r.left)/r.width - 0.5)*2;
+    this.my = ((ev.clientY - r.top)/r.height - 0.5)*2;
+  };
+  onLeave = ()=>{ this.mx = 0; this.my = 0; };
+  pulse = ()=>{ this.surge = Math.min(0.9, (this.surge||0) + 0.55); };
+
+  /* ---------- interaction ---------- */
+  toast(msg){
+    this.setState({toast:msg, toastOn:true});
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(()=> this.setState({toastOn:false}), 3600);
+  }
+  bridge(action, payload){
+    try { window.parent.postMessage({source:'jarvis-design',action:action,payload:payload||{}}, window.location.origin); }
+    catch(err){ this.toast('Interface bridge unavailable'); }
+  }
+  voiceControl(action, payload){
+    try { window.parent.postMessage({type:'jarvis-voice-control',action:action,payload:payload||{}}, window.location.origin); }
+    catch(err){ this.toast('Voice controller unavailable'); }
+  }
+  runCommand(action, payload, localUpdate){
+    if (!this.store || typeof this.store.command !== 'function'){
+      this.toast('Backend connection is not ready');
+      return Promise.resolve({ok:false,message:'Backend connection is not ready'});
+    }
+    return this.store.command(action, payload || {}).then((result)=>{
+      const resolved = result || {ok:false,message:'Command failed'};
+      this.toast(resolved.message || (resolved.ok ? 'Command completed' : 'Command failed'));
+      if (resolved.ok && localUpdate) localUpdate(resolved);
+      return resolved;
+    }).catch((error)=>{
+      const message = error && error.message ? error.message : String(error || 'Command failed');
+      this.toast(message);
+      return {ok:false,message};
+    });
+  }
+  emergencyStop = ()=>{
+    if (!this.store){ this.toast('Backend connection is not ready'); return; }
+    const request = typeof this.store.emergencyStop === 'function'
+      ? this.store.emergencyStop()
+      : this.store.command('emergency_stop',{});
+    Promise.resolve(request).then((result)=>{
+      this.toast((result && result.message) || (result && result.ok ? 'Emergency stop applied' : 'Emergency stop failed'));
+      if (result && result.ok) this.setState({held:true,st:'paused'});
+    }).catch((error)=>this.toast(error && error.message ? error.message : 'Emergency stop failed'));
+  };
+  setVoiceArmed = (armed)=>{
+    this.voiceControl(armed?'arm':'disarm');
+    this.runCommand(armed?'voice_arm':'voice_disarm',{},()=>this.setState({mic:armed}));
+  };
+  togglePushToTalk = ()=>{
+    const active = !!this.pttStartedAt || !!(this.state.voice && this.state.voice.capturing);
+    if (!active){
+      this.pttStartedAt = performance.now();
+      this.voiceControl('ptt-start');
+      this.toast('Listening — press again to send');
+      return;
+    }
+    const ms = Math.max(1, Math.round(performance.now() - (this.pttStartedAt || performance.now())));
+    this.pttStartedAt = 0;
+    this.voiceControl('ptt-stop');
+    this.runCommand('push_to_talk',{ms});
+  };
+  voiceQuick(action){
+    this.voiceControl(action);
+  }
+  go(tab){
+    return ()=>{
+      this.setState({tab});
+      this.runCommand('open_screen',{key:tab});
+    };
+  }
+  panelAction(label, panelTitle, tab){
+    return ()=>{
+      const action = String(label||'').toUpperCase();
+      if (action === 'COPY'){
+        const liveRows = this.state.live && Array.isArray(this.state.live.events) ? this.state.live.events : [];
+        const demoRows = (PANELS[tab]||PANELS.DASHBOARD)[1] || [];
+        const text = liveRows.length
+          ? liveRows.map(e=>[(e.at||'').slice(11,19),e.who,e.text].filter(Boolean).join(' · ')).join('\n')
+          : demoRows.map(r=>[r[0],r[1],r[4]].filter(Boolean).join(' · ')).join('\n');
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(()=>this.toast('Visible activity copied')).catch(()=>this.toast('Clipboard permission was not granted'));
+        } else this.toast('Clipboard is unavailable in this browser');
+        return;
+      }
+      if (action === 'SPEAK'){ this.voiceControl('test-voice'); return; }
+      if (action === 'TRACE' || action === 'AUDIT'){ this.go('SECURITY')(); return; }
+      if (action === 'EXPAND'){ this.go('CHAT')(); return; }
+      if (action === 'PUSH TO TALK'){ this.togglePushToTalk(); return; }
+      if (action === 'FREE TALKING'){ this.voiceQuick('toggle-handsfree'); return; }
+      if (action === 'CLAP WAKE'){ this.voiceQuick('toggle-clap'); return; }
+      if (action === 'PAUSE ALL' || action === 'HOLD ALL AGENTS'){ this.agentHold(); return; }
+      if (action === 'GRAPH'){ this.go('BRAIN')(); return; }
+      if (action === 'KEYS'){ this.bridge('credentials',{}); return; }
+      if (action === 'AUTONOMY' || action.indexOf('AUTONOMY ') === 0){ this.go('SETTINGS')(); return; }
+      if (action === 'NEW THREAD'){
+        this.setState({draft:''});
+        this.toast('Composer cleared · enter the new thread goal below');
+        return;
+      }
+      const needsSelection = ['PIN','OPEN','DIFF','INDEX','NEW NOTE','SEARCH','OPEN TAB','SNAPSHOT','CLOSE ALL','RUN','REVERT','REBUILD','PRUNE','EXPORT','APPROVE','REORDER','CANCEL','GRANT','REVOKE','RESET','ADD AGENT','COUNCIL MODE','FILTER'];
+      if (needsSelection.includes(action)){
+        this.toast(action+' needs a selected live item or parameters · choose a card or enter a goal');
+        return;
+      }
+      this.toast(action+' · '+panelTitle+' · display-only control in the approved layout');
+    };
+  }
+  agentHold = ()=>{
+    const release = !!this.state.held;
+    this.runCommand(release?'release':'hold',{},()=>this.setState({held:!release,st:release?'ready':'paused'}));
+  };
+  runScreenAction(item){
+    const action = item && item.action;
+    const command = action && typeof action.command === 'string' ? action.command.trim() : '';
+    if (!command){
+      this.toast((item && item.name ? item.name : 'Item')+' · status only · no backend action supplied');
+      return;
+    }
+    const payload = action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload)
+      ? {...action.payload} : {};
+    if (!payload.id && action.id) payload.id = action.id;
+    const guarded = command === 'approve' || command === 'reject' || command.indexOf('cancel_') === 0 || command.indexOf('approve_') === 0;
+    const confirmation = typeof action.confirm === 'string' && action.confirm.trim()
+      ? action.confirm.trim()
+      : (guarded ? 'Confirm '+command.replace(/_/g,' ')+' for '+(item.name||payload.id||'this item')+'?' : '');
+    if (confirmation && (typeof window.confirm !== 'function' || !window.confirm(confirmation))){
+      this.toast('Action cancelled · no changes made');
+      return;
+    }
+    if ((command === 'approve' || command === 'reject') && this.store && typeof this.store.approval === 'function'){
+      this.store.approval(payload.id, command, payload.note || '', payload).then((result)=>this.toast(result.message || (result.ok?'Decision recorded':'Decision failed')));
+      return;
+    }
+    this.runCommand(command,payload);
+  }
+  send = ()=>{
+    const d = this.state.draft.trim(); if (!d || this.state.submitting) return;
+    const time = new Date().toTimeString().slice(0,8);
+    this.setState(s=>({draft:'', submitting:true, extra:s.extra.concat([[time,'AHMED','typed',CY,d]])}));
+    this.runCommand('send_message',{text:d},(result)=>{
+      const t2 = new Date().toTimeString().slice(0,8);
+      this.setState(s=>({extra:s.extra.concat([[t2,'JARVIS',result.runId||'accepted',TE,result.message||'Message accepted by the live runtime.']])}));
+    }).finally(()=>this.setState({submitting:false}));
+  };
+
+  renderVals(){
+    const s = this.state, V = s.voice || {}, st = this.cur(), col = this.accent();
+    const stale = !!(s.meta && s.meta.stale);
+    const voiceEnabled = V.connected ? !!V.armed : !!s.mic;
+    const voiceReady = !!(V.connected && V.ready);
+    const now = new Date();
+    const pct = (seed, base, span)=> Math.min(99, Math.round(base + (s.t*3 + seed*13) % span));
+    const cpu = pct(1,14,22), ram = pct(2,58,18), disk = 46, gpu = pct(4,9,26);
+
+    const bars = (n,max,scale)=> Array.from({length:n},(_,i)=>{
+      const center = 1 - Math.abs(i-(n-1)/2)/((n-1)/2);
+      const live = ['listening','speaking','executing'].includes(s.st) && !s.held;
+      const amp = live ? (0.3 + 0.7*this.rnd(i+scale)) : 0.14 + 0.07*this.rnd(i+scale);
+      return {h: Math.round(5 + max*amp*(0.4+0.6*center))+'px', col: i%7===0 ? st.color : this.hex(col,0.55)};
+    });
+    const voiceLevel = Math.max(0,Math.min(1,Number(V.level)||0));
+    const voiceBars = Array.from({length:34},(_,i)=>{
+      const center = 1-Math.abs(i-16.5)/16.5;
+      const active = V.capturing || V.speaking;
+      const amp = active ? Math.max(0.08,voiceLevel)*(0.48+0.52*this.rnd(i+301)) : 0.05;
+      return {h:Math.round(4+22*amp*(0.45+0.55*center))+'px',col:i%7===0?st.color:this.hex(col,active?0.72:0.22)};
+    });
+
+    const scr = SCREENS[s.tab];
+    this.vizMode = (s.tab === 'DASHBOARD' || s.tab === 'VOICE') ? 'reactor' : (VIZ[s.tab] ? VIZ[s.tab][0] : 'reactor');
+    let panel = s.tab === 'AGENTS' ? PANELS.SWARM : PANELS[s.tab];
+    if (!panel && scr) panel = [scr[0]+' · ACTIVITY',
+      scr[3].slice(0,4).map((c,i)=>['00:'+(38-i*3)+':0'+(i+1), c.tag, c.name.toLowerCase(), c.tagCol, c.sub.charAt(0).toUpperCase()+c.sub.slice(1)+'.']),
+      ['REFRESH','FILTER','AUDIT']];
+    if (!panel) panel = PANELS.DASHBOARD;
+    const rowsRaw = s.tab === 'DASHBOARD' ? panel[1].concat(s.extra) : panel[1];
+
+    const council = [
+      ['GLM 5.2','z-ai/glm-5.2',1,TE],['DEEPSEEK','deepseek-ai/deepseek-v4-pro',3,CY],
+      ['META LLAMA','meta/llama-4-maverick-17b',10,BL],['OPENAI','openai/gpt-oss-120b',2,RD],
+      ['MISTRAL','mistralai/mistral-small-4',12,AM],['KIMI','moonshotai/kimi-k2.6',1,CY]
+    ];
+
+    const out = {
+      motionOpacity: this.props.reduceMotion === true ? 0 : 1,
+      stateColor: st.color, stateLabel: st.label, stateSub: st.sub,
+      planeState: s.held ? 'HELD' : 'READY',
+      stopNotice: s.held ? 'STOP ACTIVE' : 'NO STOP IS ACTIVE',
+      clock: now.toTimeString().slice(0,8),
+      dateStr: now.toDateString().slice(0,3).toUpperCase()+', '+now.toDateString().slice(4,10).toUpperCase(),
+      headBars: bars(14,24,1), sideBars: bars(18,56,7), micBars: voiceBars,
+      telemetry: [
+        {k:'SYSTEM UPTIME', v:'72:37:00', col:'#DCE8F2', w:'72%'},
+        {k:'CPU', v:cpu+'%', col:col, w:cpu+'%'},
+        {k:'RAM', v:ram+'%', col:AM, w:ram+'%'},
+        {k:'GPU', v:gpu+'%', col:TE, w:gpu+'%'},
+        {k:'DISK C:/', v:disk+'%', col:col, w:disk+'%'}
+      ],
+      ribbon: [
+        {k:'MISSION CONTROL', v: s.held ? 'AUTONOMY HELD' : 'READY FOR DIRECTIVE', col: s.held?AM:TE, tag: s.held?'HELD':'ARMED'},
+        {k:'ACTIVE PROJECT', v:'JARVIS', col:col, tag:'MASTER'},
+        {k:'WORKSPACE', v:'checkout-svc · 6 changed', col:AM, tag:'DIRTY'},
+        {k:'AGENT TEAM', v:'2 ACTIVE · 0/6 COMPLETE', col:col, tag:'SWARM'},
+        {k:'MISSION WINDOW', v:'120 MIN BUDGET', col:RD, tag:'GATED'}
+      ],
+      graphHealth: 'HEALTH GOOD',
+      councilStatus: '6/6 ONLINE',
+      route: s.auto ? 'AUTO → '+s.model : s.model,
+      routeSub: 'NVIDIA NIM API · GLM 5.2 PRIMARY',
+      autoLabel: s.auto ? 'AUTO ON' : 'AUTO OFF',
+      toggleAuto: ()=> this.runCommand('set_auto_route',{auto:!s.auto},()=>this.setState({auto:!s.auto})),
+      model: s.model,
+      modelOptions: council.map(c=>c[1]),
+      setModel: (e)=> { const modelId=e.target.value; this.runCommand('set_route',{modelId},()=>this.setState({model:modelId})); },
+      refresh: ()=> this.runCommand('refresh_catalog',{}),
+      notifyKeys: ()=> this.bridge('credentials',{}),
+      remoteApp: ()=> this.bridge('navigate',{to:'/mobile'}),
+      estop: this.emergencyStop,
+      council: council.map(c=>({
+        name:c[0], id:c[1], n:c[2], col:c[3],
+        bd: s.model===c[1] ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
+        bg: s.model===c[1] ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
+        pick: ()=> this.runCommand('set_route',{modelId:c[1]},()=>this.setState({model:c[1]}))
+      })),
+      providers: [
+        {name:'GLM', state:'DEMO', col:DIM, ms:'118 ms'},{name:'DEEPSEEK', state:'DEMO', col:DIM, ms:'134 ms'},{name:'META', state:'DEMO', col:DIM, ms:'96 ms'},
+        {name:'OPENAI', state:'DEMO', col:DIM, ms:'128 ms'},{name:'MISTRAL', state:'DEMO', col:DIM, ms:'115 ms'},{name:'KIMI', state:'DEMO', col:DIM, ms:'165 ms'}
+      ],
+      flow: [
+        {name:'UI INTERFACE', state:'ONLINE', col:TE},{name:'AGENT CORE', state:'ARMED', col:col},
+        {name:'VOICE SYSTEM', state:'ONLINE', col:col},{name:'API ROUTER', state:'29 MODELS', col:AM},
+        {name:'BRAIN GRAPH', state:'3,475 NODES', col:TE}
+      ].map(f=>({...f, bd:this.hex(f.col,0.3), bg:this.hex(f.col,0.05)})),
+      statusMeta: [
+        {k:'LAST WAKE', v:'00:41:02', col:'#DCE8F2'},
+        {k:'MODE', v:'AGENTIC', col:TE},
+        {k:'SPEAKER', v:'AHMED', col:col}
+      ],
+      coreReadouts: [
+        {k:'POWER', v:(96 + (s.t%4)*0.4).toFixed(1)+'%', col:TE},
+        {k:'FLUX', v:(2.4 + (s.t%7)*0.11).toFixed(2)+' TW', col:col},
+        {k:'COHERENCE', v:(0.91 + (s.t%5)*0.01).toFixed(2), col:col},
+        {k:'FIELD', v: s.held ? 'DAMPED' : 'STABLE', col: s.held?AM:TE}
+      ],
+      holdLabel: V.capturing ? 'RELEASE TO SEND' : 'HOLD TO SPEAK',
+      hold: this.togglePushToTalk,
+      cref: this.cref, onMove: this.onMove, onLeave: this.onLeave, pulse: this.pulse,
+      session: [
+        {k:'SESSION ID', v:'sess_20260726_0041'},{k:'STARTED', v:'00:41:02'},
+        {k:'DURATION', v:'00:0'+(1+s.t%5)+':16'},{k:'ROUTE', v: s.auto?'AUTO':'PINNED'},
+        {k:'MESSAGES', v:String(4 + s.extra.length)}
+      ],
+      viewSession: this.go('CHAT'),
+      quick: [
+        {label:'SYSTEM SCAN',go:()=>this.runCommand('system_scan',{})},
+        {label:'BROWSER OPEN',go:this.go('BROWSER')},
+        {label:'NOTE CAPTURE',go:this.go('NOTES')},
+        {label:'FILE SEARCH',go:this.go('FILES')},
+        {label:'CODE EXECUTOR',go:this.go('CODE')},
+        {label:'VOICE TEST',go:()=>this.voiceControl('test-voice')}
+      ],
+      panelTitle: panel[0],
+      panelChips: panel[2].map(c=>({
+        label:c==='PAUSE ALL'?(s.held?'RESUME MISSIONS':'HOLD ALL AGENTS'):c,
+        go:this.panelAction(c,panel[0],s.tab)
+      })),
+      rows: rowsRaw.map(r=>({time:r[0], who:r[1], meta:r[2], col:r[3], text:r[4]})),
+      draft: s.draft,
+      setDraft: (e)=> this.setState({draft:e.target.value}),
+      onKey: (e)=> { if (e.key === 'Enter') this.send(); },
+      send: this.send,
+      voiceState: !voiceEnabled ? 'DISARMED' : V.error ? 'ERROR' : V.capturing ? 'LISTENING' : V.transcribing ? 'TRANSCRIBING' : V.processing ? 'THINKING' : V.speaking ? 'SPEAKING' : voiceReady ? (V.handsFree ? 'HANDS-FREE' : V.clapWake ? 'CLAP-WAKE' : 'READY') : 'CONFIGURED',
+      voiceBtns: [
+        {label: voiceEnabled?'DISARM':'ARM', bd:this.hex(RD,0.35), bg:this.hex(RD,0.07), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceEnabled)},
+        {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', bd:this.hex(col,0.35), bg:this.hex(col,0.08), col:'#9BE9FF', go:this.togglePushToTalk},
+        {label:'TEST MIC', bd:'rgba(255,255,255,.12)', bg:'rgba(255,255,255,.03)', col:'#B9D0DC', go:()=>this.voiceQuick('test-mic')}
+      ],
+      sens: '6 / 10', sensW: '60%',
+      tokenStats: [
+        {k:'REQUESTS', v:String(12 + s.extra.length), col:col},
+        {k:'TOKENS', v:'48.2k', col:TE},
+        {k:'AVG / REQ', v:'3.9k', col:'#DCE8F2'}
+      ],
+      spark: Array.from({length:24},(_,i)=>({h: Math.round(6 + 52*this.rnd(i+21))+'px'})),
+      graphNodes: Array.from({length:18},(_,i)=>({
+        x: Math.round(8 + this.rnd(i+31)*82)+'%', y: Math.round(8 + this.rnd(i+47)*80)+'%',
+        s: (4 + Math.round(this.rnd(i+53)*5))+'px', col: i%5===0 ? TE : col, o: (0.4 + this.rnd(i+61)*0.6).toFixed(2)
+      })),
+      graphStats: [{v:'3,475', k:'NODES'},{v:'8,504', k:'EDGES'},{v:'62', k:'VAULT NOTES'}],
+      openGraph: this.go('BRAIN'),
+      envRows: [
+        {k:'CPU LOAD', v:cpu+'%', col:col, w:cpu+'%'},
+        {k:'MEMORY', v:ram+'%', col:AM, w:ram+'%'},
+        {k:'DISK', v:disk+'%', col:col, w:disk+'%'},
+        {k:'NETWORK · 1.2 / 2.6 MB/S', v:'ONLINE', col:TE, w:'78%'}
+      ],
+      tabs: TABS.map(t=>({
+        name:t, go:this.go(t),
+        bd: s.tab===t ? this.hex(col,0.5) : 'rgba(255,255,255,.06)',
+        bg: s.tab===t ? this.hex(col,0.12) : 'rgba(255,255,255,.015)',
+        col: s.tab===t ? '#EAF6FF' : '#7E97A6',
+        dot: s.tab===t ? st.color : 'rgba(120,150,165,.5)'
+      })),
+      dashOn: s.tab !== 'VOICE', voiceOn: s.tab === 'VOICE',
+      shellRef: this.shellRef,
+      stageRef: (el)=>{ this.stage = el; },
+      isDash: s.tab === 'DASHBOARD', isScreen: !!scr && s.tab !== 'VOICE',
+      vizOn: !!VIZ[s.tab], vizRef: this.vizRef, onViz: this.onViz,
+      vizTitle: VIZ[s.tab] ? VIZ[s.tab][1] : '',
+      vizHint: VIZ[s.tab] ? VIZ[s.tab][2] : '',
+      vizLegend: (VIZ[s.tab] ? VIZ[s.tab][3] : []).map(l=>({label:l[0], col:l[1]})),
+      screenTitle: scr ? scr[0] : 'DASHBOARD',
+      screenSub: scr ? scr[1] : '',
+      screenKpis: scr ? scr[2] : [],
+      screenCards: (scr ? scr[3] : []).map(c=>({
+        name:c.name, sub:c.sub, tag:c.tag, tagCol:c.tagCol, w:(c.pct||0)+'%',
+        k1:c.m1[0], v1:c.m1[1], k2:c.m2[0], v2:c.m2[1],
+        go:()=> this.toast(c.name+' · '+c.tag+' · demo item has no backend action')
+      })),
+      voiceMeta: [
+        {k:'MODEL', v: (s.auto?'AUTO · ':'')+s.model, col:'#DCE8F2'},
+        {k:'INPUT DEVICE', v:V.inputDevice||'SYSTEM DEFAULT', col:'#DCE8F2'},
+        {k:'SPEAKER', v:V.profile||'JARVIS · BRITISH', col:'#DCE8F2'},
+        {k:'VOICE CHANNEL', v:V.capturing?'CAPTURING':!voiceEnabled?'DISARMED':voiceReady?'READY':'CONFIGURED', col:voiceReady?TE:voiceEnabled?AM:RD},
+        {k:'AGENT TEAM', v:s.live ? (s.live.workspace ? ('SWARM · '+s.live.workspace.agentsActive+'/'+s.live.workspace.agentsTotal+' ACTIVE · '+s.live.workspace.tasksTotal+' TASKS') : 'NO LIVE TEAM DATA') : 'SWARM · 2/6 ACTIVE · 6 TASKS', col:col}
+      ],
+      voiceLines: [
+        {who:'YOU SAID', col:col, text:V.lastUser||'No voice command captured yet.'},
+        {who:'JARVIS', col:TE, text:V.error?('Voice error: '+V.error):(V.lastJarvis||'Voice controller ready. Arm the microphone or use push to talk.')}
+      ],
+      voiceControls: [
+        {label: voiceEnabled?'DISARM VOICE':'ARM VOICE', dot:voiceEnabled?RD:DIM, bd:this.hex(RD,0.3), bg:this.hex(RD,0.06), col:'#FF8FA3', go:()=>this.setVoiceArmed(!voiceEnabled)},
+        {label:V.capturing?'RELEASE TO SEND':'PUSH TO TALK', dot:V.capturing?TE:col, bd:this.hex(col,0.4), bg:this.hex(col,0.1), col:'#EAF6FF', go:this.togglePushToTalk},
+        {label:V.handsFree?'FREE TALKING ON':'FREE TALKING', dot:V.handsFree?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-handsfree')},
+        {label:V.clapWake?'CLAP WAKE ON':'CLAP WAKE', dot:V.clapWake?TE:DIM, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:()=>this.voiceQuick('toggle-clap')},
+        {label:V.profile||'JARVIS · BRITISH', dot:BL, bd:this.hex(BL,0.35), bg:this.hex(BL,0.1), col:'#BFD6FF', go:()=>{this.voiceControl('cycle-profile');setTimeout(()=>this.voiceControl('test-voice'),150);}},
+        {label: s.auto?'AUTO MODE ON':'AUTO MODE OFF', dot: s.auto?TE:AM, bd:this.hex(TE,0.28), bg:this.hex(TE,0.07), col:'#7CFFE6', go:()=>this.runCommand('set_auto_route',{auto:!s.auto},()=>this.setState({auto:!s.auto}))},
+        {label:s.live ? (s.live.workspace ? ('SWARM · '+s.live.workspace.agentsActive+'/'+s.live.workspace.agentsTotal+' ACTIVE') : 'AGENTS · NO LIVE TEAM DATA') : 'SWARM · 6 AGENTS', dot:col, bd:'rgba(255,255,255,.09)', bg:'rgba(255,255,255,.02)', col:'#B9D0DC', go:this.go('AGENTS')}
+      ],
+      toast: s.toast, toastOpacity: s.toastOn ? 1 : 0,
+      goDash: this.go('DASHBOARD'), goVoice: this.go('VOICE'),
+      srcTel: SRC(false), srcRouter: SRC(false), srcProviders: SRC(false), srcSession: SRC(false),
+      srcFlow: SRC(false), srcRibbon: SRC(false), srcBrain: SRC(false), srcTokens: SRC(false),
+      srcEvents: SRC(false), srcScreen: SRC(false), srcVoice: SRC(false), srcState: SRC(false),
+      sourceLabel: stale ? 'STALE · LAST SNAPSHOT' : s.live ? 'LIVE BACKEND' : 'DEMO DATA',
+      sourceCol: stale ? AM : s.live ? TE : AM,
+      sourceDetail: stale
+        ? ('last update '+fmtAge(s.live && s.live.at)+' · '+((s.meta && s.meta.error) ? String(s.meta.error).slice(0,48) : 'backend unavailable'))
+        : s.live
+        ? ((s.meta && s.meta.transport ? s.meta.transport.toUpperCase() : 'POLL') + ' · ' + ((this.props.apiBase ?? '') || window.location.origin))
+        : ((s.meta && s.meta.error) ? String(s.meta.error).slice(0,64) : 'no backend attached'),
+      reconnect: ()=> { this.connectBackend(); this.toast('Reconnecting to ' + ((this.props.apiBase ?? '') || window.location.origin)); }
+    };
+    if (s.live) this.applyLive(out, s.live);
+    if (stale) Object.keys(out).filter(k=>/^src[A-Z]/.test(k)).forEach(k=>{ out[k]=SRC('stale'); });
+    return out;
+  }
+
+  /* Every value below comes from the adapter's canonical model — no invented
+     numbers survive once a snapshot is attached. */
+  applyLive(out, L){
+    const col = this.accent(), st = this.cur(), s = this.state;
+    const T = (t)=> TONE[t] || CY;
+    const cap = (id)=> (L.capabilities||[]).find(c=>c.id===id);
+    const autoCapability = cap('auto_routing');
+    const inferenceCapability = cap('model_inference');
+    const tl = L.telemetry;
+    out.stateColor = st.color; out.stateLabel = st.label;
+    out.stateSub = L.agent.detail || st.sub;
+    out.statusMeta = [
+      {k:'LAST UPDATE', v:(L.at||'').slice(11,19)||'—', col:'#DCE8F2'},
+      {k:'AUTONOMY', v:'LEVEL '+L.agent.autonomy, col:TE},
+      {k:'VOICE', v:L.voice ? ((s.voice&&s.voice.connected) ? out.voiceState : (L.voice.capabilityState||'UNVERIFIED').toUpperCase()) : 'NO LIVE DATA', col:(s.voice&&s.voice.ready&&s.voice.armed)?col:AM}
+    ];
+    out.coreReadouts = [
+      {k:'CPU', v:Math.round(tl.cpuPct)+'%', col:TE},
+      {k:'MEMORY', v:Math.round(tl.ramPct)+'%', col:col},
+      {k:'UPTIME', v:fmtDur(tl.uptimeSec), col:col},
+      {k:'CONTROL', v:L.agent.held?'HELD':'ACTIVE', col:L.agent.held?AM:TE}
+    ];
+    out.planeState = L.agent.held ? 'HELD' : 'READY';
+    out.stopNotice = L.agent.held ? 'STOP ACTIVE' : 'NO STOP IS ACTIVE';
+    out.telemetry = [
+      {k:'SYSTEM UPTIME', v:fmtDur(tl.uptimeSec), col:'#DCE8F2', w:'100%'},
+      {k:'CPU', v:Math.round(tl.cpuPct)+'%', col:col, w:Math.round(tl.cpuPct)+'%'},
+      {k:'RAM', v:Math.round(tl.ramPct)+'%', col:AM, w:Math.round(tl.ramPct)+'%'},
+      {k:'GPU', v:Math.round(tl.gpuPct)+'%', col:TE, w:Math.round(tl.gpuPct)+'%'},
+      {k:'DISK', v:Math.round(tl.diskPct)+'%', col:col, w:Math.round(tl.diskPct)+'%'}
+    ];
+    out.envRows = [
+      {k:'CPU LOAD', v:Math.round(tl.cpuPct)+'%', col:col, w:Math.round(tl.cpuPct)+'%'},
+      {k:'MEMORY', v:Math.round(tl.ramPct)+'%', col:AM, w:Math.round(tl.ramPct)+'%'},
+      {k:'DISK', v:Math.round(tl.diskPct)+'%', col:col, w:Math.round(tl.diskPct)+'%'},
+      {k:'NETWORK · '+tl.netUpMbs.toFixed(1)+' / '+tl.netDownMbs.toFixed(1)+' MB/S', v:(tl.netUpMbs||tl.netDownMbs)?'TRAFFIC OBSERVED':'IDLE', col:(tl.netUpMbs||tl.netDownMbs)?TE:DIM, w:(tl.netUpMbs||tl.netDownMbs)?'78%':'0%'}
+    ];
+    if (L.session) out.session = [
+      {k:'SESSION ID', v:L.session.id}, {k:'STARTED', v:(L.session.startedAt||'').slice(11,19)},
+      {k:'DURATION', v:fmtDur(L.session.durationSec)}, {k:'ROUTE', v:L.session.route},
+      {k:'MESSAGES', v:String(L.session.messages)}
+    ];
+    if (L.router){
+      const selectableModels = L.router.models.filter(m=>m.selectable);
+      out.route = (L.router.auto ? 'AUTO → ' : '') + L.router.primary;
+      out.autoLabel = L.router.auto ? 'AUTO ON' : 'AUTO OFF';
+      out.modelOptions = selectableModels.map(m=>m.id);
+      out.model = s.model && selectableModels.some(m=>m.id===s.model)
+        ? s.model
+        : (selectableModels.some(m=>m.id===L.router.primary) ? L.router.primary : (selectableModels[0]||{}).id||'');
+      out.routeSub = autoCapability
+        ? autoCapability.state.toUpperCase()+' · '+autoCapability.summary
+        : L.router.models.length+' KNOWN MODELS · ROUTING EVIDENCE UNAVAILABLE';
+      out.councilStatus = selectableModels.length+'/'+L.router.models.length+' SELECTABLE · HEALTH UNVERIFIED';
+      out.council = L.router.models.map(m=>({
+        name:m.name.toUpperCase(), id:m.id, n:m.variants,
+        col: m.health === 'degraded' ? AM : m.health === 'down' ? RD : m.selectable ? CY : DIM,
+        bd: out.model===m.id ? this.hex(col,0.45) : 'rgba(255,255,255,.06)',
+        bg: out.model===m.id ? this.hex(col,0.09) : 'rgba(255,255,255,.02)',
+        pick: ()=> m.selectable
+          ? this.runCommand('set_route',{modelId:m.id},()=>this.setState({model:m.id}))
+          : this.toast(m.name+' is visible in inventory but unavailable as a live chat route')
+      }));
+    }
+    if (L.providers.length) out.providers = L.providers.map(p=>({
+      name:p.name.toUpperCase(),
+      state:(p.capabilityState||'unavailable').toUpperCase(),
+      col:p.capabilityState==='degraded'?AM:p.capabilityState==='unavailable'?RD:p.capabilityState==='verified'?TE:DIM,
+      ms:p.latencyVerified ? p.latencyMs+' ms' : 'LATENCY UNVERIFIED'
+    }));
+    if (inferenceCapability && !L.providers.length) out.providers = [{
+      name:'MODEL INFERENCE', state:inferenceCapability.state.toUpperCase(),
+      col:inferenceCapability.state==='degraded'?AM:inferenceCapability.state==='unavailable'?RD:DIM,
+      ms:'LATENCY UNVERIFIED'
+    }];
+    if (L.voice && !(s.voice&&s.voice.connected)){
+      out.voiceState = (L.voice.capabilityState||'unverified').toUpperCase();
+      out.sens = L.voice.sensitivity + ' / 10';
+      out.sensW = Math.round(L.voice.sensitivity*10) + '%';
+    }
+    if (L.usage) out.tokenStats = L.usage.metered ? [
+      {k:'REQUESTS', v:String(L.usage.requests), col:col},
+      {k:'TOKENS', v:(L.usage.tokens>=1000 ? (L.usage.tokens/1000).toFixed(1)+'k' : String(L.usage.tokens)), col:TE},
+      {k:'SPEND', v:'$'+L.usage.spendUsd.toFixed(2), col: L.usage.spendUsd > L.usage.capUsd*0.8 ? RD : AM}
+    ] : [
+      {k:'REQUESTS', v:String(L.usage.requests), col:col},
+      {k:'TOKENS', v:'NOT METERED', col:DIM},
+      {k:'SPEND', v:'NOT METERED', col:DIM}
+    ];
+    if (L.events.length) out.rows = L.events.map(e=>({
+      time:(e.at||'').slice(11,19), who:e.who, meta:e.meta, text:e.text,
+      col: e.level === 'error' ? RD : e.level === 'warn' ? AM : (e.who === 'JARVIS' ? TE : col)
+    }));
+    const scr = L.screens[s.tab];
+    if (scr){
+      out.screenTitle = scr.title; out.screenSub = scr.subtitle;
+      out.screenKpis = scr.kpis.map(k=>({k:k.k, v:k.v, col:T(k.tone)}));
+      out.screenCards = scr.items.map(i=>({
+        name:i.name, sub:i.sub, tag:i.tag, tagCol:T(i.tone), w:Math.round(i.pct)+'%',
+        k1:(i.meta[0]||['',''])[0], v1:(i.meta[0]||['',''])[1],
+        k2:(i.meta[1]||['',''])[0], v2:(i.meta[1]||['',''])[1],
+        go:i.action&&i.action.command?()=>this.runScreenAction(i):()=>this.toast(i.name+' · '+i.tag+' · status only')
+      }));
+    }
+    if (L.workspace){
+      const w = L.workspace;
+      out.ribbon = [
+        {k:'MISSION CONTROL', v: L.agent.held ? 'AUTONOMY HELD' : 'READY FOR DIRECTIVE', col: L.agent.held?AM:TE, tag: L.agent.held?'HELD':'ARMED'},
+        {k:'ACTIVE PROJECT', v: w.project || '—', col:col, tag:(w.branch || 'MAIN').toUpperCase()},
+        {k:'WORKSPACE', v: w.dirtyFiles ? (w.branch+' · '+w.dirtyFiles+' changed') : (w.branch+' · clean'), col: w.dirtyFiles?AM:TE, tag: w.dirtyFiles?'DIRTY':'CLEAN'},
+        {k:'AGENT TEAM', v: w.agentsActive+' ACTIVE · '+w.tasksComplete+'/'+w.tasksTotal+' COMPLETE', col:col, tag:'SWARM'},
+        {k:'MISSION WINDOW', v: w.budgetMin ? w.budgetMin+' MIN BUDGET' : (w.missionWindow || '—'), col: w.missionWindow ? AM : TE, tag: w.missionWindow || 'OPEN'}
+      ];
+    }
+    if (L.flow && L.flow.length) out.flow = L.flow.map(f=>({
+      name:f.name.toUpperCase(), state:f.state.toUpperCase(), col:TONE[f.tone]||CY,
+      bd:this.hex(TONE[f.tone]||CY,0.3), bg:this.hex(TONE[f.tone]||CY,0.05)
+    }));
+    if (L.graph){
+      out.graphStats = [
+        {v:L.graph.nodes.toLocaleString(), k:'NODES'},
+        {v:L.graph.edges.toLocaleString(), k:'EDGES'},
+        {v:String(L.graph.vaultNotes), k:'VAULT NOTES'}
+      ];
+      out.graphHealth = 'HEALTH ' + L.graph.health.toUpperCase();
+    }
+    const brainViz = L.viz && L.viz.BRAIN;
+    if (brainViz && brainViz.kind === 'graph' && brainViz.nodes && brainViz.nodes.length){
+      out.graphNodes = brainViz.nodes.slice(0,48).map((n,i)=>({
+        x:Math.round(4+(Math.max(-1,Math.min(1,n.x))+1)*46)+'%',
+        y:Math.round(4+(Math.max(-1,Math.min(1,n.y))+1)*46)+'%',
+        s:(4+Math.round(Math.max(0.5,Math.min(2,n.size||1))*3))+'px',
+        col:i%5===0?TE:col, o:(0.55+Math.min(0.4,Math.abs(Number(n.z)||0)*0.4)).toFixed(2)
+      }));
+    }
+    if (L.usage && L.usage.series && L.usage.series.length){
+      const mx = Math.max(1, ...L.usage.series.map(p=>p.v));
+      out.spark = L.usage.series.map(p=>({h: Math.round(6 + 52*(p.v/mx))+'px'}));
+    }
+    out.srcTel = SRC(true); out.srcState = SRC(true);
+    out.srcRouter = SRC(!!L.router); out.srcProviders = SRC(!!(L.providers && L.providers.length));
+    out.srcSession = SRC(!!L.session); out.srcVoice = SRC(!!L.voice);
+    out.srcRibbon = SRC(!!L.workspace); out.srcFlow = SRC(!!(L.flow && L.flow.length));
+    out.srcBrain = SRC(L.graph ? (brainViz && brainViz.kind === 'graph' && brainViz.nodes && brainViz.nodes.length ? true : 'partial') : false);
+    out.srcTokens = SRC(!!(L.usage && L.usage.series && L.usage.series.length));
+    out.srcEvents = SRC(!!(L.events && L.events.length));
+    const hasScreen = !!L.screens[s.tab], needsViz = !!VIZ[s.tab], hasViz = !!L.viz[s.tab];
+    out.srcScreen = SRC(hasScreen ? (needsViz && !hasViz ? 'partial' : true) : false);
+    const vz = L.viz[s.tab];
+    if (vz){
+      this.vizMode = vz.kind === 'graph' ? 'brain' : vz.kind === 'topology' ? 'topology' : 'chart';
+      out.vizOn = true;
+      if (vz.kind === 'graph'){
+        out.vizTitle = s.tab === 'BRAIN' ? 'GRAPHIFY KNOWLEDGE FIELD' : s.tab+' · LIVE GRAPH';
+        out.vizHint = (L.graph ? (L.graph.nodes.toLocaleString()+' nodes · '+L.graph.edges.toLocaleString()+' edges') : (vz.nodes.length+' projected nodes'))+' · orbit with the pointer';
+        out.vizLegend = [{label:'LIVE KNOWLEDGE',col:CY},{label:'RELATIONSHIPS',col:TE}];
+      } else if (vz.kind === 'topology'){
+        out.vizTitle = s.tab+' · LIVE TOPOLOGY';
+        out.vizHint = 'Current control-store states and routed relationships';
+        out.vizLegend = [{label:'ACTIVE',col:TE},{label:'OBSERVED',col:CY},{label:'GATED',col:AM}];
+      } else {
+        const unit = String(vz.unit||'events').toUpperCase();
+        out.vizTitle = (s.tab === 'USAGE' ? 'REQUEST ACTIVITY' : s.tab+' ACTIVITY')+' · 24H';
+        out.vizHint = 'Observed '+unit.toLowerCase()+' by hour';
+        out.vizLegend = [{label:'OBSERVED '+unit,col:CY}];
+        if (vz.compare) out.vizLegend.push({label:'COMPARISON',col:BL});
+      }
+    }
+  }
+
+  liveViz(){
+    const L = this.state.live;
+    return L ? L.viz[this.state.tab] : null;
+  }
+}
+</script>
+</body>
+</html>

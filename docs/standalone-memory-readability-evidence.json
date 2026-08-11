@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "classification": "witnessed_one_shot",
+  "recorded_at_utc": "2026-08-09T10:15:48.3572439Z",
+  "source_commit": "9f2b06d78a93f1e6e8adbb3f0f9236c773f7e3f7",
+  "runtime": {
+    "scheduled_task_state": "Ready",
+    "target_listeners": 0,
+    "live_database_sidecars": 0
+  },
+  "probe": {
+    "mode": "immutable_sqlite_local_vector_retrieval",
+    "invocation": "py -3.11 -B - (stdin)",
+    "python_version": "3.11.9",
+    "sqlite_version": "3.45.1",
+    "probe_source_retained": false,
+    "probe_source_sha256": null,
+    "stdlib_only": true,
+    "source_unchanged": true,
+    "database_writes": 0,
+    "python_socket_or_subprocess_events_observed": 0,
+    "provider_or_model_imports": 0,
+    "plaintext_memory_selected": false,
+    "plaintext_memory_returned": false
+  },
+  "source_inventory": {
+    "files": 15,
+    "bytes": 16519220,
+    "manifest_sha256": "f725e8a2697904934d6be55eadd42128c6c07644517f4f273ff69ca274ffccef",
+    "before_after_identical": true,
+    "reparse_paths": 0,
+    "named_alternate_streams": 0,
+    "multi_link_files": 0
+  },
+  "store_evidence": {
+    "collections": 3,
+    "segments": 6,
+    "known_inherited_fk_reports": 6,
+    "logical_collection_orphans": 0,
+    "active_local_records": 96,
+    "retained_local_vectors": 86,
+    "retained_vector_coverage_percent": 89.58,
+    "sampled_queries": 5,
+    "deterministic_rankings": true,
+    "minimum_self_similarity": 1.0
+  },
+  "claim_boundary": {
+    "accepted": "standalone_cutover_migrated_store_no_effect_readability",
+    "not_proven": [
+      "foreign_key_cleanliness_or_repair",
+      "chroma_client_or_hnsw_query_path",
+      "api_memory_recall",
+      "query_text_embedding",
+      "provider_or_model_health",
+      "natural_language_ranking_quality",
+      "full_record_coverage",
+      "permanent_regression_gate"
+    ]
+  }
+}
