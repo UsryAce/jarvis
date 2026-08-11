@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Migrated-store no-effect readability accepted; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's exact package/source-contract approval
-stopped_at: Human approval checkpoint -- present the exact Playwright closure hashes and Chromium source contract; require a fresh exact `approved`
-last_updated: "2026-08-09T13:15:48.3552369+03:00"
-last_activity: 2026-08-09 -- Witnessed a zero-write immutable SQLite local-vector retrieval drill over the migrated Chroma store; 86/96 retained-vector coverage, five deterministic self-retrievals, and the exact before/after source inventory matched
+status: Phase 02 Plan 05 complete; Plan 02-06 runtime binding and non-executing Chromium byte collection are next; Phase 1 distinct-SID release gate remains pending
+stopped_at: Completed 02-05 package provenance plan; resume at 02-06 Task 1 without treating package/source approval as Chromium byte approval
+last_updated: "2026-08-11T08:24:33.2303170+03:00"
+last_activity: 2026-08-11 -- Recovered the interrupted Omniroute batch, approved and validator-checked all seven Python wheels plus the declared Chromium source contract, and kept Chromium archive/executable bytes absent
 progress:
   total_phases: 9
   completed_phases: 0
@@ -22,15 +22,15 @@ See: .planning/PROJECT.md (updated 2026-07-22)
 
 **Core value:** Jarvis must reliably turn Ahmed's requests into verified real-world results while preserving control, security, and recoverability.
 **Canonical repository and live runtime:** `C:\Jarvis`; the former OneDrive repository is rollback-only
-**Current focus:** Close the Phase 1 distinct-SID release gate while continuing safe, pre-release Phase 2 implementation and supply-chain approvals
+**Current focus:** Close the Phase 1 distinct-SID release gate while executing Plan 02-06 from the exact approved package boundary without launching Chromium before its byte checkpoint
 **Milestone scope:** v1.0, 9 phases, 63 requirements; 0 phases and 9 requirements complete
 
 ## Current Position
 
 Phase: 1 release closure with Phase 2 controlled pre-release execution
-Plan: 01-14 release gate pending; 02-05 Task 2 complete; Task 3 awaits a separate exact human approval
-Status: Migrated-store no-effect readability accepted; canonical runtime remains stopped; Phase 02 Plan 05 Task 3 awaits Ahmed's separate exact package/source-contract approval
-Last activity: 2026-08-09 -- A stdlib-only immutable SQLite drill preserved the exact 15-file Chroma inventory and passed five deterministic persisted-vector self-retrievals without selecting plaintext memory
+Plan: 01-14 release gate pending; 02-05 complete; 02-06 Task 1 is next
+Status: Python supply-chain approval is complete; Chromium archive/executable bytes remain absent and require Plan 02-06's separate exact human approval before launch
+Last activity: 2026-08-11 -- Recovered Plan 02-05 to two atomic commits and sampled the standalone runtime ready with canonical listeners on 4173, 8000, and 20242
 
 Progress: [█████████░] 93%
 
@@ -118,20 +118,17 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Models]: The authenticated dashboard projects 38 configured NVIDIA catalog entries and an AUTO route to Nemotron 3 Ultra, but its current `0/38 SELECTABLE · HEALTH UNVERIFIED` state means catalog rendering must not be reported as successful inference.
 - [Phase 02 Planning]: Fifteen independently checked plans over Waves 0-8 cover CTRL-02, CTRL-03, CTRL-06, TOOL-03, TOOL-05, and TOOL-07; Plan 02-14 freezes evidence while authority stays closed, and Plan 02-15 alone consumes the exact approval and opens authority transactionally.
 - [Phase 02 Wave 0]: Plans 02-01 through 02-04 added fail-closed hostile contracts; the integrated gate passed 428 tests, 168 intentional future-module skips, one expected distinct-SID xfail, and 36 subtests without installing or launching Chromium.
-- [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 Task 2 recorded and validator-checked cryptography 49.0.0, cffi 2.1.1, and pycparser 3.0 as APPROVED; Playwright 1.61.0, greenlet 3.5.4, pyee 13.0.1, typing-extensions 4.16.0, and Chromium remain PENDING/ABSENT under separate non-auto-approvable gates.
+- [Phase 02 Wave 1]: Plans 02-07 and 02-08 added sealed policy, durable capability state, immutable receipts, and reconciliation contracts; the combined gate passed 84 tests with 49 explicitly owned future-module skips. Plan 02-05 is complete: all seven exact Python wheels and the Playwright-declared Chromium revision 1228/source contract are APPROVED, while Chromium archive/executable bytes remain ABSENT for Plan 02-06's separate non-auto-approvable gate.
+- [Repository runtime]: On 2026-08-11 the canonical JarvisAutonomous task was Running; loopback listeners on 4173, 8000, and 20242 were present and local backend health reported ready, initialized, runtime-ready, and trust-ready. This is an operational sample, not release authority.
 - [Brain]: Refresh and sync share a current-user-owned global mutex, validate generated source and exact node/typed-edge topology in isolated stages, reject unsafe reparse/Cloud Files/alternate-stream paths, publish four canonical plus two vault artifacts through durable sibling swaps, and restore exact prior bytes/absence on caught late failures; crash-atomic group visibility remains explicitly out of scope.
 - [Repository]: The canonical `C:\Jarvis` root now has a protected DACL granting full control only to the current operator, SYSTEM, and Administrators; critical child paths expose zero broad-write rules, reducing cross-account path-race risk while preserving Codex/Claude/Cursor access under Ahmed's account.
-
-### Pending Todos
-
-None yet.
 
 ### Blockers/Concerns
 
 - Phase 1 is a release and authority gate: later privileged capability expansion remains closed until its authentication, secret, audit, recovery, and emergency-stop tests pass.
 - Phase 2 is fully planned but cannot open production capability authority before the real distinct-Windows-SID DPAPI probe closes Phase 1 Plan 01-14 and the Phase 2 release suite passes.
 - Phase 2 readiness amendments are incorporated into the 15-plan Waves 0-8 graph and pass structural validation; execution still requires the recorded package/browser approvals and exact release gates in Plans 02-05, 02-06, 02-14, and 02-15.
-- Plan 02-05 Task 3 cannot be inferred from prior approval: Ahmed must separately approve the exact Playwright 1.61.0 Python closure and package-declared Chromium source/revision contract while Chromium archive/executable bytes remain pending.
+- Plan 02-06 must collect and hash the exact Chromium revision-1228 archive/executable without a Playwright helper or browser process, then obtain Ahmed's separate exact-byte approval before any Chromium launch.
 - Brain publication hardening is committed and the canonical graph/snapshot/vault generation matched commit `9f2b06d`; refresh again after this evidence-only state commit so the final handoff generation remains exact.
 - The witnessed memory drill closes migrated-store no-effect readability only. It bypasses Chroma/HNSW, `/api/memory/recall`, query-text embedding, provider/model health, and natural-language ranking quality; only 86/96 active local records had retained queue vectors and five were sampled. Phase 8 must own the reproducible regression probe and hostile tests before broader Brain or production-memory claims.
 - Focused phase research is recommended for Phase 1 local-session/DPAPI recovery details and other phase-specific integration unknowns listed in research/SUMMARY.md.
@@ -144,6 +141,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09T13:15:48.3552369+03:00
-Stopped at: Migrated-store no-effect readability accepted; commit the evidence, refresh Brain at that exact HEAD, then wait for Phase 02 Plan 05 Task 3's fresh exact approval
+Last session: 2026-08-11T08:24:33.2303170+03:00
+Stopped at: Completed Phase 02 Plan 05; continue at Plan 02-06 Task 1 while preserving the separate Chromium exact-byte approval gate
 Resume file: None
