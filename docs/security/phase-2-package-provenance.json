@@ -1,7 +1,7 @@
 {
   "schema_version": "jarvis.phase2.package-provenance.v1",
-  "generated_at_utc": "2026-08-08T22:13:48Z",
-  "status": "PENDING_HUMAN_APPROVAL",
+  "generated_at_utc": "2026-08-11T05:15:25Z",
+  "status": "APPROVED_PYTHON_CLOSURE_CHROMIUM_BYTES_PENDING",
   "artifact_directory": "C:\\Users\\Usry\\AppData\\Local\\Temp\\jarvis-phase2-plan05-20260808T164151",
   "download": {
     "mode": "download-only",
@@ -43,7 +43,7 @@
     }
   ],
   "python": {
-    "status": "PENDING",
+    "status": "APPROVED",
     "artifacts": [
       {
         "name": "cffi",
@@ -196,10 +196,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "dc418cf4c873357964d6624445ed09472e50def990c65dd4e76fc3ba8cd9cef6",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-11T05:15:25Z"
         }
       },
       {
@@ -244,10 +244,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "35c6cc4589a5d00964a59d7b3e59641e0aac0c02f15479a7af77d20f6bc79597",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-11T05:15:25Z"
         }
       },
       {
@@ -357,10 +357,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "af2f8fede4171ef667dfded53f96e2ed0d6e6bd7ee3bb46437f77e3b57689228",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-11T05:15:25Z"
         }
       },
       {
@@ -406,10 +406,10 @@
           "source_repository_checked_at_utc": "2026-08-08T14:07:13Z"
         },
         "approval": {
-          "status": "PENDING",
-          "approved_sha256": null,
-          "approved_by": null,
-          "approved_at_utc": null
+          "status": "APPROVED",
+          "approved_sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "approved_by": "human_operator",
+          "approved_at_utc": "2026-08-11T05:15:25Z"
         }
       }
     ],
@@ -459,9 +459,9 @@
       "title": "Chrome for Testing",
       "install_by_default": true,
       "source_repository_url": "https://github.com/Microsoft/playwright-python",
-      "approval_status": "PENDING",
-      "approved_by": null,
-      "approved_at_utc": null
+      "approval_status": "APPROVED",
+      "approved_by": "human_operator",
+      "approved_at_utc": "2026-08-11T05:15:25Z"
     },
     "archive": {
       "status": "ABSENT",
